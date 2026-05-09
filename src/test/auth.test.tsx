@@ -73,6 +73,101 @@ describe("AuthProvider", () => {
 
     expect(mockSupabase.auth.onAuthStateChange).toHaveBeenCalled()
   })
+
+  it("calls supabase.auth.resetPasswordForEmail with redirectTo", async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({ data: {}, error: null })
+
+    let capturedResetPassword: ((email: string) => Promise<void>) | undefined
+
+    function CaptureReset() {
+      const { resetPasswordForEmail } = useAuth()
+      capturedResetPassword = resetPasswordForEmail
+      return null
+    }
+
+    renderWithAuth(<CaptureReset />)
+    await waitFor(() => {
+      expect(capturedResetPassword).toBeDefined()
+    })
+
+    await capturedResetPassword!("test@example.com")
+
+    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith("test@example.com", {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+  })
+
+  it("throws error from resetPasswordForEmail", async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Too many requests" },
+    })
+
+    let capturedResetPassword: ((email: string) => Promise<void>) | undefined
+
+    function CaptureReset() {
+      const { resetPasswordForEmail } = useAuth()
+      capturedResetPassword = resetPasswordForEmail
+      return null
+    }
+
+    renderWithAuth(<CaptureReset />)
+    await waitFor(() => {
+      expect(capturedResetPassword).toBeDefined()
+    })
+
+    await expect(capturedResetPassword!("test@example.com")).rejects.toThrow("Too many requests")
+  })
+
+  it("calls supabase.auth.updateUser with new password", async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabase.auth.updateUser.mockResolvedValue({
+      data: { user: { id: "u1", email: "a@b.com" } },
+      error: null,
+    })
+
+    let capturedUpdatePassword: ((password: string) => Promise<void>) | undefined
+
+    function CaptureUpdate() {
+      const { updatePassword } = useAuth()
+      capturedUpdatePassword = updatePassword
+      return null
+    }
+
+    renderWithAuth(<CaptureUpdate />)
+    await waitFor(() => {
+      expect(capturedUpdatePassword).toBeDefined()
+    })
+
+    await capturedUpdatePassword!("newpass123")
+
+    expect(mockSupabase.auth.updateUser).toHaveBeenCalledWith({ password: "newpass123" })
+  })
+
+  it("throws error from updatePassword", async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+    mockSupabase.auth.updateUser.mockResolvedValue({
+      data: null,
+      error: { message: "Password too short" },
+    })
+
+    let capturedUpdatePassword: ((password: string) => Promise<void>) | undefined
+
+    function CaptureUpdate() {
+      const { updatePassword } = useAuth()
+      capturedUpdatePassword = updatePassword
+      return null
+    }
+
+    renderWithAuth(<CaptureUpdate />)
+    await waitFor(() => {
+      expect(capturedUpdatePassword).toBeDefined()
+    })
+
+    await expect(capturedUpdatePassword!("short")).rejects.toThrow("Password too short")
+  })
 })
 
 describe("AuthGuard", () => {

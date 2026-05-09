@@ -114,4 +114,100 @@ describe("Auth Page", () => {
       })
     })
   })
+
+  it("shows forgot password button on sign in screen", async () => {
+    renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+    expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument()
+  })
+
+  it("switches to forgot password mode and shows email-only form", async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }))
+    expect(screen.getByText("Reset your password")).toBeInTheDocument()
+    expect(screen.getByLabelText("Email")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Send reset link" })).toBeInTheDocument()
+  })
+
+  it("calls resetPasswordForEmail on forgot password submit", async () => {
+    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: null,
+    })
+
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }))
+    await user.clear(screen.getByLabelText("Email"))
+    await user.type(screen.getByLabelText("Email"), "a@b.com")
+    await user.click(screen.getByRole("button", { name: "Send reset link" }))
+
+    await waitFor(() => {
+      expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalled()
+    })
+  })
+
+  it("shows confirmation after reset email sent", async () => {
+    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
+      data: {},
+      error: null,
+    })
+
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }))
+    await user.type(screen.getByLabelText("Email"), "a@b.com")
+    await user.click(screen.getByRole("button", { name: "Send reset link" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("Check your email")).toBeInTheDocument()
+      expect(screen.getByText(/a@b\.com/)).toBeInTheDocument()
+    })
+  })
+
+  it("shows error on failed password reset", async () => {
+    mockSupabase.auth.resetPasswordForEmail.mockResolvedValue({
+      data: null,
+      error: { message: "Failed to send reset email" },
+    })
+
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }))
+    await user.type(screen.getByLabelText("Email"), "a@b.com")
+    await user.click(screen.getByRole("button", { name: "Send reset link" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to send reset email")).toBeInTheDocument()
+    })
+  })
+
+  it("navigates back from forgot password to sign in", async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }))
+    expect(screen.getByText("Reset your password")).toBeInTheDocument()
+
+    await user.click(screen.getByRole("button", { name: "Back to sign in" }))
+    expect(screen.getByText("Sign in to your account")).toBeInTheDocument()
+  })
 })
