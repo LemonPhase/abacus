@@ -1,27 +1,7 @@
 import { NavLink } from "react-router-dom"
-import {
-  LayoutDashboard,
-  Landmark,
-  ArrowLeftRight,
-  Target,
-  BarChart3,
-  Settings,
-  Tags,
-  TrendingUp,
-} from "lucide-react"
 
+import { NAV_LINKS } from "@/lib/navigation"
 import { cn } from "@/lib/utils"
-
-const links = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/accounts", label: "Accounts", icon: Landmark },
-  { to: "/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { to: "/budgets", label: "Budgets", icon: Target },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/categories", label: "Categories", icon: Tags },
-  { to: "/investments", label: "Investments", icon: TrendingUp },
-  { to: "/settings", label: "Settings", icon: Settings },
-]
 
 export default function Sidebar() {
   return (
@@ -33,7 +13,7 @@ export default function Sidebar() {
         <span className="text-base font-semibold tracking-tight">Abacus</span>
       </div>
       <nav className="flex-1 space-y-0.5 px-3 py-3">
-        {links.map(({ to, label, icon: Icon }) => (
+        {NAV_LINKS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

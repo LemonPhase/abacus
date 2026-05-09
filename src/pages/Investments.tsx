@@ -1,23 +1,7 @@
 import { useEffect, useState, useMemo } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Table,
   TableHeader,
@@ -33,24 +17,22 @@ import {
 import { ChartTooltip } from "@/components/ChartTooltip"
 import { useInvestmentPlansStore } from "@/stores/investmentPlansStore"
 import { useSettingsStore } from "@/stores/settingsStore"
-import type { InvestmentPlan, InvestmentType } from "@/types"
+import type { InvestmentPlan } from "@/types"
 import {
   calculateProjection, calculateTotalProjection,
-  formatInvestmentValue, INVESTMENT_TYPE_LABELS, INVESTMENT_TYPE_COLORS,
+  formatInvestmentValue, INVESTMENT_TYPE_COLORS,
 } from "@/lib/investments"
+import { InvestmentDialog, type InvestmentFormData } from "@/pages/investments/InvestmentDialog"
+import { InvestmentList } from "@/pages/investments/InvestmentList"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
-const INVESTMENT_TYPES: InvestmentType[] = ["fixed_income", "index_fund", "stock", "real_estate", "cash", "crypto", "other"]
-
-interface FormData {
-  name: string
-  type: InvestmentType
-  initialAmount: string
-  monthlyContribution: string
-  annualReturnRate: string
-  notes: string
-}
-
-const emptyForm: FormData = {
+const emptyForm: InvestmentFormData = {
   name: "",
   type: "index_fund",
   initialAmount: "",
@@ -64,7 +46,7 @@ export default function Investments() {
   const { baseCurrency } = useSettingsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<InvestmentPlan | null>(null)
-  const [form, setForm] = useState<FormData>(emptyForm)
+  const [form, setForm] = useState<InvestmentFormData>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<InvestmentPlan | null>(null)
   const [horizonYears, setHorizonYears] = useState(20)
 
@@ -273,106 +255,28 @@ export default function Investments() {
           </div>
 
           {/* Investment Plans List */}
-          <div className="rounded-xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Initial</TableHead>
-                  <TableHead className="text-right">Monthly</TableHead>
-                  <TableHead className="text-right">Return/yr</TableHead>
-                  <TableHead className="text-right">After {horizonYears}y</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {plans.map((plan) => {
-                  const proj = calculateProjection(plan, horizonYears)
-                  const final = proj[proj.length - 1]
-                  return (
-                    <TableRow key={plan.id}>
-                      <TableCell className="font-medium">{plan.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" style={{ borderColor: INVESTMENT_TYPE_COLORS[plan.type] }}>
-                          {INVESTMENT_TYPE_LABELS[plan.type]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{formatInvestmentValue(plan.initialAmount, baseCurrency)}</TableCell>
-                      <TableCell className="text-right">{formatInvestmentValue(plan.monthlyContribution, baseCurrency)}</TableCell>
-                      <TableCell className="text-right">{plan.annualReturnRate}%</TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {final && formatInvestmentValue(final.totalValue, baseCurrency)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-0.5">
-                          <Button variant="ghost" size="icon-xs" onClick={() => openEdit(plan)}>
-                            <Pencil className="size-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon-xs" onClick={() => setDeleteTarget(plan)}>
-                            <Trash2 className="size-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <InvestmentList
+            plans={plans}
+            horizonYears={horizonYears}
+            baseCurrency={baseCurrency}
+            onEdit={openEdit}
+            onDelete={setDeleteTarget}
+          />
         </>
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Edit Investment" : "Add Investment"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="inv-name">Name</Label>
-              <Input id="inv-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. S&P 500 Index Fund" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v: string | null) => setForm({ ...form, type: (v ?? "index_fund") as InvestmentType })} items={INVESTMENT_TYPES.map((t) => ({ value: t, label: INVESTMENT_TYPE_LABELS[t] }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {INVESTMENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{INVESTMENT_TYPE_LABELS[t]}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="inv-initial">Initial Amount</Label>
-                <Input id="inv-initial" type="number" step="0.01" min="0" value={form.initialAmount} onChange={(e) => setForm({ ...form, initialAmount: e.target.value })} placeholder="0" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="inv-monthly">Monthly Contribution</Label>
-                <Input id="inv-monthly" type="number" step="0.01" min="0" value={form.monthlyContribution} onChange={(e) => setForm({ ...form, monthlyContribution: e.target.value })} placeholder="0" />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="inv-return">Annual Return Rate (%)</Label>
-              <Input id="inv-return" type="number" step="0.1" value={form.annualReturnRate} onChange={(e) => setForm({ ...form, annualReturnRate: e.target.value })} placeholder="e.g. 7" />
-              <p className="text-xs text-muted-foreground">
-                Typical: Fixed Income 2-5%, Index Funds 7-10%, Stocks 8-12%, Crypto 20%+
-              </p>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="inv-notes">Notes (optional)</Label>
-              <Input id="inv-notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="e.g. Vanguard VOO" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Save" : "Add Investment"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InvestmentDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        onSave={handleSave}
+      />
 
       {/* Delete Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>

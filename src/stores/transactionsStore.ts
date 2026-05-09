@@ -7,8 +7,6 @@ import type { Database } from "@/supabase/database.types"
 
 type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"]
 
-let _unsub: (() => void) | null = null
-
 function mapRow(row: TransactionRow): Transaction {
   return {
     ...mapKeysToCamel<Transaction>(row),
@@ -22,8 +20,9 @@ interface TransactionsState {
   transactions: Transaction[]
   loading: boolean
   error: string | null
+  _unsub: (() => void) | null
   clearError: () => void
-  load: () => Promise<void>
+  load: (options?: { limit?: number; offset?: number }) => Promise<void>
   add: (data: NewTransaction & { baseAmount?: number; baseCurrency?: string }) => Promise<Transaction>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -39,20 +38,28 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   transactions: [],
   loading: false,
   error: null,
+  _unsub: null,
   clearError: () => set({ error: null }),
 
-  load: async () => {
+  load: async (options) => {
     set({ loading: true, error: null })
-    const { data, error } = await supabase
+    const { limit, offset } = options ?? {}
+    let query = supabase
       .from("transactions")
       .select("*")
       .order("date", { ascending: false })
+    if (offset !== undefined && limit !== undefined) {
+      query = query.range(offset, offset + limit - 1)
+    } else if (limit !== undefined) {
+      query = query.limit(limit)
+    }
+    const { data, error } = await query
     if (error) { set({ error: error.message, loading: false }); throw error }
     const transactions: Transaction[] = (data ?? []).map(mapRow)
     set({ transactions, loading: false })
 
-    if (!_unsub) {
-      _unsub = subscribeToTable("transactions", (payload) => {
+    if (!get()._unsub) {
+      const unsub = subscribeToTable("transactions", (payload) => {
         if (payload.eventType === "INSERT") {
           const transaction = mapRow(payload.new as TransactionRow)
           set((state) => {
@@ -71,6 +78,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
           }))
         }
       })
+      set({ _unsub: unsub })
     }
   },
 
@@ -139,9 +147,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   },
 
   unsubscribe: () => {
-    if (_unsub) {
-      _unsub()
-      _unsub = null
-    }
+    get()._unsub?.()
+    set({ _unsub: null })
   },
 }))

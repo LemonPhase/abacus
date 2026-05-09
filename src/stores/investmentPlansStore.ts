@@ -7,8 +7,6 @@ import type { Database } from "@/supabase/database.types"
 
 type InvestmentPlanRow = Database["public"]["Tables"]["investment_plans"]["Row"]
 
-let _unsub: (() => void) | null = null
-
 function mapRow(row: InvestmentPlanRow): InvestmentPlan {
   return {
     ...mapKeysToCamel<InvestmentPlan>(row),
@@ -21,8 +19,9 @@ interface InvestmentPlansState {
   plans: InvestmentPlan[]
   loading: boolean
   error: string | null
+  _unsub: (() => void) | null
   clearError: () => void
-  load: () => Promise<void>
+  load: (options?: { limit?: number; offset?: number }) => Promise<void>
   add: (data: NewInvestmentPlan) => Promise<InvestmentPlan>
   update: (id: string, data: Partial<NewInvestmentPlan>) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -34,17 +33,25 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   plans: [],
   loading: false,
   error: null,
+  _unsub: null,
   clearError: () => set({ error: null }),
 
-  load: async () => {
+  load: async (options) => {
     set({ loading: true, error: null })
-    const { data, error } = await supabase.from("investment_plans").select("*")
+    const { limit, offset } = options ?? {}
+    let query = supabase.from("investment_plans").select("*")
+    if (offset !== undefined && limit !== undefined) {
+      query = query.range(offset, offset + limit - 1)
+    } else if (limit !== undefined) {
+      query = query.limit(limit)
+    }
+    const { data, error } = await query
     if (error) { set({ error: error.message, loading: false }); throw error }
     const plans: InvestmentPlan[] = (data ?? []).map(mapRow)
     set({ plans, loading: false })
 
-    if (!_unsub) {
-      _unsub = subscribeToTable("investment_plans", (payload) => {
+    if (!get()._unsub) {
+      const unsub = subscribeToTable("investment_plans", (payload) => {
         if (payload.eventType === "INSERT") {
           const plan = mapRow(payload.new as InvestmentPlanRow)
           set((state) => {
@@ -63,6 +70,7 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
           }))
         }
       })
+      set({ _unsub: unsub })
     }
   },
 
@@ -110,9 +118,7 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   },
 
   unsubscribe: () => {
-    if (_unsub) {
-      _unsub()
-      _unsub = null
-    }
+    get()._unsub?.()
+    set({ _unsub: null })
   },
 }))

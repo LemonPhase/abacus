@@ -1,9 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -11,20 +8,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useBudgetsStore } from "@/stores/budgetsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { Budget, BudgetPeriod } from "@/types"
-import { ICON_MAP } from "@/lib/icons"
-import { formatCurrency } from "@/lib/format"
+import { BudgetDialog, type BudgetFormData } from "@/pages/budgets/BudgetDialog"
+import { BudgetList } from "@/pages/budgets/BudgetList"
 
 
 
@@ -57,22 +47,7 @@ interface BudgetProgress {
   status: "good" | "warning" | "danger" | "over"
 }
 
-const STATUS_COLORS: Record<BudgetProgress["status"], { bar: string; text: string }> = {
-  good: { bar: "bg-emerald-500", text: "text-emerald-600" },
-  warning: { bar: "bg-amber-500", text: "text-amber-600" },
-  danger: { bar: "bg-orange-500", text: "text-orange-600" },
-  over: { bar: "bg-rose-500", text: "text-rose-600" },
-}
-
-interface FormData {
-  name: string
-  categoryIds: string[]
-  amount: string
-  period: BudgetPeriod
-  startDate: string
-}
-
-const emptyForm: FormData = {
+const emptyForm: BudgetFormData = {
   name: "",
   categoryIds: [],
   amount: "",
@@ -88,7 +63,7 @@ export default function Budgets() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)
-  const [form, setForm] = useState<FormData>(emptyForm)
+  const [form, setForm] = useState<BudgetFormData>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<Budget | null>(null)
   const currentPeriod = useMemo(() => new Date(), [])
 
@@ -196,151 +171,31 @@ export default function Budgets() {
           <p className="text-sm">Create your first budget to start tracking.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {budgets.map((budget) => {
-            const progress = computeProgress(budget)
-            const colors = STATUS_COLORS[progress.status]
-            return (
-              <div key={budget.id} className="rounded-xl border bg-card p-5 space-y-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-semibold">{budget.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {budget.categoryIds.map(getCategoryName).join(", ")} · {getPeriodLabel(new Date(budget.startDate), budget.period)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon-xs" onClick={() => openEdit(budget)}>
-                      <Pencil className="size-3" />
-                    </Button>
-                    <Button variant="ghost" size="icon-xs" onClick={() => setDeleteTarget(budget)}>
-                      <Trash2 className="size-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-baseline justify-between">
-                    <span className={`text-lg font-bold tabular-nums ${colors.text}`}>
-                      {formatCurrency(progress.spent, baseCurrency)}
-                    </span>
-                    <span className="text-sm text-muted-foreground tabular-nums">
-                      of {formatCurrency(budget.amount, baseCurrency)}
-                    </span>
-                  </div>
-
-                  <div className="relative h-2 w-full rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${colors.bar}`}
-                      style={{ width: `${Math.min(progress.percentage, 100)}%` }}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{progress.percentage.toFixed(0)}% used</span>
-                    <span>
-                      {progress.percentage >= 100
-                        ? "Over budget!"
-                        : `${formatCurrency(budget.amount - progress.spent, baseCurrency)} left`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <BudgetList
+          budgets={budgets}
+          baseCurrency={baseCurrency}
+          getPeriodLabel={getPeriodLabel}
+          getCategoryName={getCategoryName}
+          computeProgress={computeProgress}
+          onEdit={openEdit}
+          onDelete={setDeleteTarget}
+        />
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Edit Budget" : "Add Budget"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="budget-name">Name</Label>
-              <Input
-                id="budget-name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Monthly Food"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Period</Label>
-              <Select value={form.period} onValueChange={(v: string | null) => setForm({ ...form, period: (v ?? "monthly") as BudgetPeriod })} items={[{ value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }]}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="budget-amount">Amount</Label>
-                <Input
-                  id="budget-amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="budget-date">Start Date</Label>
-                <Input
-                  id="budget-date"
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>Categories</Label>
-              <div className="max-h-48 overflow-y-auto rounded-lg border p-3 space-y-1">
-                {expenseCategories.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No expense categories available.</p>
-                ) : (
-                  expenseCategories.map((cat) => {
-                    const CatIcon = ICON_MAP[cat.icon ?? ""]
-                    return (
-                      <label
-                        key={cat.id}
-                        className="flex items-center gap-2.5 py-1 cursor-pointer rounded hover:bg-muted/50 px-1"
-                      >
-                        <Checkbox
-                          checked={form.categoryIds.includes(cat.id)}
-                          onCheckedChange={() => toggleCategory(cat.id)}
-                        />
-                        {CatIcon ? (
-                          <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
-                        ) : (
-                          <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                        )}
-                        <span className="text-sm">{cat.name}</span>
-                      </label>
-                    )
-                  })
-                )}
-              </div>
-              {form.name.trim() && form.amount && form.categoryIds.length === 0 && (
-                <p className="text-xs text-muted-foreground">Select at least one category.</p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim() || !form.amount || form.categoryIds.length === 0}>
-              {editing ? "Save" : "Add Budget"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <BudgetDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        onToggleCategory={toggleCategory}
+        onSave={handleSave}
+        expenseCategories={expenseCategories}
+      />
 
       {/* Delete Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>

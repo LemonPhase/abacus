@@ -91,13 +91,6 @@ export default function Settings() {
         useBudgetsStore.getState().load(),
         useInvestmentPlansStore.getState().load(),
       ])
-      await Promise.all([
-        useAccountsStore.getState().load(),
-        useCategoriesStore.getState().load(),
-        useTransactionsStore.getState().load(),
-        useBudgetsStore.getState().load(),
-        useInvestmentPlansStore.getState().load(),
-      ])
       setImportStatus("success")
       setImportMsg(`Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`)
     } catch (e) {

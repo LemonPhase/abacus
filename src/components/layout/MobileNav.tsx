@@ -1,33 +1,13 @@
 import { NavLink } from "react-router-dom"
-import {
-  LayoutDashboard,
-  Landmark,
-  ArrowLeftRight,
-  Target,
-  BarChart3,
-  Settings,
-  Tags,
-  TrendingUp,
-} from "lucide-react"
 
+import { NAV_LINKS } from "@/lib/navigation"
 import { cn } from "@/lib/utils"
-
-const links = [
-  { to: "/", label: "Home", icon: LayoutDashboard },
-  { to: "/accounts", label: "Accounts", icon: Landmark },
-  { to: "/transactions", label: "Txns", icon: ArrowLeftRight },
-  { to: "/budgets", label: "Budgets", icon: Target },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/categories", label: "Cats", icon: Tags },
-  { to: "/investments", label: "Invest", icon: TrendingUp },
-  { to: "/settings", label: "Settings", icon: Settings },
-]
 
 export default function MobileNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-card/95 backdrop-blur md:hidden">
       <div className="flex h-16 items-center justify-around px-2">
-        {links.map(({ to, label, icon: Icon }) => (
+        {NAV_LINKS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

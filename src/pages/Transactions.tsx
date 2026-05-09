@@ -1,8 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { Plus, Pencil, Trash2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Dialog,
   DialogContent,
@@ -10,13 +8,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   Table,
   TableHeader,
@@ -29,27 +20,18 @@ import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useAccountsStore } from "@/stores/accountsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
-import { parseCSV, detectColumns, applyMapping, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
+import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
 import type { TransactionKind } from "@/types"
 import { ICON_MAP } from "@/lib/icons"
 import { formatCurrency } from "@/lib/format"
+import { TransactionDialog, type TxFormData } from "@/pages/transactions/TransactionDialog"
+import { TransactionFilters, type TransactionFiltersValue } from "@/pages/transactions/TransactionFilters"
+import { CsvImportDialog, type CsvMappedRow } from "@/pages/transactions/CsvImportDialog"
 
 
 
 function formatDate(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-const TRANSACTION_TYPES: TransactionKind[] = ["income", "expense", "transfer"]
-
-interface TxFormData {
-  accountId: string
-  categoryId: string
-  type: TransactionKind
-  amount: string
-  date: string
-  description: string
-  toAccountId: string
 }
 
 const emptyTxForm: TxFormData = {
@@ -74,11 +56,13 @@ export default function Transactions() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   // Filters
-  const [filterAccount, setFilterAccount] = useState<string>("all")
-  const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [filterType, setFilterType] = useState<string>("all")
-  const [filterDateFrom, setFilterDateFrom] = useState("")
-  const [filterDateTo, setFilterDateTo] = useState("")
+  const [filters, setFilters] = useState<TransactionFiltersValue>({
+    account: "all",
+    category: "all",
+    type: "all",
+    dateFrom: "",
+    dateTo: "",
+  })
 
   // CSV import state
   const [csvDialogOpen, setCsvDialogOpen] = useState(false)
@@ -86,7 +70,7 @@ export default function Transactions() {
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvRawRows, setCsvRawRows] = useState<Record<string, string>[]>([])
   const [csvMapping, setCsvMapping] = useState<ColumnMapping>({ date: "", description: "", amount: "", type: "" })
-  const [csvMappedRows, setCsvMappedRows] = useState<{ date: string; description: string; amount: string; type?: "income" | "expense" }[]>([])
+  const [csvMappedRows, setCsvMappedRows] = useState<CsvMappedRow[]>([])
   const [csvAccountId, setCsvAccountId] = useState("")
   const [csvCategoryId, setCsvCategoryId] = useState("")
 
@@ -98,14 +82,14 @@ export default function Transactions() {
 
   const filteredTxn = useMemo(() => {
     return transactions.filter((t) => {
-      if (filterAccount !== "all" && t.accountId !== filterAccount) return false
-      if (filterCategory !== "all" && t.categoryId !== filterCategory) return false
-      if (filterType !== "all" && t.type !== filterType) return false
-      if (filterDateFrom && new Date(t.date) < new Date(filterDateFrom)) return false
-      if (filterDateTo && new Date(t.date) > new Date(filterDateTo + "T23:59:59")) return false
+      if (filters.account !== "all" && t.accountId !== filters.account) return false
+      if (filters.category !== "all" && t.categoryId !== filters.category) return false
+      if (filters.type !== "all" && t.type !== filters.type) return false
+      if (filters.dateFrom && new Date(t.date) < new Date(filters.dateFrom)) return false
+      if (filters.dateTo && new Date(t.date) > new Date(filters.dateTo + "T23:59:59")) return false
       return true
     })
-  }, [transactions, filterAccount, filterCategory, filterType, filterDateFrom, filterDateTo])
+  }, [transactions, filters])
 
   function openAdd() {
     setEditing(null)
@@ -159,11 +143,7 @@ export default function Transactions() {
     setDialogOpen(false)
     setEditing(null)
     if (!editing) {
-      setFilterAccount("all")
-      setFilterCategory("all")
-      setFilterType("all")
-      setFilterDateFrom("")
-      setFilterDateTo("")
+      setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
     }
   }
 
@@ -180,12 +160,6 @@ export default function Transactions() {
     const detected = detectColumns(result.headers)
     setCsvMapping(detected)
     setCsvStep("map")
-  }
-
-  function handleCsvRemap() {
-    const mapped = applyMapping(csvRawRows, csvMapping)
-    setCsvMappedRows(mapped)
-    setCsvStep("preview")
   }
 
   async function handleCsvImport() {
@@ -220,11 +194,7 @@ export default function Transactions() {
     setCsvHeaders([])
     setCsvRawRows([])
     setCsvMappedRows([])
-    setFilterAccount("all")
-    setFilterCategory("all")
-    setFilterType("all")
-    setFilterDateFrom("")
-    setFilterDateTo("")
+    setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
   }
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown"
@@ -252,84 +222,13 @@ export default function Transactions() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Account</Label>
-          <Select value={filterAccount} onValueChange={(v) => setFilterAccount(v ?? "all")} items={[{ value: "all", label: "All accounts" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="All accounts" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" label="All accounts">All accounts</SelectItem>
-              {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id} label={a.name}>{a.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Category</Label>
-          <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v ?? "all")} items={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}>
-            <SelectTrigger className="h-8 w-36 text-xs">
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" label="All categories">All categories</SelectItem>
-              {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">Type</Label>
-          <Select value={filterType} onValueChange={(v) => setFilterType(v ?? "all")} items={[{ value: "all", label: "All" }, { value: "income", label: "Income" }, { value: "expense", label: "Expense" }, { value: "transfer", label: "Transfer" }]}>
-            <SelectTrigger className="h-8 w-28 text-xs">
-              <SelectValue placeholder="All" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" label="All">All</SelectItem>
-              <SelectItem value="income" label="Income">Income</SelectItem>
-              <SelectItem value="expense" label="Expense">Expense</SelectItem>
-              <SelectItem value="transfer" label="Transfer">Transfer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">From</Label>
-          <Input
-            type="date"
-            className="h-8 w-36 text-xs"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <Label className="text-xs">To</Label>
-          <Input
-            type="date"
-            className="h-8 w-36 text-xs"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-          />
-        </div>
-        {(filterAccount !== "all" || filterCategory !== "all" || filterType !== "all" || filterDateFrom || filterDateTo) && (
-          <Button
-            variant="ghost"
-            size="xs"
-            className="mb-0.5"
-            onClick={() => {
-              setFilterAccount("all")
-              setFilterCategory("all")
-              setFilterType("all")
-              setFilterDateFrom("")
-              setFilterDateTo("")
-            }}
-          >
-            Clear filters
-          </Button>
-        )}
-      </div>
+      <TransactionFilters
+        accounts={accounts}
+        categories={categories}
+        value={filters}
+        onChange={setFilters}
+        onClear={() => setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })}
+      />
 
       {filteredTxn.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
@@ -394,94 +293,19 @@ export default function Transactions() {
       )}
 
       {/* Add/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            <div className="grid gap-2">
-              <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: (v ?? "expense") as TransactionKind, categoryId: "" })} items={TRANSACTION_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRANSACTION_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Account</Label>
-              <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v ?? "" })} items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Category</Label>
-              <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })} items={categories.filter((c) => (form.type === "transfer" ? true : c.type === form.type)).map((c) => ({ value: c.id, label: c.name }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories
-                    .filter((c) => (form.type === "transfer" ? true : c.type === form.type))
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="tx-amount">Amount</Label>
-                <Input
-                  id="tx-amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="tx-date">Date</Label>
-                <Input
-                  id="tx-date"
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="tx-desc">Description</Label>
-              <Input
-                id="tx-desc"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="e.g. Grocery shopping"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.accountId || !form.categoryId || !form.amount}>
-              {editing ? "Save" : "Add Transaction"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TransactionDialog
+        open={dialogOpen}
+        editing={!!editing}
+        form={form}
+        accounts={accounts}
+        categories={categories}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+        onFormChange={setForm}
+        onSave={handleSave}
+      />
 
       {/* Delete Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
@@ -498,158 +322,34 @@ export default function Transactions() {
       </Dialog>
 
       {/* CSV Import Dialog */}
-      <Dialog open={csvDialogOpen} onOpenChange={(open) => { setCsvDialogOpen(open); if (!open) { setCsvStep("upload"); setCsvHeaders([]); setCsvRawRows([]); setCsvMappedRows([]) }}}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {csvStep === "upload" && "Import CSV"}
-              {csvStep === "map" && "Map Columns"}
-              {csvStep === "preview" && "Preview Import"}
-            </DialogTitle>
-          </DialogHeader>
-
-          {csvStep === "upload" && (
-            <div className="py-8">
-              <label className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-muted-foreground/25 p-8 cursor-pointer hover:border-muted-foreground/50 transition-colors">
-                <Upload className="size-8 text-muted-foreground" />
-                <div className="text-center">
-                  <p className="text-sm font-medium">Click to upload a CSV file</p>
-                  <p className="text-xs text-muted-foreground mt-1">Bank exports, spreadsheets, etc.</p>
-                </div>
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleCsvFile(file)
-                  }}
-                />
-              </label>
-            </div>
-          )}
-
-          {csvStep === "map" && (
-            <div className="space-y-4 py-2">
-              <p className="text-sm text-muted-foreground">
-                Match CSV columns to transaction fields. Auto-detected where possible.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Date column</Label>
-                  <Select value={csvMapping.date} onValueChange={(v: string | null) => setCsvMapping({ ...csvMapping, date: v ?? "" })}>
-                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
-                    <SelectContent>
-                      {csvHeaders.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Amount column</Label>
-                  <Select value={csvMapping.amount} onValueChange={(v: string | null) => setCsvMapping({ ...csvMapping, amount: v ?? "" })}>
-                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
-                    <SelectContent>
-                      {csvHeaders.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Description column</Label>
-                  <Select value={csvMapping.description} onValueChange={(v: string | null) => setCsvMapping({ ...csvMapping, description: v ?? "" })}>
-                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
-                    <SelectContent>
-                      {csvHeaders.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Type column (optional)</Label>
-                  <Select value={csvMapping.type} onValueChange={(v: string | null) => setCsvMapping({ ...csvMapping, type: v ?? "" })}>
-                    <SelectTrigger><SelectValue placeholder="Auto-detect" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Auto-detect</SelectItem>
-                      {csvHeaders.map((h) => (
-                        <SelectItem key={h} value={h}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCsvStep("upload")}>Back</Button>
-                <Button onClick={handleCsvRemap} disabled={!csvMapping.date || !csvMapping.amount}>Preview</Button>
-              </DialogFooter>
-            </div>
-          )}
-
-          {csvStep === "preview" && (
-            <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Account</Label>
-                  <Select value={csvAccountId} onValueChange={(v: string | null) => setCsvAccountId(v ?? "")} items={accounts.map((a) => ({ value: a.id, label: a.name }))}>
-                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id} label={a.name}>{a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Default Category</Label>
-                  <Select value={csvCategoryId} onValueChange={(v: string | null) => setCsvCategoryId(v ?? "")} items={categories.map((c) => ({ value: c.id, label: c.name }))}>
-                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                    <SelectContent>
-                      {categories
-                        .map((c) => (
-                          <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {csvMappedRows.length} transactions will be imported.
-              </p>
-              <div className="max-h-64 overflow-auto rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs">Date</TableHead>
-                      <TableHead className="text-xs">Description</TableHead>
-                      <TableHead className="text-xs text-right">Amount</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {csvMappedRows.slice(0, 50).map((row, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs">{row.date}</TableCell>
-                        <TableCell className="text-xs max-w-40 truncate">{row.description}</TableCell>
-                        <TableCell className="text-xs text-right">{row.amount}</TableCell>
-                        <TableCell className="text-xs">{row.type ?? "auto"}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCsvStep("map")}>Back</Button>
-                <Button onClick={handleCsvImport} disabled={!csvAccountId || !csvCategoryId || csvMappedRows.length === 0}>
-                  Import {csvMappedRows.length} Transactions
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <CsvImportDialog
+        open={csvDialogOpen}
+        step={csvStep}
+        headers={csvHeaders}
+        rawRows={csvRawRows}
+        mapping={csvMapping}
+        mappedRows={csvMappedRows}
+        accountId={csvAccountId}
+        categoryId={csvCategoryId}
+        accounts={accounts}
+        categories={categories}
+        onOpenChange={(open) => {
+          setCsvDialogOpen(open)
+          if (!open) {
+            setCsvStep("upload")
+            setCsvHeaders([])
+            setCsvRawRows([])
+            setCsvMappedRows([])
+          }
+        }}
+        onFileSelected={handleCsvFile}
+        onStepChange={setCsvStep}
+        onMappingChange={setCsvMapping}
+        onMappedRowsChange={setCsvMappedRows}
+        onAccountChange={setCsvAccountId}
+        onCategoryChange={setCsvCategoryId}
+        onImport={handleCsvImport}
+      />
     </div>
   )
 }

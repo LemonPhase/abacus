@@ -25,9 +25,9 @@ describe("Sidebar", () => {
 describe("MobileNav", () => {
   it("renders all nav links with short labels", () => {
     renderWithRouter(<MobileNav />)
-    expect(screen.getByText("Home")).toBeInTheDocument()
+    expect(screen.getByText("Dashboard")).toBeInTheDocument()
     expect(screen.getByText("Accounts")).toBeInTheDocument()
-    expect(screen.getByText("Txns")).toBeInTheDocument()
+    expect(screen.getByText("Transactions")).toBeInTheDocument()
     expect(screen.getByText("Budgets")).toBeInTheDocument()
     expect(screen.getByText("Reports")).toBeInTheDocument()
     expect(screen.getByText("Settings")).toBeInTheDocument()

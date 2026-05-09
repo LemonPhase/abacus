@@ -7,8 +7,6 @@ import type { Database } from "@/supabase/database.types"
 
 type AccountRow = Database["public"]["Tables"]["accounts"]["Row"]
 
-let _unsub: (() => void) | null = null
-
 function mapRow(row: AccountRow): Account {
   return {
     ...mapKeysToCamel<Account>(row),
@@ -21,8 +19,9 @@ interface AccountsState {
   accounts: Account[]
   loading: boolean
   error: string | null
+  _unsub: (() => void) | null
   clearError: () => void
-  load: () => Promise<void>
+  load: (options?: { limit?: number; offset?: number }) => Promise<void>
   add: (data: NewAccount) => Promise<Account>
   update: (id: string, data: Partial<NewAccount>) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -35,17 +34,25 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
   accounts: [],
   loading: false,
   error: null,
+  _unsub: null,
   clearError: () => set({ error: null }),
 
-  load: async () => {
+  load: async (options) => {
     set({ loading: true, error: null })
-    const { data, error } = await supabase.from("accounts").select("*")
+    const { limit, offset } = options ?? {}
+    let query = supabase.from("accounts").select("*")
+    if (offset !== undefined && limit !== undefined) {
+      query = query.range(offset, offset + limit - 1)
+    } else if (limit !== undefined) {
+      query = query.limit(limit)
+    }
+    const { data, error } = await query
     if (error) { set({ error: error.message, loading: false }); throw error }
     const accounts: Account[] = (data ?? []).map(mapRow)
     set({ accounts, loading: false })
 
-    if (!_unsub) {
-      _unsub = subscribeToTable("accounts", (payload) => {
+    if (!get()._unsub) {
+      const unsub = subscribeToTable("accounts", (payload) => {
         if (payload.eventType === "INSERT") {
           const account = mapRow(payload.new as AccountRow)
           set((state) => {
@@ -64,6 +71,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
           }))
         }
       })
+      set({ _unsub: unsub })
     }
   },
 
@@ -115,9 +123,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
   },
 
   unsubscribe: () => {
-    if (_unsub) {
-      _unsub()
-      _unsub = null
-    }
+    get()._unsub?.()
+    set({ _unsub: null })
   },
 }))
