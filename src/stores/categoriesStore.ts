@@ -1,6 +1,6 @@
 import { create } from "zustand"
-import { db } from "@/db"
-import { nanoid } from "@/db/nanoid"
+import { supabase } from "@/supabase/client"
+import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
 import type { Category, NewCategory, CategoryKind } from "@/types"
 
 interface CategoriesState {
@@ -22,24 +22,47 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
 
   load: async () => {
     set({ loading: true })
-    const categories = await db.categories.toArray()
+    const { data, error } = await supabase.from("categories").select("*")
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const categories: Category[] = (data ?? []).map((row: any) => ({
+      ...mapKeysToCamel<Category>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }))
     set({ categories, loading: false })
   },
 
   add: async (data) => {
-    const category: Category = { ...data, id: nanoid() }
-    await db.categories.add(category)
+    const { data: inserted, error } = await supabase
+      .from("categories")
+      .insert(mapKeysToSnake(data) as Record<string, unknown>)
+      .select()
+      .single()
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = inserted as any
+    const category: Category = {
+      ...mapKeysToCamel<Category>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }
     await get().load()
     return category
   },
 
   update: async (id, data) => {
-    await db.categories.update(id, data)
+    const { error } = await supabase
+      .from("categories")
+      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .eq("id", id)
+    if (error) throw error
     await get().load()
   },
 
   remove: async (id) => {
-    await db.categories.delete(id)
+    const { error } = await supabase.from("categories").delete().eq("id", id)
+    if (error) throw error
     await get().load()
   },
 

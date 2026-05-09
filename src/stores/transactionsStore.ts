@@ -1,6 +1,6 @@
 import { create } from "zustand"
-import { db } from "@/db"
-import { nanoid } from "@/db/nanoid"
+import { supabase } from "@/supabase/client"
+import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
 import type { Transaction, NewTransaction, TransactionKind } from "@/types"
 
 interface TransactionsState {
@@ -23,32 +23,57 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
 
   load: async () => {
     set({ loading: true })
-    const transactions = await db.transactions.orderBy("date").reverse().toArray()
+    const { data, error } = await supabase
+      .from("transactions")
+      .select("*")
+      .order("date", { ascending: false })
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transactions: Transaction[] = (data ?? []).map((row: any) => ({
+      ...mapKeysToCamel<Transaction>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      date: new Date(row.date),
+    }))
     set({ transactions, loading: false })
   },
 
   add: async (data) => {
-    const now = new Date()
-    const transaction: Transaction = {
+    const payload = {
       ...data,
-      id: nanoid(),
       baseAmount: data.baseAmount ?? data.amount,
       baseCurrency: data.baseCurrency ?? data.currency,
-      createdAt: now,
-      updatedAt: now,
     }
-    await db.transactions.add(transaction)
+    const { data: inserted, error } = await supabase
+      .from("transactions")
+      .insert(mapKeysToSnake(payload) as Record<string, unknown>)
+      .select()
+      .single()
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = inserted as any
+    const transaction: Transaction = {
+      ...mapKeysToCamel<Transaction>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+      date: new Date(row.date),
+    }
     await get().load()
     return transaction
   },
 
   update: async (id, data) => {
-    await db.transactions.update(id, { ...data, updatedAt: new Date() })
+    const { error } = await supabase
+      .from("transactions")
+      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .eq("id", id)
+    if (error) throw error
     await get().load()
   },
 
   remove: async (id) => {
-    await db.transactions.delete(id)
+    const { error } = await supabase.from("transactions").delete().eq("id", id)
+    if (error) throw error
     await get().load()
   },
 

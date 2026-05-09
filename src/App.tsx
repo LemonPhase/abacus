@@ -1,8 +1,11 @@
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"
 
+import { AuthProvider, AuthGuard } from "@/supabase/auth"
+
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
 
+import Auth from "@/pages/Auth"
 import Dashboard from "@/pages/Dashboard"
 import Accounts from "@/pages/Accounts"
 import Transactions from "@/pages/Transactions"
@@ -45,7 +48,12 @@ function AppLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout />
+      <AuthProvider>
+        <Routes>
+          <Route path="/auth" element={<Auth />} />
+          <Route path="*" element={<AuthGuard><AppLayout /></AuthGuard>} />
+        </Routes>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

@@ -7,8 +7,8 @@ export interface Account {
   currency: string
   balance: number
   notes?: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export type CategoryKind = "income" | "expense"
@@ -20,6 +20,8 @@ export interface Category {
   parentId?: string
   color: string
   icon?: string
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export type TransactionKind = "income" | "expense" | "transfer"
@@ -36,8 +38,8 @@ export interface Transaction {
   date: Date
   description?: string
   correlativeId?: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export type BudgetPeriod = "monthly" | "yearly"
@@ -49,6 +51,8 @@ export interface Budget {
   amount: number
   period: BudgetPeriod
   startDate: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export interface ExchangeRate {
@@ -70,8 +74,8 @@ export interface InvestmentPlan {
   annualReturnRate: number
   currency: string
   notes?: string
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export interface ProjectionYear {
@@ -92,35 +96,6 @@ export interface UserSettings {
 }
 
 export type NewAccount = Omit<Account, "id" | "createdAt" | "updatedAt">
-export type NewCategory = Omit<Category, "id">
+export type NewCategory = Omit<Category, "id" | "createdAt" | "updatedAt">
 export type NewTransaction = Omit<Transaction, "id" | "baseAmount" | "baseCurrency" | "createdAt" | "updatedAt">
-export type NewBudget = Omit<Budget, "id">
-
-// File System Access API types
-declare global {
-  interface FileSystemFileHandle {
-    createWritable(): Promise<FileSystemWritableFileStream>
-    getFile(): Promise<File>
-    readonly name: string
-    queryPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
-    requestPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
-  }
-  interface FileSystemWritableFileStream extends WritableStream {
-    write(data: string | Blob | ArrayBuffer): Promise<void>
-    close(): Promise<void>
-  }
-  interface FileSystemHandlePermissionDescriptor {
-    mode?: "read" | "readwrite"
-  }
-  interface SaveFilePickerOptions {
-    suggestedName?: string
-    types?: Array<{ description: string; accept: Record<string, string[]> }>
-  }
-  interface OpenFilePickerOptions {
-    types?: Array<{ description: string; accept: Record<string, string[]> }>
-  }
-  interface Window {
-    showSaveFilePicker(options?: SaveFilePickerOptions): Promise<FileSystemFileHandle>
-    showOpenFilePicker(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>
-  }
-}
+export type NewBudget = Omit<Budget, "id" | "createdAt" | "updatedAt">

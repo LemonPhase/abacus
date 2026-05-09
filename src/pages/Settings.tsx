@@ -1,8 +1,6 @@
 import { useState } from "react"
-import { Download, Upload, Sun, Moon, Monitor, RefreshCw, Shield } from "lucide-react"
+import { Download, Upload, Sun, Moon, Monitor } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -17,31 +15,34 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useSettingsStore } from "@/stores/settingsStore"
-import { db } from "@/db"
-import { loadSyncConfig, saveSyncConfig, writeToSyncHandle, pickSyncLocation, syncFromFile, downloadSyncFile, type SyncConfig } from "@/lib/sync"
+import { useAuth } from "@/supabase/auth"
+import { supabase } from "@/supabase/client"
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "CAD", "AUD", "CHF", "INR", "BRL"]
 
+// Table names as used in Supabase (snake_case)
+const TABLES = ["accounts", "categories", "transactions", "budgets", "exchange_rates", "investment_plans"] as const
+
 export default function Settings() {
   const { baseCurrency, theme, setBaseCurrency, setTheme } = useSettingsStore()
+  const { user, signOut } = useAuth()
   const [importDialog, setImportDialog] = useState(false)
   const [importStatus, setImportStatus] = useState<"idle" | "success" | "error">("idle")
   const [importMsg, setImportMsg] = useState("")
-  const [syncConfig, setSyncConfig] = useState<SyncConfig>(loadSyncConfig)
-  const [syncPassphrase, setSyncPassphrase] = useState(syncConfig.passphrase)
-  const [syncStatus, setSyncStatus] = useState("")
 
   async function handleExport() {
-    const data = {
-      version: 1,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data: Record<string, any> = {
+      version: 2,
       exportedAt: new Date().toISOString(),
-      accounts: await db.accounts.toArray(),
-      categories: await db.categories.toArray(),
-      transactions: await db.transactions.toArray(),
-      budgets: await db.budgets.toArray(),
-      exchangeRates: await db.exchangeRates.toArray(),
-      investmentPlans: await db.investmentPlans.toArray(),
     }
+
+    for (const table of TABLES) {
+      const { data: rows, error } = await supabase.from(table).select("*")
+      if (error) throw error
+      data[table] = rows ?? []
+    }
+
     const json = JSON.stringify(data, null, 2)
     const blob = new Blob([json], { type: "application/json" })
     const url = URL.createObjectURL(blob)
@@ -56,72 +57,33 @@ export default function Settings() {
     try {
       setImportStatus("idle")
       const text = await file.text()
-      const data = JSON.parse(text)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = JSON.parse(text) as Record<string, any>
 
-      if (!data.version || !data.accounts || !data.transactions) {
+      if (!data.accounts || !data.transactions) {
         throw new Error("Invalid export format")
       }
 
-      // Clear existing data
-      await db.accounts.clear()
-      await db.categories.clear()
-      await db.transactions.clear()
-      await db.budgets.clear()
-      await db.exchangeRates.clear()
-      await db.investmentPlans.clear()
+      // Delete all existing rows from each table
+      for (const table of TABLES) {
+        const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
+        if (error) throw error
+      }
 
-      // Import
-      if (data.accounts.length) await db.accounts.bulkAdd(data.accounts)
-      if (data.categories?.length) await db.categories.bulkAdd(data.categories)
-      if (data.transactions.length) await db.transactions.bulkAdd(data.transactions)
-      if (data.budgets?.length) await db.budgets.bulkAdd(data.budgets)
-      if (data.exchangeRates?.length) await db.exchangeRates.bulkAdd(data.exchangeRates)
-      if (data.investmentPlans?.length) await db.investmentPlans.bulkAdd(data.investmentPlans)
+      // Import data from each table
+      for (const table of TABLES) {
+        const rows = data[table]
+        if (rows?.length) {
+          const { error } = await supabase.from(table).insert(rows)
+          if (error) throw error
+        }
+      }
 
       setImportStatus("success")
-      setImportMsg(`Imported ${data.accounts.length} accounts, ${data.transactions.length} transactions.`)
+      setImportMsg(`Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`)
     } catch (e) {
       setImportStatus("error")
       setImportMsg(e instanceof Error ? e.message : "Failed to import")
-    }
-  }
-
-  function handleSyncToggle(enabled: boolean) {
-    const config = loadSyncConfig()
-    config.enabled = enabled
-    if (enabled) config.passphrase = syncPassphrase
-    saveSyncConfig(config)
-    setSyncConfig(config)
-    if (!enabled) setSyncStatus("Auto-sync disabled")
-  }
-
-  async function handleSetSyncLocation() {
-    setSyncStatus("Picking location...")
-    const result = await pickSyncLocation(setSyncStatus)
-    setSyncStatus(result.message)
-    if (result.success) {
-      setSyncConfig(loadSyncConfig())
-    }
-  }
-
-  async function handleSyncNow() {
-    setSyncStatus("Syncing...")
-    const result = await writeToSyncHandle(syncPassphrase, setSyncStatus)
-    setSyncStatus(result.message)
-  }
-
-  async function handleSyncExport() {
-    setSyncStatus("Downloading...")
-    const result = await downloadSyncFile(syncPassphrase, setSyncStatus)
-    setSyncStatus(result.message)
-  }
-
-  async function handleSyncImport() {
-    setSyncStatus("Importing...")
-    const result = await syncFromFile(syncPassphrase, setSyncStatus)
-    setSyncStatus(result.message)
-    if (result.success) {
-      setTimeout(() => window.location.reload(), 500)
     }
   }
 
@@ -185,82 +147,13 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Cross-Device Sync */}
-        <div className="rounded-xl border bg-card p-5 space-y-4">
-          <h2 className="font-semibold flex items-center gap-2">
-            <RefreshCw className="size-4" />
-            Cross-Device Sync
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Pick a sync file in your cloud drive folder (Dropbox, iCloud, Google Drive). Changes auto-sync to it. On another device, import from the same file.
-          </p>
-
-          <div className="grid gap-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Auto-sync on changes</Label>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={syncConfig.enabled}
-                onClick={() => handleSyncToggle(!syncConfig.enabled)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors ${syncConfig.enabled ? "bg-primary" : "bg-muted"}`}
-              >
-                <span className={`inline-block size-3.5 rounded-full bg-background transition-transform ${syncConfig.enabled ? "translate-x-4.5" : "translate-x-0.5"}`} />
-              </button>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="sync-passphrase" className="flex items-center gap-1.5">
-                <Shield className="size-3" />
-                Encryption Passphrase
-              </Label>
-              <Input
-                id="sync-passphrase"
-                type="password"
-                value={syncPassphrase}
-                onChange={(e) => setSyncPassphrase(e.target.value)}
-                placeholder="Same passphrase on all devices"
-                className="text-sm"
-              />
-              <p className="text-xs text-muted-foreground">AES-256-GCM encrypted. Your data never leaves your device unencrypted.</p>
-            </div>
-
-            {syncConfig.fileName && (
-              <p className="text-xs text-muted-foreground">
-                Sync file: <span className="font-medium">{syncConfig.fileName}</span>
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleSetSyncLocation}>
-                <RefreshCw className="size-3.5" />
-                Set Sync Location
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={!syncPassphrase}>
-                <Upload className="size-3.5" />
-                Sync Now
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSyncImport} disabled={!syncPassphrase}>
-                <Download className="size-3.5" />
-                Import Sync
-              </Button>
-              <Button variant="ghost" size="sm" onClick={handleSyncExport} disabled={!syncPassphrase}>
-                Download .enc
-              </Button>
-            </div>
-
-            {syncStatus && (
-              <p className={`text-xs ${syncStatus.toLowerCase().includes("fail") || syncStatus.toLowerCase().includes("wrong") || syncStatus.toLowerCase().includes("cancel") ? "text-rose-600" : syncStatus.toLowerCase().includes("sync") || syncStatus.toLowerCase().includes("complete") || syncStatus.toLowerCase().includes("import") ? "text-emerald-600" : "text-muted-foreground"}`}>
-                {syncStatus}
-              </p>
-            )}
-
-            {syncConfig.lastSyncedAt && (
-              <p className="text-xs text-muted-foreground">
-                Last synced: {new Date(syncConfig.lastSyncedAt).toLocaleString()}
-              </p>
-            )}
-          </div>
+        {/* Account */}
+        <div className="rounded-xl border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Account</h2>
+          <p className="text-sm text-muted-foreground">{user?.email}</p>
+          <Button variant="outline" size="sm" onClick={() => signOut()}>
+            Sign Out
+          </Button>
         </div>
 
         {/* About */}

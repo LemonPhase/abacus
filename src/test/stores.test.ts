@@ -1,22 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest"
-import { db } from "@/db"
 import { useAccountsStore } from "@/stores/accountsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useBudgetsStore } from "@/stores/budgetsStore"
 import { useSettingsStore } from "@/stores/settingsStore"
-
-async function clearAllTables() {
-  await db.accounts.clear()
-  await db.categories.clear()
-  await db.transactions.clear()
-  await db.budgets.clear()
-  await db.exchangeRates.clear()
-}
+import { getTable } from "@/test/supabase-mock"
 
 describe("Accounts Store", () => {
-  beforeEach(async () => {
-    await clearAllTables()
+  beforeEach(() => {
     useAccountsStore.setState({ accounts: [], loading: false })
   })
 
@@ -55,9 +46,10 @@ describe("Accounts Store", () => {
 
     await store.update(account.id, { name: "New Name", balance: 200 })
 
-    const result = await db.accounts.get(account.id)
-    expect(result!.name).toBe("New Name")
-    expect(result!.balance).toBe(200)
+    const dbRows = getTable("accounts")
+    const updated = dbRows.find((r) => r.id === account.id)
+    expect(updated?.name).toBe("New Name")
+    expect(updated?.balance).toBe(200)
   })
 
   it("removes an account from the database", async () => {
@@ -70,8 +62,8 @@ describe("Accounts Store", () => {
     })
 
     await store.remove(account.id)
-    const result = await db.accounts.get(account.id)
-    expect(result).toBeUndefined()
+    const dbRows = getTable("accounts")
+    expect(dbRows.find((r) => r.id === account.id)).toBeUndefined()
   })
 
   it("filters accounts by type", async () => {
@@ -101,8 +93,7 @@ describe("Accounts Store", () => {
 })
 
 describe("Categories Store", () => {
-  beforeEach(async () => {
-    await clearAllTables()
+  beforeEach(() => {
     useCategoriesStore.setState({ categories: [], loading: false })
   })
 
@@ -139,8 +130,7 @@ describe("Categories Store", () => {
 })
 
 describe("Transactions Store", () => {
-  beforeEach(async () => {
-    await clearAllTables()
+  beforeEach(() => {
     useTransactionsStore.setState({ transactions: [], loading: false })
   })
 
@@ -206,8 +196,7 @@ describe("Transactions Store", () => {
 })
 
 describe("Budgets Store", () => {
-  beforeEach(async () => {
-    await clearAllTables()
+  beforeEach(() => {
     useBudgetsStore.setState({ budgets: [], loading: false })
   })
 
@@ -239,9 +228,10 @@ describe("Budgets Store", () => {
 
     await store.update(budget.id, { amount: 1000, name: "Updated Budget" })
 
-    const result = await db.budgets.get(budget.id)
-    expect(result!.amount).toBe(1000)
-    expect(result!.name).toBe("Updated Budget")
+    const dbRows = getTable("budgets")
+    const updated = dbRows.find((r) => r.id === budget.id)
+    expect(updated?.amount).toBe(1000)
+    expect(updated?.name).toBe("Updated Budget")
   })
 })
 

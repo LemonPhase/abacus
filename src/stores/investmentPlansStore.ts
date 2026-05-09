@@ -1,6 +1,6 @@
 import { create } from "zustand"
-import { db } from "@/db"
-import { nanoid } from "@/db/nanoid"
+import { supabase } from "@/supabase/client"
+import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
 import type { InvestmentPlan, NewInvestmentPlan } from "@/types"
 
 interface InvestmentPlansState {
@@ -19,30 +19,47 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
 
   load: async () => {
     set({ loading: true })
-    const plans = await db.investmentPlans.toArray()
+    const { data, error } = await supabase.from("investment_plans").select("*")
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const plans: InvestmentPlan[] = (data ?? []).map((row: any) => ({
+      ...mapKeysToCamel<InvestmentPlan>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
+    }))
     set({ plans, loading: false })
   },
 
   add: async (data) => {
-    const now = new Date()
+    const { data: inserted, error } = await supabase
+      .from("investment_plans")
+      .insert(mapKeysToSnake(data) as Record<string, unknown>)
+      .select()
+      .single()
+    if (error) throw error
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = inserted as any
     const plan: InvestmentPlan = {
-      ...data,
-      id: nanoid(),
-      createdAt: now,
-      updatedAt: now,
+      ...mapKeysToCamel<InvestmentPlan>(row),
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
     }
-    await db.investmentPlans.add(plan)
     await get().load()
     return plan
   },
 
   update: async (id, data) => {
-    await db.investmentPlans.update(id, { ...data, updatedAt: new Date() })
+    const { error } = await supabase
+      .from("investment_plans")
+      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .eq("id", id)
+    if (error) throw error
     await get().load()
   },
 
   remove: async (id) => {
-    await db.investmentPlans.delete(id)
+    const { error } = await supabase.from("investment_plans").delete().eq("id", id)
+    if (error) throw error
     await get().load()
   },
 
