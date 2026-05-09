@@ -3,6 +3,7 @@ import { useAccountsStore } from "@/stores/accountsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useBudgetsStore } from "@/stores/budgetsStore"
+import { useInvestmentPlansStore } from "@/stores/investmentPlansStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { getTable } from "@/test/supabase-mock"
 
@@ -90,6 +91,11 @@ describe("Accounts Store", () => {
     expect(found).toBeDefined()
     expect(found!.name).toBe("Find Me")
   })
+
+  it("returns undefined for unknown id", () => {
+    const store = useAccountsStore.getState()
+    expect(store.getById("nonexistent")).toBeUndefined()
+  })
 })
 
 describe("Categories Store", () => {
@@ -126,6 +132,48 @@ describe("Categories Store", () => {
     const roots = useCategoriesStore.getState().getRootCategories("expense")
     expect(roots).toHaveLength(1)
     expect(roots[0].name).toBe("Food")
+  })
+
+  it("updates a category in the database", async () => {
+    const store = useCategoriesStore.getState()
+    const cat = await store.add({ name: "Old Name", type: "expense", color: "#ff0000" })
+
+    await store.update(cat.id, { name: "New Name", color: "#00ff00" })
+
+    const dbRows = getTable("categories")
+    const updated = dbRows.find((r) => r.id === cat.id)
+    expect(updated?.name).toBe("New Name")
+    expect(updated?.color).toBe("#00ff00")
+  })
+
+  it("removes a category from the database", async () => {
+    const store = useCategoriesStore.getState()
+    const cat = await store.add({ name: "To Delete", type: "income", color: "#ff0000" })
+
+    await store.remove(cat.id)
+    const dbRows = getTable("categories")
+    expect(dbRows.find((r) => r.id === cat.id)).toBeUndefined()
+  })
+
+  it("gets category by id", async () => {
+    const store = useCategoriesStore.getState()
+    const cat = await store.add({ name: "Utilities", type: "expense", color: "#ffff00" })
+
+    const found = store.getById(cat.id)
+    expect(found).toBeDefined()
+    expect(found!.name).toBe("Utilities")
+  })
+
+  it("gets child categories", async () => {
+    const store = useCategoriesStore.getState()
+    const parent = await store.add({ name: "Food", type: "expense", color: "#ff0000" })
+    await store.add({ name: "Groceries", type: "expense", color: "#00ff00", parentId: parent.id })
+    await store.add({ name: "Dining Out", type: "expense", color: "#0000ff", parentId: parent.id })
+
+    await store.load()
+    const children = useCategoriesStore.getState().getChildren(parent.id)
+    expect(children).toHaveLength(2)
+    expect(children.map((c) => c.name).sort()).toEqual(["Dining Out", "Groceries"])
   })
 })
 
@@ -193,6 +241,99 @@ describe("Transactions Store", () => {
     expect(may).toHaveLength(1)
     expect(may[0].amount).toBe(20)
   })
+
+  it("updates a transaction in the database", async () => {
+    const store = useTransactionsStore.getState()
+    const txn = await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "expense",
+      amount: 42, currency: "USD", date: new Date("2026-05-01"),
+    })
+
+    await store.update(txn.id, { amount: 99, description: "Updated" })
+
+    const dbRows = getTable("transactions")
+    const updated = dbRows.find((r) => r.id === txn.id)
+    expect(updated?.amount).toBe(99)
+    expect(updated?.description).toBe("Updated")
+  })
+
+  it("removes a transaction from the database", async () => {
+    const store = useTransactionsStore.getState()
+    const txn = await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "expense",
+      amount: 15, currency: "USD", date: new Date("2026-05-01"),
+    })
+
+    await store.remove(txn.id)
+    const dbRows = getTable("transactions")
+    expect(dbRows.find((r) => r.id === txn.id)).toBeUndefined()
+  })
+
+  it("filters by account", async () => {
+    const store = useTransactionsStore.getState()
+    await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "expense",
+      amount: 10, currency: "USD", date: new Date("2026-05-01"),
+    })
+    await store.add({
+      accountId: "acc-2", categoryId: "cat-1", type: "expense",
+      amount: 20, currency: "USD", date: new Date("2026-05-02"),
+    })
+
+    await store.load()
+    const forAcc1 = useTransactionsStore.getState().getByAccount("acc-1")
+    expect(forAcc1).toHaveLength(1)
+    expect(forAcc1[0].amount).toBe(10)
+  })
+
+  it("filters by category", async () => {
+    const store = useTransactionsStore.getState()
+    await store.add({
+      accountId: "acc-1", categoryId: "cat-food", type: "expense",
+      amount: 50, currency: "USD", date: new Date("2026-05-01"),
+    })
+    await store.add({
+      accountId: "acc-1", categoryId: "cat-rent", type: "expense",
+      amount: 500, currency: "USD", date: new Date("2026-05-01"),
+    })
+
+    await store.load()
+    const forFood = useTransactionsStore.getState().getByCategory("cat-food")
+    expect(forFood).toHaveLength(1)
+    expect(forFood[0].amount).toBe(50)
+  })
+
+  it("filters by type", async () => {
+    const store = useTransactionsStore.getState()
+    await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "income",
+      amount: 1000, currency: "USD", date: new Date("2026-05-01"),
+    })
+    await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "expense",
+      amount: 100, currency: "USD", date: new Date("2026-05-02"),
+    })
+
+    await store.load()
+    const incomes = useTransactionsStore.getState().getByType("income")
+    const expenses = useTransactionsStore.getState().getByType("expense")
+    expect(incomes).toHaveLength(1)
+    expect(incomes[0].amount).toBe(1000)
+    expect(expenses).toHaveLength(1)
+    expect(expenses[0].amount).toBe(100)
+  })
+
+  it("gets transaction by id", async () => {
+    const store = useTransactionsStore.getState()
+    const txn = await store.add({
+      accountId: "acc-1", categoryId: "cat-1", type: "expense",
+      amount: 42, currency: "USD", date: new Date("2026-05-01"),
+    })
+
+    const found = store.getById(txn.id)
+    expect(found).toBeDefined()
+    expect(found!.amount).toBe(42)
+  })
 })
 
 describe("Budgets Store", () => {
@@ -232,6 +373,119 @@ describe("Budgets Store", () => {
     const updated = dbRows.find((r) => r.id === budget.id)
     expect(updated?.amount).toBe(1000)
     expect(updated?.name).toBe("Updated Budget")
+  })
+
+  it("removes a budget from the database", async () => {
+    const store = useBudgetsStore.getState()
+    const budget = await store.add({
+      categoryIds: ["cat-1"],
+      name: "To Delete",
+      amount: 100,
+      period: "monthly",
+      startDate: new Date("2026-01-01"),
+    })
+
+    await store.remove(budget.id)
+    const dbRows = getTable("budgets")
+    expect(dbRows.find((r) => r.id === budget.id)).toBeUndefined()
+  })
+
+  it("gets budget by id", async () => {
+    const store = useBudgetsStore.getState()
+    const budget = await store.add({
+      categoryIds: ["cat-1"],
+      name: "Find Me",
+      amount: 500,
+      period: "monthly",
+      startDate: new Date("2026-01-01"),
+    })
+
+    const found = store.getById(budget.id)
+    expect(found).toBeDefined()
+    expect(found!.name).toBe("Find Me")
+  })
+})
+
+describe("Investment Plans Store", () => {
+  beforeEach(() => {
+    useInvestmentPlansStore.setState({ plans: [], loading: false })
+  })
+
+  it("starts with empty state", () => {
+    const state = useInvestmentPlansStore.getState()
+    expect(state.plans).toEqual([])
+    expect(state.loading).toBe(false)
+  })
+
+  it("adds an investment plan and loads it", async () => {
+    const store = useInvestmentPlansStore.getState()
+    const plan = await store.add({
+      name: "Index Fund",
+      type: "index_fund",
+      initialAmount: 10000,
+      monthlyContribution: 500,
+      annualReturnRate: 7,
+      currency: "USD",
+    })
+
+    expect(plan.name).toBe("Index Fund")
+    expect(plan.type).toBe("index_fund")
+    expect(plan.id).toBeDefined()
+
+    const loaded = useInvestmentPlansStore.getState()
+    expect(loaded.plans).toHaveLength(1)
+    expect(loaded.plans[0].initialAmount).toBe(10000)
+  })
+
+  it("updates a plan in the database", async () => {
+    const store = useInvestmentPlansStore.getState()
+    const plan = await store.add({
+      name: "Old Plan",
+      type: "stock",
+      initialAmount: 5000,
+      monthlyContribution: 200,
+      annualReturnRate: 5,
+      currency: "USD",
+    })
+
+    await store.update(plan.id, { name: "New Plan", monthlyContribution: 300 })
+
+    const dbRows = getTable("investment_plans")
+    const updated = dbRows.find((r) => r.id === plan.id)
+    expect(updated?.name).toBe("New Plan")
+    expect(updated?.monthly_contribution).toBe(300)
+  })
+
+  it("removes a plan from the database", async () => {
+    const store = useInvestmentPlansStore.getState()
+    const plan = await store.add({
+      name: "To Delete",
+      type: "cash",
+      initialAmount: 1000,
+      monthlyContribution: 100,
+      annualReturnRate: 2,
+      currency: "USD",
+    })
+
+    await store.remove(plan.id)
+    const dbRows = getTable("investment_plans")
+    expect(dbRows.find((r) => r.id === plan.id)).toBeUndefined()
+  })
+
+  it("gets plan by id", async () => {
+    const store = useInvestmentPlansStore.getState()
+    const plan = await store.add({
+      name: "Find Me",
+      type: "real_estate",
+      initialAmount: 50000,
+      monthlyContribution: 1000,
+      annualReturnRate: 8,
+      currency: "USD",
+    })
+
+    const found = store.getById(plan.id)
+    expect(found).toBeDefined()
+    expect(found!.name).toBe("Find Me")
   })
 })
 

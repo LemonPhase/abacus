@@ -57,6 +57,16 @@ describe("applyMapping", () => {
     expect(result[0].type).toBe("income")
     expect(result[1].type).toBe("expense")
   })
+
+  it("leaves type undefined when value does not match known patterns", () => {
+    const rows = [
+      { Date: "2026-01-15", Desc: "Transfer", Amt: "100", Dir: "transfer" },
+    ]
+    const mapping = { date: "Date", description: "Desc", amount: "Amt", type: "Dir" }
+    const result = applyMapping(rows, mapping)
+
+    expect(result[0].type).toBeUndefined()
+  })
 })
 
 describe("parseAmount", () => {
