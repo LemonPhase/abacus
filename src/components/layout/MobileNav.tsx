@@ -1,0 +1,67 @@
+import { NavLink } from "react-router-dom"
+import {
+  LayoutDashboard,
+  Landmark,
+  ArrowLeftRight,
+  Target,
+  BarChart3,
+  Settings,
+  Tags,
+  TrendingUp,
+} from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+const links = [
+  { to: "/", label: "Home", icon: LayoutDashboard },
+  { to: "/accounts", label: "Accounts", icon: Landmark },
+  { to: "/transactions", label: "Txns", icon: ArrowLeftRight },
+  { to: "/budgets", label: "Budgets", icon: Target },
+  { to: "/reports", label: "Reports", icon: BarChart3 },
+  { to: "/categories", label: "Cats", icon: Tags },
+  { to: "/investments", label: "Invest", icon: TrendingUp },
+  { to: "/settings", label: "Settings", icon: Settings },
+]
+
+export default function MobileNav() {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/60 bg-card/95 backdrop-blur md:hidden">
+      <div className="flex h-16 items-center justify-around px-2">
+        {links.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({ isActive }) =>
+              cn(
+                "flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[11px] font-medium transition-all duration-200",
+                isActive
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <div
+                  className={cn(
+                    "flex size-8 items-center justify-center rounded-lg transition-all duration-200",
+                    isActive && "bg-primary/10"
+                  )}
+                >
+                  <Icon
+                    className={cn(
+                      "size-5 transition-transform duration-200",
+                      isActive && "scale-110"
+                    )}
+                  />
+                </div>
+                {label}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  )
+}
