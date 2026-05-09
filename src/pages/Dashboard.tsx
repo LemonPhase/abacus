@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { ChartTooltip } from "@/components/ChartTooltip"
 import { TrendingDown, TrendingUp, Wallet, PiggyBank } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAccountsStore } from "@/stores/accountsStore"
@@ -157,10 +158,7 @@ export default function Dashboard() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} className="text-muted-foreground" />
                 <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
-                <Tooltip
-                  contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }}
-                  formatter={(value: unknown) => formatCurrency(value as number, baseCurrency)}
-                />
+                <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
                 <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
                 <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expense" />
               </BarChart>
@@ -191,10 +189,7 @@ export default function Dashboard() {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }}
-                  formatter={(value: unknown) => formatCurrency(value as number, baseCurrency)}
-                />
+                <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
               </PieChart>
             </ResponsiveContainer>
           )}

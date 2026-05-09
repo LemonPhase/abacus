@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { ChartTooltip } from "@/components/ChartTooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -182,7 +183,7 @@ export default function Reports() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }} formatter={(v: unknown) => formatCurrency(v as number, baseCurrency)} />
+                  <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
                   <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
                   <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expense" />
                 </BarChart>
@@ -196,7 +197,7 @@ export default function Reports() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }} formatter={(v: unknown) => formatCurrency(v as number, baseCurrency)} />
+                  <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
                   <Line type="monotone" dataKey="netWorth" stroke="#3b82f6" strokeWidth={2} dot={false} name="Net Worth" />
                 </LineChart>
               </ResponsiveContainer>

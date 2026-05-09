@@ -27,9 +27,10 @@ import {
   TableCell,
 } from "@/components/ui/table"
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts"
+import { ChartTooltip } from "@/components/ChartTooltip"
 import { useInvestmentPlansStore } from "@/stores/investmentPlansStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { InvestmentPlan, InvestmentType } from "@/types"
@@ -214,7 +215,7 @@ export default function Investments() {
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
-                  <Tooltip contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }} formatter={(v: unknown) => formatInvestmentValue(v as number, baseCurrency)} />
+                  <ChartTooltip formatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
                   {plans.map((plan, i) => (
                     <Line key={plan.id} type="monotone" dataKey={plan.name} stroke={GROWTH_COLORS[i % GROWTH_COLORS.length]} strokeWidth={2} dot={false} />
                   ))}
@@ -232,7 +233,7 @@ export default function Investments() {
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: "0.75rem", border: "1px solid hsl(var(--border))", background: "hsl(var(--popover))" }} formatter={(v: unknown) => formatInvestmentValue(v as number, baseCurrency)} />
+                  <ChartTooltip formatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
