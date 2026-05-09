@@ -1,7 +1,21 @@
 import { create } from "zustand"
 import { supabase } from "@/supabase/client"
 import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
+import { subscribeToTable } from "@/lib/realtime"
 import type { Account, NewAccount, AccountType } from "@/types"
+import type { Database } from "@/supabase/database.types"
+
+type AccountRow = Database["public"]["Tables"]["accounts"]["Row"]
+
+let _unsub: (() => void) | null = null
+
+function mapRow(row: AccountRow): Account {
+  return {
+    ...mapKeysToCamel<Account>(row),
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  }
+}
 
 interface AccountsState {
   accounts: Account[]
@@ -12,6 +26,7 @@ interface AccountsState {
   remove: (id: string) => Promise<void>
   getByType: (type: AccountType) => Account[]
   getById: (id: string) => Account | undefined
+  unsubscribe: () => void
 }
 
 export const useAccountsStore = create<AccountsState>()((set, get) => ({
@@ -22,29 +37,40 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
     set({ loading: true })
     const { data, error } = await supabase.from("accounts").select("*")
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const accounts: Account[] = (data ?? []).map((row: any) => ({
-      ...mapKeysToCamel<Account>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    }))
+    const accounts: Account[] = (data ?? []).map(mapRow)
     set({ accounts, loading: false })
+
+    if (!_unsub) {
+      _unsub = subscribeToTable("accounts", (payload) => {
+        if (payload.eventType === "INSERT") {
+          const account = mapRow(payload.new as AccountRow)
+          set((state) => {
+            if (state.accounts.some((a) => a.id === account.id)) return state
+            return { accounts: [...state.accounts, account] }
+          })
+        } else if (payload.eventType === "UPDATE") {
+          const account = mapRow(payload.new as AccountRow)
+          set((state) => ({
+            accounts: state.accounts.map((a) => (a.id === account.id ? account : a)),
+          }))
+        } else if (payload.eventType === "DELETE") {
+          const id = (payload.old as { id: string }).id
+          set((state) => ({
+            accounts: state.accounts.filter((a) => a.id !== id),
+          }))
+        }
+      })
+    }
   },
 
   add: async (data) => {
     const { data: inserted, error } = await supabase
       .from("accounts")
-      .insert(mapKeysToSnake(data) as Record<string, unknown>)
+      .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["accounts"]["Insert"])
       .select()
       .single()
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = inserted as any
-    const account: Account = {
-      ...mapKeysToCamel<Account>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    }
+    const account = mapRow(inserted as AccountRow)
     await get().load()
     return account
   },
@@ -52,7 +78,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
   update: async (id, data) => {
     const { error } = await supabase
       .from("accounts")
-      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["accounts"]["Update"])
       .eq("id", id)
     if (error) throw error
     await get().load()
@@ -70,5 +96,12 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
 
   getById: (id) => {
     return get().accounts.find((a) => a.id === id)
+  },
+
+  unsubscribe: () => {
+    if (_unsub) {
+      _unsub()
+      _unsub = null
+    }
   },
 }))

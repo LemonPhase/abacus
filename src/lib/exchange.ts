@@ -1,5 +1,6 @@
 import { supabase } from "@/supabase/client"
 import { mapKeysToSnake } from "@/lib/case"
+import type { Database } from "@/supabase/database.types"
 
 const API_BASE = "https://open.er-api.com/v6/latest"
 
@@ -28,7 +29,7 @@ export async function getOrFetchRate(from: string, to: string, date: Date): Prom
     .eq("from_currency", from)
     .eq("to_currency", to)
     .eq("date", dateStr)
-    .maybeSingle() as { data: { rate: number } | null; error: unknown }
+    .maybeSingle()
 
   if (error) return null
   if (existing) return existing.rate
@@ -41,7 +42,7 @@ export async function getOrFetchRate(from: string, to: string, date: Date): Prom
         toCurrency: to,
         rate,
         date: dateStr,
-      }) as Record<string, unknown>,
+      }) as Database["public"]["Tables"]["exchange_rates"]["Insert"],
     )
     if (insertError) return null
     return rate

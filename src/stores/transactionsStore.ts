@@ -1,7 +1,22 @@
 import { create } from "zustand"
 import { supabase } from "@/supabase/client"
 import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
+import { subscribeToTable } from "@/lib/realtime"
 import type { Transaction, NewTransaction, TransactionKind } from "@/types"
+import type { Database } from "@/supabase/database.types"
+
+type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"]
+
+let _unsub: (() => void) | null = null
+
+function mapRow(row: TransactionRow): Transaction {
+  return {
+    ...mapKeysToCamel<Transaction>(row),
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+    date: new Date(row.date),
+  }
+}
 
 interface TransactionsState {
   transactions: Transaction[]
@@ -15,6 +30,7 @@ interface TransactionsState {
   getByDateRange: (from: Date, to: Date) => Transaction[]
   getByType: (type: TransactionKind) => Transaction[]
   getById: (id: string) => Transaction | undefined
+  unsubscribe: () => void
 }
 
 export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
@@ -28,14 +44,30 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
       .select("*")
       .order("date", { ascending: false })
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const transactions: Transaction[] = (data ?? []).map((row: any) => ({
-      ...mapKeysToCamel<Transaction>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      date: new Date(row.date),
-    }))
+    const transactions: Transaction[] = (data ?? []).map(mapRow)
     set({ transactions, loading: false })
+
+    if (!_unsub) {
+      _unsub = subscribeToTable("transactions", (payload) => {
+        if (payload.eventType === "INSERT") {
+          const transaction = mapRow(payload.new as TransactionRow)
+          set((state) => {
+            if (state.transactions.some((t) => t.id === transaction.id)) return state
+            return { transactions: [transaction, ...state.transactions] }
+          })
+        } else if (payload.eventType === "UPDATE") {
+          const transaction = mapRow(payload.new as TransactionRow)
+          set((state) => ({
+            transactions: state.transactions.map((t) => (t.id === transaction.id ? transaction : t)),
+          }))
+        } else if (payload.eventType === "DELETE") {
+          const id = (payload.old as { id: string }).id
+          set((state) => ({
+            transactions: state.transactions.filter((t) => t.id !== id),
+          }))
+        }
+      })
+    }
   },
 
   add: async (data) => {
@@ -46,18 +78,11 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
     }
     const { data: inserted, error } = await supabase
       .from("transactions")
-      .insert(mapKeysToSnake(payload) as Record<string, unknown>)
+      .insert(mapKeysToSnake(payload) as Database["public"]["Tables"]["transactions"]["Insert"])
       .select()
       .single()
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = inserted as any
-    const transaction: Transaction = {
-      ...mapKeysToCamel<Transaction>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      date: new Date(row.date),
-    }
+    const transaction = mapRow(inserted as TransactionRow)
     await get().load()
     return transaction
   },
@@ -65,7 +90,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   update: async (id, data) => {
     const { error } = await supabase
       .from("transactions")
-      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["transactions"]["Update"])
       .eq("id", id)
     if (error) throw error
     await get().load()
@@ -95,5 +120,12 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
 
   getById: (id) => {
     return get().transactions.find((t) => t.id === id)
+  },
+
+  unsubscribe: () => {
+    if (_unsub) {
+      _unsub()
+      _unsub = null
+    }
   },
 }))

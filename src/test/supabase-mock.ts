@@ -200,8 +200,20 @@ function createBuilder(tableName: string): any {
   return builder
 }
 
+function createMockChannel() {
+  const channel = {
+    on: vi.fn(() => channel),
+    subscribe: vi.fn(() => channel),
+    unsubscribe: vi.fn(),
+  }
+  return channel
+}
+
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
+  channel: vi.fn(() => createMockChannel()),
+  removeChannel: vi.fn(),
+  removeAllChannels: vi.fn(),
   auth: {
     getSession: vi.fn(() => Promise.resolve({ data: { session: null }, error: null })),
     signInWithPassword: vi.fn(),

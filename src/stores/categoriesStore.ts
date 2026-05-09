@@ -1,7 +1,21 @@
 import { create } from "zustand"
 import { supabase } from "@/supabase/client"
 import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
+import { subscribeToTable } from "@/lib/realtime"
 import type { Category, NewCategory, CategoryKind } from "@/types"
+import type { Database } from "@/supabase/database.types"
+
+type CategoryRow = Database["public"]["Tables"]["categories"]["Row"]
+
+let _unsub: (() => void) | null = null
+
+function mapRow(row: CategoryRow): Category {
+  return {
+    ...mapKeysToCamel<Category>(row),
+    createdAt: new Date(row.created_at),
+    updatedAt: new Date(row.updated_at),
+  }
+}
 
 interface CategoriesState {
   categories: Category[]
@@ -14,6 +28,7 @@ interface CategoriesState {
   getById: (id: string) => Category | undefined
   getChildren: (parentId: string) => Category[]
   getRootCategories: (type: CategoryKind) => Category[]
+  unsubscribe: () => void
 }
 
 export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
@@ -24,29 +39,40 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
     set({ loading: true })
     const { data, error } = await supabase.from("categories").select("*")
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const categories: Category[] = (data ?? []).map((row: any) => ({
-      ...mapKeysToCamel<Category>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    }))
+    const categories: Category[] = (data ?? []).map(mapRow)
     set({ categories, loading: false })
+
+    if (!_unsub) {
+      _unsub = subscribeToTable("categories", (payload) => {
+        if (payload.eventType === "INSERT") {
+          const category = mapRow(payload.new as CategoryRow)
+          set((state) => {
+            if (state.categories.some((c) => c.id === category.id)) return state
+            return { categories: [...state.categories, category] }
+          })
+        } else if (payload.eventType === "UPDATE") {
+          const category = mapRow(payload.new as CategoryRow)
+          set((state) => ({
+            categories: state.categories.map((c) => (c.id === category.id ? category : c)),
+          }))
+        } else if (payload.eventType === "DELETE") {
+          const id = (payload.old as { id: string }).id
+          set((state) => ({
+            categories: state.categories.filter((c) => c.id !== id),
+          }))
+        }
+      })
+    }
   },
 
   add: async (data) => {
     const { data: inserted, error } = await supabase
       .from("categories")
-      .insert(mapKeysToSnake(data) as Record<string, unknown>)
+      .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Insert"])
       .select()
       .single()
     if (error) throw error
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = inserted as any
-    const category: Category = {
-      ...mapKeysToCamel<Category>(row),
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    }
+    const category = mapRow(inserted as CategoryRow)
     await get().load()
     return category
   },
@@ -54,7 +80,7 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   update: async (id, data) => {
     const { error } = await supabase
       .from("categories")
-      .update(mapKeysToSnake(data) as Record<string, unknown>)
+      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Update"])
       .eq("id", id)
     if (error) throw error
     await get().load()
@@ -80,5 +106,12 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
 
   getRootCategories: (type) => {
     return get().categories.filter((c) => c.type === type && !c.parentId)
+  },
+
+  unsubscribe: () => {
+    if (_unsub) {
+      _unsub()
+      _unsub = null
+    }
   },
 }))
