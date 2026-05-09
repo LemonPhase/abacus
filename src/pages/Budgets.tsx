@@ -23,6 +23,7 @@ import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { Budget, BudgetPeriod } from "@/types"
+import { ICON_MAP } from "@/lib/icons"
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
@@ -306,19 +307,26 @@ export default function Budgets() {
                 {expenseCategories.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No expense categories available.</p>
                 ) : (
-                  expenseCategories.map((cat) => (
-                    <label
-                      key={cat.id}
-                      className="flex items-center gap-2.5 py-1 cursor-pointer rounded hover:bg-muted/50 px-1"
-                    >
-                      <Checkbox
-                        checked={form.categoryIds.includes(cat.id)}
-                        onCheckedChange={() => toggleCategory(cat.id)}
-                      />
-                      <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                      <span className="text-sm">{cat.name}</span>
-                    </label>
-                  ))
+                  expenseCategories.map((cat) => {
+                    const CatIcon = ICON_MAP[cat.icon ?? ""]
+                    return (
+                      <label
+                        key={cat.id}
+                        className="flex items-center gap-2.5 py-1 cursor-pointer rounded hover:bg-muted/50 px-1"
+                      >
+                        <Checkbox
+                          checked={form.categoryIds.includes(cat.id)}
+                          onCheckedChange={() => toggleCategory(cat.id)}
+                        />
+                        {CatIcon ? (
+                          <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
+                        ) : (
+                          <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                        )}
+                        <span className="text-sm">{cat.name}</span>
+                      </label>
+                    )
+                  })
                 )}
               </div>
             </div>

@@ -14,6 +14,7 @@ import { useAccountsStore } from "@/stores/accountsStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { ICON_MAP } from "@/lib/icons"
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)
@@ -55,12 +56,12 @@ export default function Reports() {
   }, [filteredTxn])
 
   const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; color: string; income: number; expense: number }>()
+    const map = new Map<string, { name: string; color: string; icon: string | null; income: number; expense: number }>()
     for (const t of filteredTxn) {
       const cat = categories.find((c) => c.id === t.categoryId)
       const key = cat?.id ?? t.categoryId
       if (!map.has(key)) {
-        map.set(key, { name: cat?.name ?? "Unknown", color: cat?.color ?? "#888", income: 0, expense: 0 })
+        map.set(key, { name: cat?.name ?? "Unknown", color: cat?.color ?? "#888", icon: cat?.icon ?? null, income: 0, expense: 0 })
       }
       const entry = map.get(key)!
       if (t.type === "income") entry.income += t.baseAmount
@@ -218,7 +219,14 @@ export default function Reports() {
                   <TableRow key={cat.name}>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span className="size-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                        {(() => {
+                          const IconComp = cat.icon ? ICON_MAP[cat.icon] : null
+                          return IconComp ? (
+                            <IconComp className="size-4 shrink-0" style={{ color: cat.color }} />
+                          ) : (
+                            <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                          )
+                        })()}
                         {cat.name}
                       </div>
                     </TableCell>
