@@ -5,6 +5,7 @@ import { AuthProvider, AuthGuard } from "@/supabase/auth"
 import ThemeProvider from "@/components/ThemeProvider"
 import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
+import GlobalErrorBanner from "@/components/GlobalErrorBanner"
 
 import Auth from "@/pages/Auth"
 import ResetPassword from "@/pages/ResetPassword"
@@ -22,11 +23,12 @@ function AppLayout() {
 
   return (
     <div className="flex min-h-screen">
+      <GlobalErrorBanner />
       <Sidebar />
       <main className="flex-1 overflow-auto pb-20 md:pb-0">
         <div className="container mx-auto p-4 md:p-6 max-w-5xl">
           <div
-            key={location.pathname}
+            
             className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out"
           >
             <Routes location={location}>

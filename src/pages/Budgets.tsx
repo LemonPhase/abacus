@@ -24,10 +24,9 @@ import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import type { Budget, BudgetPeriod } from "@/types"
 import { ICON_MAP } from "@/lib/icons"
+import { formatCurrency } from "@/lib/format"
 
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
-}
+
 
 function getPeriodLabel(date: Date, period: BudgetPeriod): string {
   if (period === "monthly") {

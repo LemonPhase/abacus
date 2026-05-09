@@ -29,6 +29,7 @@ import {
 import { useAccountsStore } from "@/stores/accountsStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import type { Account, AccountType } from "@/types"
+import { formatCurrency } from "@/lib/format"
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "CAD", "AUD", "CHF", "INR", "BRL"]
 const ACCOUNT_TYPES: AccountType[] = ["checking", "savings", "investment", "credit", "cash"]
@@ -57,9 +58,7 @@ const emptyForm: FormData = {
   notes: "",
 }
 
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
-}
+
 
 export default function Accounts() {
   const { accounts, load, add, update, remove } = useAccountsStore()

@@ -15,6 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useAccountsStore } from "@/stores/accountsStore"
+import { useCategoriesStore } from "@/stores/categoriesStore"
+import { useTransactionsStore } from "@/stores/transactionsStore"
+import { useBudgetsStore } from "@/stores/budgetsStore"
+import { useInvestmentPlansStore } from "@/stores/investmentPlansStore"
 import { useAuth } from "@/supabase/auth"
 import { supabase } from "@/supabase/client"
 
@@ -79,6 +84,20 @@ export default function Settings() {
         }
       }
 
+      await Promise.all([
+        useAccountsStore.getState().load(),
+        useCategoriesStore.getState().load(),
+        useTransactionsStore.getState().load(),
+        useBudgetsStore.getState().load(),
+        useInvestmentPlansStore.getState().load(),
+      ])
+      await Promise.all([
+        useAccountsStore.getState().load(),
+        useCategoriesStore.getState().load(),
+        useTransactionsStore.getState().load(),
+        useBudgetsStore.getState().load(),
+        useInvestmentPlansStore.getState().load(),
+      ])
       setImportStatus("success")
       setImportMsg(`Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`)
     } catch (e) {

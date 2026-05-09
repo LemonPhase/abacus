@@ -32,10 +32,9 @@ import { useSettingsStore } from "@/stores/settingsStore"
 import { parseCSV, detectColumns, applyMapping, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
 import type { TransactionKind } from "@/types"
 import { ICON_MAP } from "@/lib/icons"
+import { formatCurrency } from "@/lib/format"
 
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
-}
+
 
 function formatDate(d: Date) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })

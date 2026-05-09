@@ -20,6 +20,8 @@ function mapRow(row: InvestmentPlanRow): InvestmentPlan {
 interface InvestmentPlansState {
   plans: InvestmentPlan[]
   loading: boolean
+  error: string | null
+  clearError: () => void
   load: () => Promise<void>
   add: (data: NewInvestmentPlan) => Promise<InvestmentPlan>
   update: (id: string, data: Partial<NewInvestmentPlan>) => Promise<void>
@@ -31,11 +33,13 @@ interface InvestmentPlansState {
 export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get) => ({
   plans: [],
   loading: false,
+  error: null,
+  clearError: () => set({ error: null }),
 
   load: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     const { data, error } = await supabase.from("investment_plans").select("*")
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const plans: InvestmentPlan[] = (data ?? []).map(mapRow)
     set({ plans, loading: false })
 
@@ -63,30 +67,42 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   },
 
   add: async (data) => {
+    set({ error: null })
     const { data: inserted, error } = await supabase
       .from("investment_plans")
       .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["investment_plans"]["Insert"])
       .select()
       .single()
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const plan = mapRow(inserted as InvestmentPlanRow)
-    await get().load()
+    set((state) => {
+      if (state.plans.some((item) => item.id === plan.id)) return state
+      return { plans: [...state.plans, plan] }
+    })
     return plan
   },
 
   update: async (id, data) => {
+    set({ error: null })
     const { error } = await supabase
       .from("investment_plans")
       .update(mapKeysToSnake(data) as Database["public"]["Tables"]["investment_plans"]["Update"])
       .eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      plans: state.plans.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+    }))
   },
 
   remove: async (id) => {
+    set({ error: null })
     const { error } = await supabase.from("investment_plans").delete().eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      plans: state.plans.filter((item) => item.id !== id),
+    }))
   },
 
   getById: (id) => {

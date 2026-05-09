@@ -21,6 +21,8 @@ function mapRow(row: TransactionRow): Transaction {
 interface TransactionsState {
   transactions: Transaction[]
   loading: boolean
+  error: string | null
+  clearError: () => void
   load: () => Promise<void>
   add: (data: NewTransaction & { baseAmount?: number; baseCurrency?: string }) => Promise<Transaction>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>
@@ -36,14 +38,16 @@ interface TransactionsState {
 export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   transactions: [],
   loading: false,
+  error: null,
+  clearError: () => set({ error: null }),
 
   load: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     const { data, error } = await supabase
       .from("transactions")
       .select("*")
       .order("date", { ascending: false })
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const transactions: Transaction[] = (data ?? []).map(mapRow)
     set({ transactions, loading: false })
 
@@ -71,6 +75,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   },
 
   add: async (data) => {
+    set({ error: null })
     const payload = {
       ...data,
       baseAmount: data.baseAmount ?? data.amount,
@@ -81,25 +86,36 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
       .insert(mapKeysToSnake(payload) as Database["public"]["Tables"]["transactions"]["Insert"])
       .select()
       .single()
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const transaction = mapRow(inserted as TransactionRow)
-    await get().load()
+    set((state) => {
+      if (state.transactions.some((item) => item.id === transaction.id)) return state
+      return { transactions: [...state.transactions, transaction] }
+    })
     return transaction
   },
 
   update: async (id, data) => {
+    set({ error: null })
     const { error } = await supabase
       .from("transactions")
       .update(mapKeysToSnake(data) as Database["public"]["Tables"]["transactions"]["Update"])
       .eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      transactions: state.transactions.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+    }))
   },
 
   remove: async (id) => {
+    set({ error: null })
     const { error } = await supabase.from("transactions").delete().eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      transactions: state.transactions.filter((item) => item.id !== id),
+    }))
   },
 
   getByAccount: (accountId) => {

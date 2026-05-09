@@ -20,6 +20,8 @@ function mapRow(row: CategoryRow): Category {
 interface CategoriesState {
   categories: Category[]
   loading: boolean
+  error: string | null
+  clearError: () => void
   load: () => Promise<void>
   add: (data: NewCategory) => Promise<Category>
   update: (id: string, data: Partial<NewCategory>) => Promise<void>
@@ -34,11 +36,13 @@ interface CategoriesState {
 export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   categories: [],
   loading: false,
+  error: null,
+  clearError: () => set({ error: null }),
 
   load: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     const { data, error } = await supabase.from("categories").select("*")
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const categories: Category[] = (data ?? []).map(mapRow)
     set({ categories, loading: false })
 
@@ -66,30 +70,42 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   },
 
   add: async (data) => {
+    set({ error: null })
     const { data: inserted, error } = await supabase
       .from("categories")
       .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Insert"])
       .select()
       .single()
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const category = mapRow(inserted as CategoryRow)
-    await get().load()
+    set((state) => {
+      if (state.categories.some((item) => item.id === category.id)) return state
+      return { categories: [...state.categories, category] }
+    })
     return category
   },
 
   update: async (id, data) => {
+    set({ error: null })
     const { error } = await supabase
       .from("categories")
       .update(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Update"])
       .eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      categories: state.categories.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+    }))
   },
 
   remove: async (id) => {
+    set({ error: null })
     const { error } = await supabase.from("categories").delete().eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      categories: state.categories.filter((item) => item.id !== id),
+    }))
   },
 
   getByType: (type) => {

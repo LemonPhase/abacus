@@ -21,6 +21,8 @@ function mapRow(row: BudgetRow): Budget {
 interface BudgetsState {
   budgets: Budget[]
   loading: boolean
+  error: string | null
+  clearError: () => void
   load: () => Promise<void>
   add: (data: NewBudget) => Promise<Budget>
   update: (id: string, data: Partial<NewBudget>) => Promise<void>
@@ -32,11 +34,13 @@ interface BudgetsState {
 export const useBudgetsStore = create<BudgetsState>()((set, get) => ({
   budgets: [],
   loading: false,
+  error: null,
+  clearError: () => set({ error: null }),
 
   load: async () => {
-    set({ loading: true })
+    set({ loading: true, error: null })
     const { data, error } = await supabase.from("budgets").select("*")
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const budgets: Budget[] = (data ?? []).map(mapRow)
     set({ budgets, loading: false })
 
@@ -64,30 +68,42 @@ export const useBudgetsStore = create<BudgetsState>()((set, get) => ({
   },
 
   add: async (data) => {
+    set({ error: null })
     const { data: inserted, error } = await supabase
       .from("budgets")
       .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["budgets"]["Insert"])
       .select()
       .single()
-    if (error) throw error
+    if (error) { set({ error: error.message, loading: false }); throw error }
     const budget = mapRow(inserted as BudgetRow)
-    await get().load()
+    set((state) => {
+      if (state.budgets.some((item) => item.id === budget.id)) return state
+      return { budgets: [...state.budgets, budget] }
+    })
     return budget
   },
 
   update: async (id, data) => {
+    set({ error: null })
     const { error } = await supabase
       .from("budgets")
       .update(mapKeysToSnake(data) as Database["public"]["Tables"]["budgets"]["Update"])
       .eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      budgets: state.budgets.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+    }))
   },
 
   remove: async (id) => {
+    set({ error: null })
     const { error } = await supabase.from("budgets").delete().eq("id", id)
-    if (error) throw error
-    await get().load()
+    if (error) { set({ error: error.message, loading: false }); throw error }
+
+    set((state) => ({
+      budgets: state.budgets.filter((item) => item.id !== id),
+    }))
   },
 
   getById: (id) => {

@@ -10,10 +10,9 @@ import { useBudgetsStore } from "@/stores/budgetsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { ICON_MAP } from "@/lib/icons"
+import { formatCurrency } from "@/lib/format"
 
-function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)
-}
+
 
 function StatCard({ title, value, icon: Icon, trend }: { title: string; value: string; icon: React.ElementType; trend?: "up" | "down" }) {
   return (
