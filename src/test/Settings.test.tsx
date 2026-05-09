@@ -1,11 +1,8 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen, act } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { MemoryRouter } from "react-router-dom"
 import Settings from "@/pages/Settings"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { useAuth } from "@/supabase/auth"
-import { supabase } from "@/supabase/client"
 
 // Mock the Auth context
 vi.mock("@/supabase/auth", async (importOriginal) => {
