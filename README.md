@@ -19,7 +19,6 @@ A local-first personal finance manager built with React + TypeScript + Tauri.
 
 - React 19, React Router v7, TypeScript 6
 - Tailwind CSS v4, shadcn/ui (base-nova), lucide-react
-- Dexie.js (IndexedDB) for local persistence
 - Supabase for cloud sync & auth
 - Zustand for state management
 - Recharts for data visualization
@@ -60,7 +59,7 @@ Run `npx supabase db reset` after changing migrations.
 | `npm run dev`        | Start dev server                              |
 | `npm run build`      | Typecheck then production build to `dist/`    |
 | `npm run lint`       | ESLint                                        |
-| `npm test`           | Vitest unit tests (jsdom + fake-indexeddb)    |
+| `npm test`           | Vitest unit tests (jsdom + in-memory mock DB)    |
 | `npm run test:e2e`   | Playwright E2E tests (requires dev server)    |
 | `npm run tauri dev`  | Tauri desktop dev mode                        |
 | `npm run tauri build`| Build native desktop app                      |
@@ -78,18 +77,16 @@ src/
 ├── components/
 │   ├── layout/       # Sidebar, MobileNav
 │   └── ui/           # shadcn/ui components
-├── db/               # Dexie schema, seeds, nanoid
+├── supabase/         # Client, auth, types, migrations
 ├── stores/           # Zustand stores (one per domain)
 ├── lib/              # Utilities (csv, exchange, sync, cn)
 ├── types/            # Shared TypeScript interfaces
-└── test/             # Unit test setup + specs
+├── test/             # Unit tests & supabase-mock.ts
 e2e/                  # Playwright E2E specs
 src-tauri/            # Tauri v2 Rust backend
-supabase/             # Local Supabase config & migrations
 ```
 
 ## Notes
 
 - The DB is auto-seeded with default categories on first open.
-- Unit tests monkey-patch IndexedDB globally via `fake-indexeddb/auto`.
 - Tailwind CSS v4 has no config file — everything lives in `src/index.css`.
