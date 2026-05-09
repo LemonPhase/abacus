@@ -335,7 +335,7 @@ export default function Investments() {
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v: string | null) => setForm({ ...form, type: (v ?? "index_fund") as InvestmentType })}>
+              <Select value={form.type} onValueChange={(v: string | null) => setForm({ ...form, type: (v ?? "index_fund") as InvestmentType })} items={INVESTMENT_TYPES.map((t) => ({ value: t, label: INVESTMENT_TYPE_LABELS[t] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {INVESTMENT_TYPES.map((t) => (

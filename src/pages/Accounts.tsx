@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useAccountsStore } from "@/stores/accountsStore"
+import { useTransactionsStore } from "@/stores/transactionsStore"
 import type { Account, AccountType } from "@/types"
 
 const CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "CAD", "AUD", "CHF", "INR", "BRL"]
@@ -62,6 +63,7 @@ function formatCurrency(amount: number, currency: string) {
 
 export default function Accounts() {
   const { accounts, load, add, update, remove } = useAccountsStore()
+  const { transactions } = useTransactionsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [form, setForm] = useState<FormData>(emptyForm)
@@ -199,7 +201,7 @@ export default function Accounts() {
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as AccountType })}>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as AccountType })} items={ACCOUNT_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -251,6 +253,14 @@ export default function Accounts() {
           </DialogHeader>
           <p className="text-muted-foreground">
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            {(() => {
+              const count = transactions.filter((t) => t.accountId === deleteTarget?.id).length
+              return count > 0 ? (
+                <span className="block mt-1 text-rose-600 font-medium">
+                  {count} transaction{count !== 1 ? "s" : ""} will become unlinked.
+                </span>
+              ) : null
+            })()}
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>

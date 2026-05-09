@@ -270,7 +270,7 @@ export default function Budgets() {
             </div>
             <div className="grid gap-2">
               <Label>Period</Label>
-              <Select value={form.period} onValueChange={(v: string | null) => setForm({ ...form, period: (v ?? "monthly") as BudgetPeriod })}>
+              <Select value={form.period} onValueChange={(v: string | null) => setForm({ ...form, period: (v ?? "monthly") as BudgetPeriod })} items={[{ value: "monthly", label: "Monthly" }, { value: "yearly", label: "Yearly" }]}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="monthly">Monthly</SelectItem>
@@ -329,6 +329,9 @@ export default function Budgets() {
                   })
                 )}
               </div>
+              {form.name.trim() && form.amount && form.categoryIds.length === 0 && (
+                <p className="text-xs text-muted-foreground">Select at least one category.</p>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { TrendingDown, TrendingUp, Wallet, PiggyBank } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { useAccountsStore } from "@/stores/accountsStore"
 import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useBudgetsStore } from "@/stores/budgetsStore"
@@ -41,6 +43,7 @@ export default function Dashboard() {
   const { budgets, load: loadBudgets } = useBudgetsStore()
   const { categories, load: loadCategories } = useCategoriesStore()
   const { baseCurrency } = useSettingsStore()
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadAccounts()
@@ -144,8 +147,9 @@ export default function Dashboard() {
         <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
           <h2 className="text-sm font-semibold tracking-tight mb-4">Income vs Expenses</h2>
           {monthlyData.every((m) => m.income === 0 && m.expense === 0) ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
               <p className="text-sm">No transaction data yet</p>
+              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={250}>
@@ -167,8 +171,9 @@ export default function Dashboard() {
         <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
           <h2 className="text-sm font-semibold tracking-tight mb-4">Spending by Category</h2>
           {categorySpending.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
               <p className="text-sm">No spending data this month</p>
+              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={250}>
@@ -217,8 +222,9 @@ export default function Dashboard() {
         <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
           <h2 className="text-sm font-semibold tracking-tight mb-3">Recent Transactions</h2>
           {recentTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
               <p className="text-sm">No transactions yet</p>
+              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
             </div>
           ) : (
             <div className="space-y-2">
@@ -240,8 +246,9 @@ export default function Dashboard() {
         <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
           <h2 className="text-sm font-semibold tracking-tight mb-3">Active Budgets</h2>
           {budgets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
               <p className="text-sm">No budgets yet</p>
+              <Button variant="outline" size="sm" onClick={() => navigate("/budgets")}>Create Budget</Button>
             </div>
           ) : (
             <div className="space-y-3">

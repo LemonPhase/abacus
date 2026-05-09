@@ -96,6 +96,7 @@ export default function Categories() {
       await add(data)
     }
 
+    setActiveTab(data.type)
     setDialogOpen(false)
     setEditing(null)
   }
@@ -206,27 +207,27 @@ export default function Categories() {
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as CategoryKind, parentId: "" })}>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as CategoryKind, parentId: "" })} items={[{ value: "expense", label: "Expense" }, { value: "income", label: "Income" }]}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense">Expense</SelectItem>
-                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense" label="Expense">Expense</SelectItem>
+                  <SelectItem value="income" label="Income">Income</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {parentOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Parent Category</Label>
-                <Select value={form.parentId} onValueChange={(v) => setForm({ ...form, parentId: v ?? "" })}>
+                <Select value={form.parentId} onValueChange={(v) => setForm({ ...form, parentId: v ?? "" })} items={[{ value: "", label: "None (root category)" }, ...parentOptions.map((c) => ({ value: c.id, label: c.name }))]}>
                   <SelectTrigger>
                     <SelectValue placeholder="None (root category)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (root category)</SelectItem>
+                    <SelectItem value="" label="None (root category)">None (root category)</SelectItem>
                     {parentOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

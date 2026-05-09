@@ -159,6 +159,13 @@ export default function Transactions() {
 
     setDialogOpen(false)
     setEditing(null)
+    if (!editing) {
+      setFilterAccount("all")
+      setFilterCategory("all")
+      setFilterType("all")
+      setFilterDateFrom("")
+      setFilterDateTo("")
+    }
   }
 
   async function handleDelete() {
@@ -214,6 +221,11 @@ export default function Transactions() {
     setCsvHeaders([])
     setCsvRawRows([])
     setCsvMappedRows([])
+    setFilterAccount("all")
+    setFilterCategory("all")
+    setFilterType("all")
+    setFilterDateFrom("")
+    setFilterDateTo("")
   }
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown"
@@ -244,43 +256,43 @@ export default function Transactions() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
         <div className="grid gap-1.5">
           <Label className="text-xs">Account</Label>
-          <Select value={filterAccount} onValueChange={(v) => setFilterAccount(v ?? "all")}>
+          <Select value={filterAccount} onValueChange={(v) => setFilterAccount(v ?? "all")} items={[{ value: "all", label: "All accounts" }, ...accounts.map((a) => ({ value: a.id, label: a.name }))]}>
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="All accounts" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All accounts</SelectItem>
+              <SelectItem value="all" label="All accounts">All accounts</SelectItem>
               {accounts.map((a) => (
-                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                <SelectItem key={a.id} value={a.id} label={a.name}>{a.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs">Category</Label>
-          <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v ?? "all")}>
+          <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v ?? "all")} items={[{ value: "all", label: "All categories" }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}>
             <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue placeholder="All categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="all" label="All categories">All categories</SelectItem>
               {categories.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs">Type</Label>
-          <Select value={filterType} onValueChange={(v) => setFilterType(v ?? "all")}>
+          <Select value={filterType} onValueChange={(v) => setFilterType(v ?? "all")} items={[{ value: "all", label: "All" }, { value: "income", label: "Income" }, { value: "expense", label: "Expense" }, { value: "transfer", label: "Transfer" }]}>
             <SelectTrigger className="h-8 w-28 text-xs">
               <SelectValue placeholder="All" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="income">Income</SelectItem>
-              <SelectItem value="expense">Expense</SelectItem>
-              <SelectItem value="transfer">Transfer</SelectItem>
+              <SelectItem value="all" label="All">All</SelectItem>
+              <SelectItem value="income" label="Income">Income</SelectItem>
+              <SelectItem value="expense" label="Expense">Expense</SelectItem>
+              <SelectItem value="transfer" label="Transfer">Transfer</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -391,7 +403,7 @@ export default function Transactions() {
           <div className="grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: (v ?? "expense") as TransactionKind })}>
+              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: (v ?? "expense") as TransactionKind, categoryId: "" })} items={TRANSACTION_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -404,7 +416,7 @@ export default function Transactions() {
             </div>
             <div className="grid gap-2">
               <Label>Account</Label>
-              <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v ?? "" })}>
+              <Select value={form.accountId} onValueChange={(v) => setForm({ ...form, accountId: v ?? "" })} items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
@@ -417,7 +429,7 @@ export default function Transactions() {
             </div>
             <div className="grid gap-2">
               <Label>Category</Label>
-              <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })}>
+              <Select value={form.categoryId} onValueChange={(v) => setForm({ ...form, categoryId: v ?? "" })} items={categories.filter((c) => (form.type === "transfer" ? true : c.type === form.type)).map((c) => ({ value: c.id, label: c.name }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
@@ -582,24 +594,23 @@ export default function Transactions() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>Account</Label>
-                  <Select value={csvAccountId} onValueChange={(v: string | null) => setCsvAccountId(v ?? "")}>
+                  <Select value={csvAccountId} onValueChange={(v: string | null) => setCsvAccountId(v ?? "")} items={accounts.map((a) => ({ value: a.id, label: a.name }))}>
                     <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                     <SelectContent>
                       {accounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        <SelectItem key={a.id} value={a.id} label={a.name}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label>Default Category</Label>
-                  <Select value={csvCategoryId} onValueChange={(v: string | null) => setCsvCategoryId(v ?? "")}>
+                  <Select value={csvCategoryId} onValueChange={(v: string | null) => setCsvCategoryId(v ?? "")} items={categories.map((c) => ({ value: c.id, label: c.name }))}>
                     <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
                       {categories
-                        .filter((c) => c.type === "expense")
                         .map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
                         ))}
                     </SelectContent>
                   </Select>
