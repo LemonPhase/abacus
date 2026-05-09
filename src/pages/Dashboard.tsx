@@ -6,6 +6,7 @@ import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useBudgetsStore } from "@/stores/budgetsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { ICON_MAP } from "@/lib/icons"
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)
@@ -194,12 +195,19 @@ export default function Dashboard() {
           )}
           {categorySpending.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-              {categorySpending.slice(0, 6).map((cat, i) => (
-                <div key={cat.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="size-2 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                  {cat.name}
-                </div>
-              ))}
+              {categorySpending.slice(0, 6).map((cat, i) => {
+                const CatIcon = ICON_MAP[categories.find((c) => c.name === cat.name)?.icon ?? ""]
+                return (
+                  <div key={cat.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    {CatIcon ? (
+                      <CatIcon className="size-3.5 shrink-0" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }} />
+                    ) : (
+                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                    )}
+                    {cat.name}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

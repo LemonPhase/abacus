@@ -31,6 +31,7 @@ import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
 import { parseCSV, detectColumns, applyMapping, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
 import type { TransactionKind } from "@/types"
+import { ICON_MAP } from "@/lib/icons"
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
@@ -217,6 +218,7 @@ export default function Transactions() {
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown"
   const getCategoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Unknown"
+  const getCategoryIcon = (id: string) => categories.find((c) => c.id === id)?.icon ?? null
   const getCategoryColor = (id: string) => categories.find((c) => c.id === id)?.color ?? "#888"
 
   return (
@@ -347,7 +349,15 @@ export default function Transactions() {
                   <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(tx.categoryId) }} />
+                      {(() => {
+                        const iconName = getCategoryIcon(tx.categoryId)
+                        const IconComp = iconName ? ICON_MAP[iconName] : null
+                        return IconComp ? (
+                          <IconComp className="size-3.5 shrink-0" style={{ color: getCategoryColor(tx.categoryId) }} />
+                        ) : (
+                          <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(tx.categoryId) }} />
+                        )
+                      })()}
                       <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
                     </div>
                   </TableCell>

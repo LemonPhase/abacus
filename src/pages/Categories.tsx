@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import type { Category, CategoryKind } from "@/types"
+import { ICON_MAP, ICON_NAMES } from "@/lib/icons"
 
 const COLORS = [
   "#16a34a", "#22c55e", "#10b981", "#34d399", "#6ee7b7", // greens
@@ -33,6 +34,7 @@ interface FormData {
   type: CategoryKind
   color: string
   parentId: string
+  icon: string
 }
 
 const emptyForm: FormData = {
@@ -40,6 +42,7 @@ const emptyForm: FormData = {
   type: "expense",
   color: COLORS[0],
   parentId: "",
+  icon: "",
 }
 
 export default function Categories() {
@@ -67,6 +70,7 @@ export default function Categories() {
       type: cat.type,
       color: cat.color,
       parentId: cat.parentId ?? "",
+      icon: cat.icon ?? "",
     })
     setDialogOpen(true)
   }
@@ -80,6 +84,7 @@ export default function Categories() {
       name: form.name.trim(),
       type: form.type,
       color: form.color,
+      icon: form.icon || undefined,
       ...(form.parentId ? { parentId: form.parentId } : {}),
     }
 
@@ -103,11 +108,16 @@ export default function Categories() {
 
   function CategoryItem({ cat, level = 0 }: { cat: Category; level?: number }) {
     const children = getChildren(cat.id)
+    const CatIcon = ICON_MAP[cat.icon ?? ""]
     return (
       <div>
         <div className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50" style={{ paddingLeft: `${12 + level * 20}px` }}>
           <div className="flex items-center gap-3">
-            <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+            {CatIcon ? (
+              <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
+            ) : (
+              <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+            )}
             <span className="font-medium text-sm">{cat.name}</span>
             {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
           </div>
@@ -234,6 +244,29 @@ export default function Categories() {
                     onClick={() => setForm({ ...form, color })}
                   />
                 ))}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Icon</Label>
+              <div className="grid grid-cols-6 gap-1.5 max-h-40 overflow-y-auto rounded-lg border p-2">
+                {ICON_NAMES.map((iconName) => {
+                  const Icon = ICON_MAP[iconName]
+                  return (
+                    <button
+                      key={iconName}
+                      type="button"
+                      title={iconName}
+                      className={`flex items-center justify-center size-9 rounded-lg transition-colors ${
+                        form.icon === iconName
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                      onClick={() => setForm({ ...form, icon: form.icon === iconName ? "" : iconName })}
+                    >
+                      <Icon className="size-4" />
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
