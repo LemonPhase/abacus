@@ -6,6 +6,7 @@ import Sidebar from "@/components/layout/Sidebar"
 import MobileNav from "@/components/layout/MobileNav"
 
 import Auth from "@/pages/Auth"
+import ResetPassword from "@/pages/ResetPassword"
 import Dashboard from "@/pages/Dashboard"
 import Accounts from "@/pages/Accounts"
 import Transactions from "@/pages/Transactions"
@@ -51,6 +52,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="*" element={<AuthGuard><AppLayout /></AuthGuard>} />
         </Routes>
       </AuthProvider>
