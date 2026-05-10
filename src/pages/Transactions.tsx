@@ -47,10 +47,16 @@ const emptyTxForm: TxFormData = {
 }
 
 export default function Transactions() {
-  const { transactions, load: loadTx, add, update, remove } = useTransactionsStore()
-  const { accounts, load: loadAccounts } = useAccountsStore()
-  const { categories, load: loadCategories } = useCategoriesStore()
-  const { baseCurrency } = useSettingsStore()
+  const transactions = useTransactionsStore((s) => s.transactions)
+  const loadTx = useTransactionsStore((s) => s.load)
+  const add = useTransactionsStore((s) => s.add)
+  const update = useTransactionsStore((s) => s.update)
+  const remove = useTransactionsStore((s) => s.remove)
+  const accounts = useAccountsStore((s) => s.accounts)
+  const loadAccounts = useAccountsStore((s) => s.load)
+  const categories = useCategoriesStore((s) => s.categories)
+  const loadCategories = useCategoriesStore((s) => s.load)
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)

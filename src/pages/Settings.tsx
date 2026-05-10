@@ -31,7 +31,10 @@ const TABLES = [
 ] as const
 
 export default function Settings() {
-  const { baseCurrency, theme, setBaseCurrency, setTheme } = useSettingsStore()
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
+  const theme = useSettingsStore((s) => s.theme)
+  const setBaseCurrency = useSettingsStore((s) => s.setBaseCurrency)
+  const setTheme = useSettingsStore((s) => s.setTheme)
   const { user, signOut } = useAuth()
   const [importDialog, setImportDialog] = useState(false)
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle')

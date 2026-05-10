@@ -52,8 +52,12 @@ const emptyForm: InvestmentFormData = {
 }
 
 export default function Investments() {
-  const { plans, load, add, update, remove } = useInvestmentPlansStore()
-  const { baseCurrency } = useSettingsStore()
+  const plans = useInvestmentPlansStore((s) => s.plans)
+  const load = useInvestmentPlansStore((s) => s.load)
+  const add = useInvestmentPlansStore((s) => s.add)
+  const update = useInvestmentPlansStore((s) => s.update)
+  const remove = useInvestmentPlansStore((s) => s.remove)
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<InvestmentPlan | null>(null)
   const [form, setForm] = useState<InvestmentFormData>(emptyForm)

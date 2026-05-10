@@ -28,10 +28,12 @@ import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
 
 export default function Reports() {
-  const { load: loadAccounts } = useAccountsStore()
-  const { transactions, load: loadTxn } = useTransactionsStore()
-  const { categories, load: loadCategories } = useCategoriesStore()
-  const { baseCurrency } = useSettingsStore()
+  const loadAccounts = useAccountsStore((s) => s.load)
+  const transactions = useTransactionsStore((s) => s.transactions)
+  const loadTxn = useTransactionsStore((s) => s.load)
+  const categories = useCategoriesStore((s) => s.categories)
+  const loadCategories = useCategoriesStore((s) => s.load)
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
 
   const now = new Date()
   const [dateFrom, setDateFrom] = useState(

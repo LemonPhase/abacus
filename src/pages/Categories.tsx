@@ -23,7 +23,11 @@ const emptyForm: CategoryFormData = {
 }
 
 export default function Categories() {
-  const { load, add, update, remove, getRootCategories, getChildren } = useCategoriesStore()
+  const categories = useCategoriesStore((s) => s.categories)
+  const load = useCategoriesStore((s) => s.load)
+  const add = useCategoriesStore((s) => s.add)
+  const update = useCategoriesStore((s) => s.update)
+  const remove = useCategoriesStore((s) => s.remove)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState<CategoryFormData>(emptyForm)
@@ -85,7 +89,7 @@ export default function Categories() {
   }
 
   function CategoryItem({ cat, level = 0 }: { cat: Category; level?: number }) {
-    const children = getChildren(cat.id)
+    const children = categories.filter((c) => c.parentId === cat.id)
     const CatIcon = ICON_MAP[cat.icon ?? '']
     return (
       <div>
@@ -122,7 +126,7 @@ export default function Categories() {
   }
 
   function CategoryList({ type }: { type: CategoryKind }) {
-    const roots = getRootCategories(type)
+    const roots = categories.filter((c) => c.type === type && !c.parentId)
     if (roots.length === 0) {
       return (
         <div className="p-8 text-center text-muted-foreground">
@@ -140,8 +144,8 @@ export default function Categories() {
   }
 
   const parentOptions = editing
-    ? getRootCategories(form.type).filter((c) => c.id !== editing.id)
-    : getRootCategories(form.type)
+    ? categories.filter((c) => c.type === form.type && !c.parentId && c.id !== editing.id)
+    : categories.filter((c) => c.type === form.type && !c.parentId)
 
   return (
     <div className="space-y-6">

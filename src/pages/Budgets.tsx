@@ -54,10 +54,16 @@ const emptyForm: BudgetFormData = {
 }
 
 export default function Budgets() {
-  const { budgets, load, add, update, remove } = useBudgetsStore()
-  const { categories, load: loadCategories } = useCategoriesStore()
-  const { transactions, load: loadTransactions } = useTransactionsStore()
-  const { baseCurrency } = useSettingsStore()
+  const budgets = useBudgetsStore((s) => s.budgets)
+  const load = useBudgetsStore((s) => s.load)
+  const add = useBudgetsStore((s) => s.add)
+  const update = useBudgetsStore((s) => s.update)
+  const remove = useBudgetsStore((s) => s.remove)
+  const categories = useCategoriesStore((s) => s.categories)
+  const loadCategories = useCategoriesStore((s) => s.load)
+  const transactions = useTransactionsStore((s) => s.transactions)
+  const loadTransactions = useTransactionsStore((s) => s.load)
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)

@@ -40,8 +40,12 @@ const emptyForm: AccountFormData = {
 }
 
 export default function Accounts() {
-  const { accounts, load, add, update, remove } = useAccountsStore()
-  const { transactions } = useTransactionsStore()
+  const accounts = useAccountsStore((s) => s.accounts)
+  const load = useAccountsStore((s) => s.load)
+  const add = useAccountsStore((s) => s.add)
+  const update = useAccountsStore((s) => s.update)
+  const remove = useAccountsStore((s) => s.remove)
+  const transactions = useTransactionsStore((s) => s.transactions)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [form, setForm] = useState<AccountFormData>(emptyForm)

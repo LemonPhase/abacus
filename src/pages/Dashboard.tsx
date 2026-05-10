@@ -73,11 +73,15 @@ const CHART_COLORS = [
 ]
 
 export default function Dashboard() {
-  const { accounts, load: loadAccounts } = useAccountsStore()
-  const { transactions, load: loadTxn } = useTransactionsStore()
-  const { budgets, load: loadBudgets } = useBudgetsStore()
-  const { categories, load: loadCategories } = useCategoriesStore()
-  const { baseCurrency } = useSettingsStore()
+  const accounts = useAccountsStore((s) => s.accounts)
+  const loadAccounts = useAccountsStore((s) => s.load)
+  const transactions = useTransactionsStore((s) => s.transactions)
+  const loadTxn = useTransactionsStore((s) => s.load)
+  const budgets = useBudgetsStore((s) => s.budgets)
+  const loadBudgets = useBudgetsStore((s) => s.load)
+  const categories = useCategoriesStore((s) => s.categories)
+  const loadCategories = useCategoriesStore((s) => s.load)
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const navigate = useNavigate()
 
   useEffect(() => {
