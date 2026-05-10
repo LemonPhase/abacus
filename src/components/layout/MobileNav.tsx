@@ -11,7 +11,7 @@ export default function MobileNav() {
           <NavLink
             key={to}
             to={to}
-            end={to === '/app'}
+            end={to === '/dashboard'}
             className={({ isActive }) =>
               cn(
                 'flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[11px] font-medium transition-all duration-200',

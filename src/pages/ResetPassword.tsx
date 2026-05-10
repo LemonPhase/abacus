@@ -71,7 +71,7 @@ export default function ResetPassword() {
             Your password has been reset successfully.
           </CardDescription>
           <CardFooter className="pt-2">
-            <Button className="w-full" onClick={() => navigate('/app')}>
+            <Button className="w-full" onClick={() => navigate('/dashboard')}>
               Go to dashboard
             </Button>
           </CardFooter>

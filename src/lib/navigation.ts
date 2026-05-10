@@ -17,12 +17,12 @@ export type NavLinkConfig = {
 }
 
 export const NAV_LINKS: NavLinkConfig[] = [
-  { to: '/app', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/app/accounts', label: 'Accounts', icon: Landmark },
-  { to: '/app/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { to: '/app/budgets', label: 'Budgets', icon: Target },
-  { to: '/app/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/app/categories', label: 'Categories', icon: Tags },
-  { to: '/app/investments', label: 'Investments', icon: TrendingUp },
-  { to: '/app/settings', label: 'Settings', icon: Settings },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/accounts', label: 'Accounts', icon: Landmark },
+  { to: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { to: '/budgets', label: 'Budgets', icon: Target },
+  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/categories', label: 'Categories', icon: Tags },
+  { to: '/investments', label: 'Investments', icon: TrendingUp },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]

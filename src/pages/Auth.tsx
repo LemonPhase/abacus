@@ -20,7 +20,7 @@ export default function Auth() {
   const { signIn, signUp, resetPasswordForEmail } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/app'
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

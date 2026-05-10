@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar'
 import MobileNav from '@/components/layout/MobileNav'
 import GlobalErrorBanner from '@/components/GlobalErrorBanner'
 
+import Landing from '@/pages/Landing'
 import Auth from '@/pages/Auth'
 import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
@@ -29,7 +30,7 @@ function AppLayout() {
         <div className="container mx-auto p-4 md:p-6 max-w-5xl">
           <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
             <Routes location={location}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/accounts" element={<Accounts />} />
               <Route path="/transactions" element={<Transactions />} />
               <Route path="/budgets" element={<Budgets />} />
@@ -52,6 +53,7 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route
