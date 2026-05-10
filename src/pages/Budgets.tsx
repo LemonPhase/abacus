@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -55,6 +55,7 @@ const emptyForm: BudgetFormData = {
 
 export default function Budgets() {
   const budgets = useBudgetsStore((s) => s.budgets)
+  const loading = useBudgetsStore((s) => s.loading)
   const load = useBudgetsStore((s) => s.load)
   const add = useBudgetsStore((s) => s.add)
   const update = useBudgetsStore((s) => s.update)
@@ -180,7 +181,11 @@ export default function Budgets() {
         </Button>
       </div>
 
-      {budgets.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : budgets.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
           <p className="text-lg font-medium mb-1">No budgets yet</p>
           <p className="text-sm">Create your first budget to start tracking.</p>

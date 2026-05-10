@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Upload } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -50,6 +50,7 @@ const emptyTxForm: TxFormData = {
 
 export default function Transactions() {
   const transactions = useTransactionsStore((s) => s.transactions)
+  const loading = useTransactionsStore((s) => s.loading)
   const loadTx = useTransactionsStore((s) => s.load)
   const add = useTransactionsStore((s) => s.add)
   const bulkAdd = useTransactionsStore((s) => s.bulkAdd)
@@ -443,132 +444,140 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Filters */}
-      <TransactionFilters
-        accounts={accounts}
-        categories={categories}
-        value={filters}
-        onChange={setFilters}
-        onClear={() =>
-          setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
-        }
-      />
-
-      {filteredTxn.length === 0 ? (
-        <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
-          <p className="text-lg font-medium mb-1">
-            {transactions.length === 0
-              ? 'No transactions yet'
-              : 'No transactions match your filters'}
-          </p>
-          <p className="text-sm">
-            {transactions.length === 0
-              ? 'Add your first transaction or import a CSV file to get started.'
-              : 'Try adjusting your filters.'}
-          </p>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
         <>
-          <div className="rounded-xl border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">Date</TableHead>
-                  <TableHead>Account</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="max-w-48">Description</TableHead>
-                  <TableHead className="text-right w-28">Amount</TableHead>
-                  <TableHead className="w-16" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagedTxn.map((tx) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="text-xs tabular-nums">
-                      {formatDate(new Date(tx.date))}
-                    </TableCell>
-                    <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        {(() => {
-                          const iconName = getCategoryIcon(tx.categoryId)
-                          const IconComp = iconName ? ICON_MAP[iconName] : null
-                          return IconComp ? (
-                            <IconComp
-                              className="size-3.5 shrink-0"
-                              style={{ color: getCategoryColor(tx.categoryId) }}
-                            />
-                          ) : (
-                            <span
-                              className="size-2 rounded-full shrink-0"
-                              style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
-                            />
-                          )
-                        })()}
-                        <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground truncate max-w-48">
-                      {tx.description || '—'}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
-                    >
-                      {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
-                        ? '+'
-                        : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
-                          ? '−'
-                          : '↔'}{' '}
-                      {formatCurrency(Math.abs(tx.amount), tx.currency)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-0.5">
-                        <Button variant="ghost" size="icon-xs" onClick={() => openEdit(tx)}>
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => setDeleteTarget(tx.id)}
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-3 px-1">
-              <p className="text-xs text-muted-foreground">
-                Showing {(page - 1) * PAGE_SIZE + 1}–
-                {Math.min(page * PAGE_SIZE, filteredTxn.length)} of {filteredTxn.length}{' '}
-                transactions
+          {/* Filters */}
+          <TransactionFilters
+            accounts={accounts}
+            categories={categories}
+            value={filters}
+            onChange={setFilters}
+            onClear={() =>
+              setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
+            }
+          />
+
+          {filteredTxn.length === 0 ? (
+            <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
+              <p className="text-lg font-medium mb-1">
+                {transactions.length === 0
+                  ? 'No transactions yet'
+                  : 'No transactions match your filters'}
               </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Previous
-                </Button>
-                <span className="text-xs text-muted-foreground px-2 tabular-nums">
-                  Page {page} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Next
-                </Button>
-              </div>
+              <p className="text-sm">
+                {transactions.length === 0
+                  ? 'Add your first transaction or import a CSV file to get started.'
+                  : 'Try adjusting your filters.'}
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="rounded-xl border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-28">Date</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="max-w-48">Description</TableHead>
+                      <TableHead className="text-right w-28">Amount</TableHead>
+                      <TableHead className="w-16" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pagedTxn.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="text-xs tabular-nums">
+                          {formatDate(new Date(tx.date))}
+                        </TableCell>
+                        <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            {(() => {
+                              const iconName = getCategoryIcon(tx.categoryId)
+                              const IconComp = iconName ? ICON_MAP[iconName] : null
+                              return IconComp ? (
+                                <IconComp
+                                  className="size-3.5 shrink-0"
+                                  style={{ color: getCategoryColor(tx.categoryId) }}
+                                />
+                              ) : (
+                                <span
+                                  className="size-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
+                                />
+                              )
+                            })()}
+                            <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground truncate max-w-48">
+                          {tx.description || '—'}
+                        </TableCell>
+                        <TableCell
+                          className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                        >
+                          {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
+                            ? '+'
+                            : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
+                              ? '−'
+                              : '↔'}{' '}
+                          {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-0.5">
+                            <Button variant="ghost" size="icon-xs" onClick={() => openEdit(tx)}>
+                              <Pencil className="size-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => setDeleteTarget(tx.id)}
+                            >
+                              <Trash2 className="size-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-3 px-1">
+                  <p className="text-xs text-muted-foreground">
+                    Showing {(page - 1) * PAGE_SIZE + 1}–
+                    {Math.min(page * PAGE_SIZE, filteredTxn.length)} of {filteredTxn.length}{' '}
+                    transactions
+                  </p>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-xs text-muted-foreground px-2 tabular-nums">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

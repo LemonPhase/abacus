@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
 import { AccountDialog, type AccountFormData } from '@/pages/accounts/AccountDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +41,7 @@ const emptyForm: AccountFormData = {
 
 export default function Accounts() {
   const accounts = useAccountsStore((s) => s.accounts)
+  const loading = useAccountsStore((s) => s.loading)
   const load = useAccountsStore((s) => s.load)
   const add = useAccountsStore((s) => s.add)
   const update = useAccountsStore((s) => s.update)
@@ -125,7 +126,11 @@ export default function Accounts() {
         </Button>
       </div>
 
-      {accounts.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : accounts.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
           <p className="text-lg font-medium mb-1">No accounts yet</p>
           <p className="text-sm">Add your first account to get started.</p>

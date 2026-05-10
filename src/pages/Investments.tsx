@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Plus } from 'lucide-react'
+import { Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
@@ -53,6 +53,7 @@ const emptyForm: InvestmentFormData = {
 
 export default function Investments() {
   const plans = useInvestmentPlansStore((s) => s.plans)
+  const loading = useInvestmentPlansStore((s) => s.loading)
   const load = useInvestmentPlansStore((s) => s.load)
   const add = useInvestmentPlansStore((s) => s.add)
   const update = useInvestmentPlansStore((s) => s.update)
@@ -189,7 +190,11 @@ export default function Investments() {
         </Button>
       </div>
 
-      {plans.length === 0 ? (
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : plans.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
           <p className="text-lg font-medium mb-1">No investment plans yet</p>
           <p className="text-sm">Add investments to see compound growth projections.</p>

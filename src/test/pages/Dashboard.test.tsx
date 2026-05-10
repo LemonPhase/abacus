@@ -22,14 +22,16 @@ beforeEach(() => {
 })
 
 describe('Dashboard Page', () => {
-  it('renders the main sections', () => {
+  it('renders the main sections', async () => {
     renderWithRouter(<Dashboard />)
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Net Worth')).toBeInTheDocument()
-    expect(screen.getByText('Income')).toBeInTheDocument()
-    expect(screen.getByText('Expenses')).toBeInTheDocument()
-    expect(screen.getByText('Budget Left')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Net Worth')).toBeInTheDocument()
+      expect(screen.getByText('Income')).toBeInTheDocument()
+      expect(screen.getByText('Expenses')).toBeInTheDocument()
+      expect(screen.getByText('Budget Left')).toBeInTheDocument()
+    })
   })
 
   it('shows empty states when no data is available', async () => {

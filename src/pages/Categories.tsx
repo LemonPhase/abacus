@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -108,6 +108,7 @@ function CategoryList({ type, categories, onEdit, onDelete }: CategoryListProps)
 
 export default function Categories() {
   const categories = useCategoriesStore((s) => s.categories)
+  const loading = useCategoriesStore((s) => s.loading)
   const load = useCategoriesStore((s) => s.load)
   const add = useCategoriesStore((s) => s.add)
   const update = useCategoriesStore((s) => s.update)
@@ -197,32 +198,38 @@ export default function Categories() {
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="expense">Expenses</TabsTrigger>
-          <TabsTrigger value="income">Income</TabsTrigger>
-        </TabsList>
-        <TabsContent value="expense">
-          <div className="rounded-xl border mt-4">
-            <CategoryList
-              type="expense"
-              categories={categories}
-              onEdit={openEdit}
-              onDelete={confirmDelete}
-            />
-          </div>
-        </TabsContent>
-        <TabsContent value="income">
-          <div className="rounded-xl border mt-4">
-            <CategoryList
-              type="income"
-              categories={categories}
-              onEdit={openEdit}
-              onDelete={confirmDelete}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="expense">Expenses</TabsTrigger>
+            <TabsTrigger value="income">Income</TabsTrigger>
+          </TabsList>
+          <TabsContent value="expense">
+            <div className="rounded-xl border mt-4">
+              <CategoryList
+                type="expense"
+                categories={categories}
+                onEdit={openEdit}
+                onDelete={confirmDelete}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="income">
+            <div className="rounded-xl border mt-4">
+              <CategoryList
+                type="income"
+                categories={categories}
+                onEdit={openEdit}
+                onDelete={confirmDelete}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
 
       <CategoryDialog
         open={dialogOpen}

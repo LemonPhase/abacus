@@ -20,12 +20,14 @@ beforeEach(() => {
 })
 
 describe('Reports Page', () => {
-  it('renders the report filters', () => {
+  it('renders the report filters', async () => {
     renderWithRouter(<Reports />)
 
     expect(screen.getByText('Reports')).toBeInTheDocument()
-    expect(screen.getByText('From')).toBeInTheDocument()
-    expect(screen.getByText('To')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('From')).toBeInTheDocument()
+      expect(screen.getByText('To')).toBeInTheDocument()
+    })
   })
 
   it('shows empty state when there are no transactions', async () => {
