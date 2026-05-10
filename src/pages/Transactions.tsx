@@ -20,7 +20,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { supabase } from '@/supabase/client'
+import { getOrFetchRate } from '@/services/exchange'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
 import type { TransactionKind } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
@@ -153,27 +153,8 @@ export default function Transactions() {
 
   async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
     if (fromCurrency === toCurrency) return 1
-    // Try exact pair
-    const { data } = await supabase
-      .from('exchange_rates')
-      .select('rate')
-      .eq('from_currency', fromCurrency)
-      .eq('to_currency', toCurrency)
-      .order('date', { ascending: false })
-      .limit(1)
-      .single()
-    if (data) return data.rate
-    // Try inverse
-    const { data: inverse } = await supabase
-      .from('exchange_rates')
-      .select('rate')
-      .eq('from_currency', toCurrency)
-      .eq('to_currency', fromCurrency)
-      .order('date', { ascending: false })
-      .limit(1)
-      .single()
-    if (inverse) return 1 / inverse.rate
-    return 1
+    const rate = await getOrFetchRate(fromCurrency, toCurrency, new Date(form.date))
+    return rate ?? 1
   }
 
   async function handleSave() {

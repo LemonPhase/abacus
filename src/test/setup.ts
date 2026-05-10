@@ -29,6 +29,14 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+globalThis.fetch = vi.fn(() =>
+  Promise.resolve({
+    json: () => Promise.resolve({ result: undefined, rates: {} }),
+    ok: true,
+    status: 200,
+  } as unknown as Response),
+) as unknown as typeof globalThis.fetch
+
 beforeEach(() => {
   resetAllTables()
   vi.clearAllMocks()
