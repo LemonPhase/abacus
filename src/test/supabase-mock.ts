@@ -23,7 +23,8 @@ export function resetAllTables(): void {
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
-  return [...(tables.get(name) ?? [])]
+  if (!tables.has(name)) tables.set(name, [])
+  return tables.get(name)!
 }
 
 function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {

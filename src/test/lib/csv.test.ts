@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectColumns, applyMapping, parseAmount, parseDate } from '@/lib/csv'
+import { detectColumns, applyMapping, parseAmount, parseDate, parseCSV } from '@/lib/csv'
 
 describe('detectColumns', () => {
   it('detects date column by common names', () => {
@@ -108,5 +108,61 @@ describe('parseDate', () => {
   it('returns null for invalid dates', () => {
     expect(parseDate('not a date')).toBeNull()
     expect(parseDate('')).toBeNull()
+  })
+})
+
+describe('parseCSV', () => {
+  it('parses a simple CSV file with headers and rows correctly', async () => {
+    const file = new File(['Date,Description,Amount\n2026-01-01,Test,100\n'], 'test.csv', {
+      type: 'text/csv',
+    })
+    const result = await parseCSV(file)
+
+    expect(result.headers).toEqual(['Date', 'Description', 'Amount'])
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0]).toEqual({
+      Date: '2026-01-01',
+      Description: 'Test',
+      Amount: '100',
+    })
+    expect(result.errors).toEqual([])
+  })
+
+  it('returns empty rows array for file with only headers', async () => {
+    const file = new File(['Date,Description,Amount\n'], 'headers-only.csv', {
+      type: 'text/csv',
+    })
+    const result = await parseCSV(file)
+
+    expect(result.headers).toEqual(['Date', 'Description', 'Amount'])
+    expect(result.rows).toHaveLength(0)
+  })
+
+  it('handles CSV with empty lines (skipEmptyLines)', async () => {
+    const file = new File(
+      ['Date,Value\n2026-01-01,100\n\n2026-01-02,200\n\n\n2026-01-03,300\n'],
+      'test.csv',
+      { type: 'text/csv' },
+    )
+    const result = await parseCSV(file)
+
+    expect(result.rows).toHaveLength(3)
+    expect(result.rows[0].Value).toBe('100')
+    expect(result.rows[1].Value).toBe('200')
+    expect(result.rows[2].Value).toBe('300')
+  })
+
+  it('handles CSV with multiple columns', async () => {
+    const file = new File(
+      ['Name,Email,Age\nAlice,alice@test.com,30\nBob,bob@test.com,25\n'],
+      'test.csv',
+      { type: 'text/csv' },
+    )
+    const result = await parseCSV(file)
+
+    expect(result.headers).toEqual(['Name', 'Email', 'Age'])
+    expect(result.rows).toHaveLength(2)
+    expect(result.rows[0]).toEqual({ Name: 'Alice', Email: 'alice@test.com', Age: '30' })
+    expect(result.rows[1]).toEqual({ Name: 'Bob', Email: 'bob@test.com', Age: '25' })
   })
 })
