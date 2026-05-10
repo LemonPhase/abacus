@@ -1,25 +1,25 @@
-import { Link } from "react-router-dom"
-import { useAuth } from "@/supabase/auth"
-import { buttonVariants } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
-import { ArrowRight, LayoutDashboard, Landmark, BarChart3 } from "lucide-react"
+import { Link } from 'react-router-dom'
+import { useAuth } from '@/supabase/auth'
+import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
+import { ArrowRight, LayoutDashboard, Landmark, BarChart3 } from 'lucide-react'
 
 const features = [
   {
     icon: LayoutDashboard,
-    title: "Accounts",
-    desc: "Track all your accounts in one place with automatic balance updates.",
+    title: 'Accounts',
+    desc: 'Track all your accounts in one place with automatic balance updates.',
   },
   {
     icon: Landmark,
-    title: "Transactions",
-    desc: "Log income, expenses, and transfers. Import from CSV when needed.",
+    title: 'Transactions',
+    desc: 'Log income, expenses, and transfers. Import from CSV when needed.',
   },
   {
     icon: BarChart3,
-    title: "Insights",
-    desc: "Monthly breakdowns, category spending, and budget tracking.",
+    title: 'Insights',
+    desc: 'Monthly breakdowns, category spending, and budget tracking.',
   },
 ]
 
@@ -35,17 +35,18 @@ export default function Landing() {
         </div>
         <h1 className="mt-5 text-3xl font-semibold tracking-tight">Abacus</h1>
         <p className="mt-2 max-w-md text-center text-base text-muted-foreground">
-          Personal finance, precisely calculated. Track accounts, transactions, and budgets without the clutter.
+          Personal finance, precisely calculated. Track accounts, transactions, and budgets without
+          the clutter.
         </p>
 
         <div className="mt-8 flex gap-3">
           {user ? (
-            <Link to="/dashboard" className={cn(buttonVariants(), "gap-2")}>
+            <Link to="/dashboard" className={cn(buttonVariants(), 'gap-2')}>
               Dashboard
               <ArrowRight className="size-4" />
             </Link>
           ) : (
-            <Link to="/auth" className={cn(buttonVariants(), "gap-2")}>
+            <Link to="/auth" className={cn(buttonVariants(), 'gap-2')}>
               Get Started
               <ArrowRight className="size-4" />
             </Link>

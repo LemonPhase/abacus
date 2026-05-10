@@ -258,9 +258,9 @@ export const mockSupabase = {
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),
   auth: {
-    getSession: vi.fn<() => Promise<{ data: { session: Record<string, unknown> | null }; error: null }>>(
-      () => Promise.resolve({ data: { session: null }, error: null }),
-    ),
+    getSession: vi.fn<
+      () => Promise<{ data: { session: Record<string, unknown> | null }; error: null }>
+    >(() => Promise.resolve({ data: { session: null }, error: null })),
     signInWithPassword: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
