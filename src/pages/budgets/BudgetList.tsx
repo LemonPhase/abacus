@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/currency'
 import type { Budget, BudgetPeriod } from '@/types'
 import { Pencil, Trash2 } from 'lucide-react'
 

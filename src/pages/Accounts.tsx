@@ -21,7 +21,7 @@ import {
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import type { Account, AccountType } from '@/types'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/currency'
 
 const TYPE_COLORS: Record<AccountType, string> = {
   checking: 'default',

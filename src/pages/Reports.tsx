@@ -25,7 +25,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ICON_MAP } from '@/lib/icons'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/currency'
 
 export default function Reports() {
   const { load: loadAccounts } = useAccountsStore()

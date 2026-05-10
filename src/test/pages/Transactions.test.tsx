@@ -25,8 +25,8 @@ const accountFixture: Account = {
   type: 'checking',
   currency: 'USD',
   balance: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 const categoryFixture: Category = {
@@ -34,8 +34,8 @@ const categoryFixture: Category = {
   name: 'Groceries',
   type: 'expense',
   color: '#ff0000',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 beforeEach(() => {

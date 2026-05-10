@@ -7,8 +7,8 @@ export interface Account {
   currency: string
   balance: number
   notes?: string
-  createdAt: Date | string
-  updatedAt: Date | string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export type CategoryKind = 'income' | 'expense'
@@ -20,8 +20,8 @@ export interface Category {
   parentId?: string
   color: string
   icon?: string
-  createdAt: Date | string
-  updatedAt: Date | string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export type TransactionKind = 'income' | 'expense' | 'transfer'
@@ -38,8 +38,8 @@ export interface Transaction {
   date: Date
   description?: string
   correlativeId?: string
-  createdAt: Date | string
-  updatedAt: Date | string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export type BudgetPeriod = 'monthly' | 'yearly'
@@ -51,8 +51,8 @@ export interface Budget {
   amount: number
   period: BudgetPeriod
   startDate: Date
-  createdAt: Date | string
-  updatedAt: Date | string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface ExchangeRate {
@@ -81,8 +81,8 @@ export interface InvestmentPlan {
   annualReturnRate: number
   currency: string
   notes?: string
-  createdAt: Date | string
-  updatedAt: Date | string
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface ProjectionYear {

@@ -22,8 +22,8 @@ const accountFixture: Account = {
   type: 'checking',
   currency: 'USD',
   balance: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 const toAccountFixture: Account = {
@@ -32,8 +32,8 @@ const toAccountFixture: Account = {
   type: 'savings',
   currency: 'EUR',
   balance: 0,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 const categoryFixture: Category = {
@@ -41,8 +41,8 @@ const categoryFixture: Category = {
   name: 'Transfers',
   type: 'expense',
   color: '#ff0000',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
 }
 
 beforeEach(() => {
@@ -87,8 +87,8 @@ describe('Transactions transfer logic', () => {
       baseCurrency: accountFixture.currency,
       date: new Date('2026-05-01'),
       description: 'Move funds',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
 
     const inTx: Transaction = {
@@ -103,8 +103,8 @@ describe('Transactions transfer logic', () => {
       date: new Date('2026-05-01'),
       description: 'Move funds',
       correlativeId: outTx.id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
 
     add.mockResolvedValueOnce(outTx).mockResolvedValueOnce(inTx)

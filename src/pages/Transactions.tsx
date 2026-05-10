@@ -24,7 +24,7 @@ import { supabase } from '@/supabase/client'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
 import type { TransactionKind } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency } from '@/lib/currency'
 import { TransactionDialog, type TxFormData } from '@/pages/transactions/TransactionDialog'
 import {
   TransactionFilters,
