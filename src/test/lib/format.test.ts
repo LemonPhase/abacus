@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatCurrency } from './format'
+import { formatCurrency } from '@/lib/format'
 
 describe('formatCurrency', () => {
   it('formats USD correctly', () => {
