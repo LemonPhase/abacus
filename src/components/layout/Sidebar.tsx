@@ -9,9 +9,11 @@ export default function Sidebar() {
       {/* Brand header */}
       <div className="flex flex-col px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <span className="text-sm font-bold">A</span>
-          </div>
+          <img
+            src="/logo.svg"
+            alt="Abacus"
+            className="mt-0.5 size-8 shrink-0 text-sidebar-primary-foreground"
+          />
           <span className="text-base font-semibold tracking-tight">Abacus</span>
         </div>
         <p className="mt-1 pl-11 text-xs text-muted-foreground">Wealth Management</p>

@@ -30,9 +30,11 @@ export default function Landing() {
     <div className="flex min-h-screen flex-col">
       {/* Hero */}
       <section className="flex flex-1 flex-col items-center justify-center px-4 py-20">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-sm">
-          A
-        </div>
+        <img
+          src="/logo.svg"
+          alt="Abacus"
+          className="size-20 text-primary-foreground drop-shadow-sm"
+        />
         <h1 className="mt-5 text-3xl font-semibold tracking-tight">Abacus</h1>
         <p className="mt-2 max-w-md text-center text-base text-muted-foreground">
           Personal finance, precisely calculated. Track accounts, transactions, and budgets without
