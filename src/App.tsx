@@ -38,12 +38,12 @@ function AppLayout() {
   const location = useLocation()
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       <GlobalErrorBanner />
       <Sidebar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-1 flex-col overflow-y-auto">
         <TopHeader />
-        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+        <main className="flex-1 pb-20 md:pb-0">
           <div className="container mx-auto p-4 md:p-6 max-w-[1400px]">
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
               <Suspense fallback={<PageFallback />}>

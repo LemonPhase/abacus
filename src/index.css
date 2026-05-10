@@ -143,13 +143,16 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased;
-    background-image: radial-gradient(rgba(28, 25, 23, 0.12) 0.5px, transparent 0.5px);
-    background-size: 24px 24px;
-    background-attachment: fixed;
+    @apply text-foreground antialiased;
+    background:
+      radial-gradient(circle, rgba(28, 25, 23, 0.12) 0.7px, transparent 1px) 0 0 / 24px 24px fixed,
+      var(--background);
   }
   .dark body {
-    background-image: radial-gradient(rgba(239, 232, 229, 0.06) 0.5px, transparent 0.5px);
+    background:
+      radial-gradient(circle, rgba(239, 232, 229, 0.08) 0.7px, transparent 1px) 0 0 / 24px 24px
+        fixed,
+      var(--background);
   }
   html {
     @apply font-sans;

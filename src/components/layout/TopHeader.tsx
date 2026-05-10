@@ -10,12 +10,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export default function TopHeader() {
+import { cn } from '@/lib/utils'
+
+export default function TopHeader({ className }: { className?: string }) {
   const { user, signOut } = useAuth()
   const initial = user?.email?.charAt(0).toUpperCase() ?? '?'
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-end gap-3 border-b border-border/30 bg-background/80 px-6 backdrop-blur-md">
+    <header
+      className={cn(
+        'sticky top-0 z-40 flex h-16 shrink-0 items-center justify-end gap-3 border-b border-border/30 bg-background/80 px-6 backdrop-blur-md',
+        className,
+      )}
+    >
       {/* Search */}
       <div className="relative">
         <Input
