@@ -117,6 +117,24 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       return item
     }
 
+    const internalBulkAdd = async (data: Record<string, unknown>[]): Promise<T[]> => {
+      if (data.length === 0) return []
+      set({ error: null })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: inserted, error } = await (supabase.from as any)(table).insert(data).select()
+      if (error) {
+        set({ error: error.message, loading: false })
+        throw error
+      }
+      const items = (inserted as Record<string, unknown>[]).map(mapRow)
+      set((state: Record<string, unknown>) => {
+        const list = getItems(() => state)
+        const newList = prependInsert ? [...items, ...list] : [...list, ...items]
+        return { [collectionKey]: newList }
+      })
+      return items
+    }
+
     const internalUpdate = async (id: string, data: Record<string, unknown>): Promise<void> => {
       set({ error: null })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -162,6 +180,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       clearError: () => set({ error: null }),
       load,
       _add: internalAdd,
+      _bulkAdd: internalBulkAdd,
       _update: internalUpdate,
       remove,
       getById,

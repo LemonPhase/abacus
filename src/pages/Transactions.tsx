@@ -22,7 +22,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { getOrFetchRate } from '@/services/exchange'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
-import type { TransactionKind } from '@/types'
+import type { TransactionKind, NewTransaction } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
 import { TransactionDialog, type TxFormData } from '@/pages/transactions/TransactionDialog'
@@ -52,6 +52,7 @@ export default function Transactions() {
   const transactions = useTransactionsStore((s) => s.transactions)
   const loadTx = useTransactionsStore((s) => s.load)
   const add = useTransactionsStore((s) => s.add)
+  const bulkAdd = useTransactionsStore((s) => s.bulkAdd)
   const update = useTransactionsStore((s) => s.update)
   const remove = useTransactionsStore((s) => s.remove)
   const accounts = useAccountsStore((s) => s.accounts)
@@ -373,6 +374,8 @@ export default function Transactions() {
       const account = accounts.find((a) => a.id === csvAccountId)
       const currency = account?.currency ?? baseCurrency
 
+      const rowsToInsert: NewTransaction[] = []
+
       for (const row of csvMappedRows) {
         const parsedAmount = parseAmount(row.amount)
         if (!parsedAmount) continue
@@ -380,22 +383,23 @@ export default function Transactions() {
         if (!date) continue
 
         let type: TransactionKind = row.type ?? 'expense'
-        // Auto-detect: negative amount = expense, positive = income
         if (!row.type) {
           type = parsedAmount < 0 ? 'expense' : 'income'
         }
 
-        const dbAmount = Math.abs(parsedAmount)
-
-        await add({
+        rowsToInsert.push({
           accountId: csvAccountId,
           categoryId: csvCategoryId,
           type,
-          amount: dbAmount,
+          amount: Math.abs(parsedAmount),
           currency,
           date,
           description: row.description.trim() || undefined,
         })
+      }
+
+      if (rowsToInsert.length > 0) {
+        await bulkAdd(rowsToInsert)
       }
 
       setCsvDialogOpen(false)

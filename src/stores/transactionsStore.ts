@@ -33,6 +33,7 @@ interface TransactionsState {
   add: (
     data: NewTransaction & { baseAmount?: number; baseCurrency?: string },
   ) => Promise<Transaction>
+  bulkAdd: (data: NewTransaction[]) => Promise<Transaction[]>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>
   getByAccount: (accountId: string) => Transaction[]
@@ -44,7 +45,7 @@ interface TransactionsState {
 }
 
 export const useTransactionsStore = create<TransactionsState>()((set, get) => {
-  const { _add, _update, ...base } = crud(set, get)
+  const { _add, _bulkAdd, _update, ...base } = crud(set, get)
   return {
     transactions: [],
     ...base,
@@ -56,6 +57,19 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
         categoryId: data.categoryId || null,
       }
       return _add(mapKeysToSnake(payload) as Database['public']['Tables']['transactions']['Insert'])
+    },
+    bulkAdd: (data) => {
+      const payloads = data.map((d) => ({
+        ...d,
+        baseAmount: d.amount,
+        baseCurrency: d.currency,
+        categoryId: d.categoryId || null,
+      }))
+      return _bulkAdd(
+        payloads.map((p) =>
+          mapKeysToSnake(p),
+        ) as Database['public']['Tables']['transactions']['Insert'][],
+      )
     },
     update: (id, data) => {
       const clean: Record<string, unknown> = { ...data }
