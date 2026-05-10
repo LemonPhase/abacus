@@ -14,28 +14,26 @@ export default function MobileNav() {
             end={to === '/dashboard'}
             className={({ isActive }) =>
               cn(
-                'flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[11px] font-medium transition-all duration-200',
+                'flex min-w-0 flex-1 items-center justify-center py-1 font-medium transition-all duration-200',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )
             }
           >
             {({ isActive }) => (
-              <>
-                <div
+              <div
+                className={cn(
+                  'flex size-10 items-center justify-center rounded-lg transition-all duration-200',
+                  isActive && 'bg-primary/10',
+                )}
+                title={label}
+              >
+                <Icon
                   className={cn(
-                    'flex size-8 items-center justify-center rounded-lg transition-all duration-200',
-                    isActive && 'bg-primary/10',
+                    'size-5 transition-transform duration-200',
+                    isActive && 'scale-110',
                   )}
-                >
-                  <Icon
-                    className={cn(
-                      'size-5 transition-transform duration-200',
-                      isActive && 'scale-110',
-                    )}
-                  />
-                </div>
-                {label}
-              </>
+                />
+              </div>
             )}
           </NavLink>
         ))}

@@ -23,13 +23,22 @@ describe('Sidebar', () => {
 })
 
 describe('MobileNav', () => {
-  it('renders all nav links with short labels', () => {
+  it('renders all nav links as icons with title attributes', () => {
     renderWithRouter(<MobileNav />)
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Accounts')).toBeInTheDocument()
-    expect(screen.getByText('Transactions')).toBeInTheDocument()
-    expect(screen.getByText('Budgets')).toBeInTheDocument()
-    expect(screen.getByText('Reports')).toBeInTheDocument()
-    expect(screen.getByText('Settings')).toBeInTheDocument()
+    const labels = [
+      'Dashboard',
+      'Accounts',
+      'Transactions',
+      'Budgets',
+      'Reports',
+      'Categories',
+      'Investments',
+      'Settings',
+    ]
+    for (const label of labels) {
+      expect(screen.getByTitle(label)).toBeInTheDocument()
+    }
+    // Verify all 8 nav links are present
+    expect(screen.getAllByRole('link')).toHaveLength(8)
   })
 })
