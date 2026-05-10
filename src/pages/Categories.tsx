@@ -22,6 +22,90 @@ const emptyForm: CategoryFormData = {
   icon: '',
 }
 
+// Defined at module level so they don't unmount/remount on every parent render.
+// Previously they were defined inside the Categories component body, which
+// caused React to treat them as new component types on every state change.
+interface CategoryItemProps {
+  cat: Category
+  level: number
+  categories: Category[]
+  onEdit: (cat: Category) => void
+  onDelete: (cat: Category) => void
+}
+
+function CategoryItem({ cat, level, categories, onEdit, onDelete }: CategoryItemProps) {
+  const children = categories.filter((c) => c.parentId === cat.id)
+  const CatIcon = ICON_MAP[cat.icon ?? '']
+  return (
+    <div>
+      <div
+        className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50"
+        style={{ paddingLeft: `${12 + level * 20}px` }}
+      >
+        <div className="flex items-center gap-3">
+          {CatIcon ? (
+            <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
+          ) : (
+            <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+          )}
+          <span className="font-medium text-sm">{cat.name}</span>
+          {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-xs" onClick={() => onEdit(cat)}>
+            <Pencil className="size-3" />
+          </Button>
+          <Button variant="ghost" size="icon-xs" onClick={() => onDelete(cat)}>
+            <Trash2 className="size-3" />
+          </Button>
+        </div>
+      </div>
+      {children.map((child) => (
+        <CategoryItem
+          key={child.id}
+          cat={child}
+          level={level + 1}
+          categories={categories}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
+  )
+}
+
+interface CategoryListProps {
+  type: CategoryKind
+  categories: Category[]
+  onEdit: (cat: Category) => void
+  onDelete: (cat: Category) => void
+}
+
+function CategoryList({ type, categories, onEdit, onDelete }: CategoryListProps) {
+  const roots = categories.filter((c) => c.type === type && !c.parentId)
+  if (roots.length === 0) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <p className="text-sm">No categories yet. Add one to get started.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="divide-y">
+      {roots.map((cat) => (
+        <CategoryItem
+          key={cat.id}
+          cat={cat}
+          level={0}
+          categories={categories}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function Categories() {
   const categories = useCategoriesStore((s) => s.categories)
   const load = useCategoriesStore((s) => s.load)
@@ -96,61 +180,6 @@ export default function Categories() {
     }
   }
 
-  function CategoryItem({ cat, level = 0 }: { cat: Category; level?: number }) {
-    const children = categories.filter((c) => c.parentId === cat.id)
-    const CatIcon = ICON_MAP[cat.icon ?? '']
-    return (
-      <div>
-        <div
-          className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50"
-          style={{ paddingLeft: `${12 + level * 20}px` }}
-        >
-          <div className="flex items-center gap-3">
-            {CatIcon ? (
-              <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
-            ) : (
-              <span
-                className="size-3 rounded-full shrink-0"
-                style={{ backgroundColor: cat.color }}
-              />
-            )}
-            <span className="font-medium text-sm">{cat.name}</span>
-            {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-xs" onClick={() => openEdit(cat)}>
-              <Pencil className="size-3" />
-            </Button>
-            <Button variant="ghost" size="icon-xs" onClick={() => confirmDelete(cat)}>
-              <Trash2 className="size-3" />
-            </Button>
-          </div>
-        </div>
-        {children.map((child) => (
-          <CategoryItem key={child.id} cat={child} level={level + 1} />
-        ))}
-      </div>
-    )
-  }
-
-  function CategoryList({ type }: { type: CategoryKind }) {
-    const roots = categories.filter((c) => c.type === type && !c.parentId)
-    if (roots.length === 0) {
-      return (
-        <div className="p-8 text-center text-muted-foreground">
-          <p className="text-sm">No categories yet. Add one to get started.</p>
-        </div>
-      )
-    }
-    return (
-      <div className="divide-y">
-        {roots.map((cat) => (
-          <CategoryItem key={cat.id} cat={cat} />
-        ))}
-      </div>
-    )
-  }
-
   const parentOptions = editing
     ? categories.filter((c) => c.type === form.type && !c.parentId && c.id !== editing.id)
     : categories.filter((c) => c.type === form.type && !c.parentId)
@@ -175,12 +204,22 @@ export default function Categories() {
         </TabsList>
         <TabsContent value="expense">
           <div className="rounded-xl border mt-4">
-            <CategoryList type="expense" />
+            <CategoryList
+              type="expense"
+              categories={categories}
+              onEdit={openEdit}
+              onDelete={confirmDelete}
+            />
           </div>
         </TabsContent>
         <TabsContent value="income">
           <div className="rounded-xl border mt-4">
-            <CategoryList type="income" />
+            <CategoryList
+              type="income"
+              categories={categories}
+              onEdit={openEdit}
+              onDelete={confirmDelete}
+            />
           </div>
         </TabsContent>
       </Tabs>
