@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { AccountDialog, type AccountFormData } from '@/pages/accounts/AccountDialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -19,20 +18,10 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/format'
-
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
-const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'investment', 'credit', 'cash']
 
 const TYPE_COLORS: Record<AccountType, string> = {
   checking: 'default',
@@ -42,15 +31,7 @@ const TYPE_COLORS: Record<AccountType, string> = {
   cash: 'outline',
 }
 
-interface FormData {
-  name: string
-  type: AccountType
-  currency: string
-  balance: string
-  notes: string
-}
-
-const emptyForm: FormData = {
+const emptyForm: AccountFormData = {
   name: '',
   type: 'checking',
   currency: 'USD',
@@ -63,7 +44,7 @@ export default function Accounts() {
   const { transactions } = useTransactionsStore()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
-  const [form, setForm] = useState<FormData>(emptyForm)
+  const [form, setForm] = useState<AccountFormData>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
 
   useEffect(() => {
@@ -189,91 +170,17 @@ export default function Accounts() {
         </div>
       )}
 
-      <Dialog
+      <AccountDialog
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open)
           if (!open) setEditing(null)
         }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editing ? 'Edit Account' : 'Add Account'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Main Checking"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Type</Label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => setForm({ ...form, type: v as AccountType })}
-                items={ACCOUNT_TYPES.map((t) => ({
-                  value: t,
-                  label: t.charAt(0).toUpperCase() + t.slice(1),
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ACCOUNT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label>Currency</Label>
-                <Select
-                  value={form.currency}
-                  onValueChange={(v) => setForm({ ...form, currency: v ?? 'USD' })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="balance">Balance</Label>
-                <Input
-                  id="balance"
-                  type="number"
-                  step="0.01"
-                  value={form.balance}
-                  onChange={(e) => setForm({ ...form, balance: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>
-              {editing ? 'Save' : 'Add Account'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        editing={editing}
+        form={form}
+        onFormChange={setForm}
+        onSave={handleSave}
+      />
 
       <Dialog
         open={!!deleteTarget}

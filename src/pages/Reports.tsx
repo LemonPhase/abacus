@@ -9,7 +9,7 @@ import {
   BarChart,
   Bar,
 } from 'recharts'
-import { ChartTooltip } from '@/components/ChartTooltip'
+import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {

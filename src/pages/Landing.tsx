@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useAuth } from '@/supabase/auth'
+import { useAuth } from '@/auth/auth'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'

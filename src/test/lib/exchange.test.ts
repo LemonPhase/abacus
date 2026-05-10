@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fetchExchangeRate, getOrFetchRate, convertCurrency } from '@/lib/exchange'
+import { fetchExchangeRate, getOrFetchRate, convertCurrency } from '@/services/exchange'
 import { resetAllTables } from '@/test/supabase-mock'
 
 let mockFetch: ReturnType<typeof vi.fn>

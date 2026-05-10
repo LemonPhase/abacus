@@ -7,8 +7,8 @@ import { useSettingsStore } from '@/stores/settingsStore'
 
 const mockSignOut = vi.fn()
 
-vi.mock('@/supabase/auth', async (importOriginal) => {
-  const actual = (await importOriginal()) as typeof import('@/supabase/auth')
+vi.mock('@/auth/auth', async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof import('@/auth/auth')
   return {
     ...actual,
     useAuth: () => ({ user: { email: 'test@example.com' }, signOut: mockSignOut }),

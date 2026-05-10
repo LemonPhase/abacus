@@ -8,12 +8,8 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table'
-import {
-  calculateProjection,
-  formatInvestmentValue,
-  INVESTMENT_TYPE_COLORS,
-  INVESTMENT_TYPE_LABELS,
-} from '@/lib/investments'
+import { calculateProjection, formatInvestmentValue } from '@/lib/investments'
+import { INVESTMENT_TYPE_COLORS, INVESTMENT_TYPE_LABELS } from './constants'
 import type { InvestmentPlan } from '@/types'
 import { Pencil, Trash2 } from 'lucide-react'
 

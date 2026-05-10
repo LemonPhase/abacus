@@ -22,7 +22,7 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { ChartTooltip } from '@/components/ChartTooltip'
+import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { InvestmentPlan } from '@/types'
@@ -30,8 +30,8 @@ import {
   calculateProjection,
   calculateTotalProjection,
   formatInvestmentValue,
-  INVESTMENT_TYPE_COLORS,
 } from '@/lib/investments'
+import { INVESTMENT_TYPE_COLORS } from '@/pages/investments/constants'
 import { InvestmentDialog, type InvestmentFormData } from '@/pages/investments/InvestmentDialog'
 import { InvestmentList } from '@/pages/investments/InvestmentList'
 import {

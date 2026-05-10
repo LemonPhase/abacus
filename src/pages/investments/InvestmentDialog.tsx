@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { INVESTMENT_TYPE_LABELS } from '@/lib/investments'
+import { INVESTMENT_TYPE_LABELS } from './constants'
 import type { InvestmentPlan, InvestmentType } from '@/types'
 
 const INVESTMENT_TYPES: InvestmentType[] = [

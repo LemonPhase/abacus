@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import GlobalErrorBanner from '@/components/GlobalErrorBanner'
+import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 

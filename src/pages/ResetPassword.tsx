@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound, Loader2 } from 'lucide-react'
-import { useAuth } from '@/supabase/auth'
+import { useAuth } from '@/auth/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

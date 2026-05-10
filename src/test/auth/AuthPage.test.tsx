@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { AuthProvider } from '@/supabase/auth'
+import { AuthProvider } from '@/auth/auth'
 import { mockSupabase } from '@/test/supabase-mock'
 import Auth from '@/pages/Auth'
 

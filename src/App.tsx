@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 
-import { AuthProvider, AuthGuard } from '@/supabase/auth'
+import { AuthProvider, AuthGuard } from '@/auth/auth'
 
-import ThemeProvider from '@/components/ThemeProvider'
+import ThemeProvider from '@/components/providers/ThemeProvider'
 import Sidebar from '@/components/layout/Sidebar'
 import MobileNav from '@/components/layout/MobileNav'
-import GlobalErrorBanner from '@/components/GlobalErrorBanner'
+import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner'
 
 import Landing from '@/pages/Landing'
 import Auth from '@/pages/Auth'

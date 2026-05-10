@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { AuthProvider, useAuth, AuthGuard } from '@/supabase/auth'
+import { AuthProvider, useAuth, AuthGuard } from '@/auth/auth'
 import { mockSupabase } from '@/test/supabase-mock'
 
 beforeEach(() => {

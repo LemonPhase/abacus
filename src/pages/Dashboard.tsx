@@ -11,7 +11,7 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { ChartTooltip } from '@/components/ChartTooltip'
+import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAccountsStore } from '@/stores/accountsStore'

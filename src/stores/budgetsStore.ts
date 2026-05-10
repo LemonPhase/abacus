@@ -1,7 +1,6 @@
 import { create } from 'zustand'
-import { supabase } from '@/supabase/client'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { subscribeToTable } from '@/lib/realtime'
+import { createCrudSlice } from '@/stores/crudStore'
 import type { Budget, NewBudget } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -15,6 +14,12 @@ function mapRow(row: BudgetRow): Budget {
     startDate: new Date(row.start_date),
   }
 }
+
+const crud = createCrudSlice<Budget>({
+  table: 'budgets',
+  collectionKey: 'budgets',
+  mapRow: (row) => mapRow(row as BudgetRow),
+})
 
 interface BudgetsState {
   budgets: Budget[]
@@ -30,108 +35,13 @@ interface BudgetsState {
   unsubscribe: () => void
 }
 
-export const useBudgetsStore = create<BudgetsState>()((set, get) => ({
-  budgets: [],
-  loading: false,
-  error: null,
-  _unsub: null,
-  clearError: () => set({ error: null }),
-
-  load: async (options) => {
-    set({ loading: true, error: null })
-    const { limit, offset } = options ?? {}
-    let query = supabase.from('budgets').select('*')
-    if (offset !== undefined && limit !== undefined) {
-      query = query.range(offset, offset + limit - 1)
-    } else if (limit !== undefined) {
-      query = query.limit(limit)
-    }
-    const { data, error } = await query
-    if (error) {
-      set({ error: error.message, loading: false })
-      throw error
-    }
-    const budgets: Budget[] = (data ?? []).map(mapRow)
-    set({ budgets, loading: false })
-
-    if (!get()._unsub) {
-      const unsub = subscribeToTable('budgets', (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const budget = mapRow(payload.new as BudgetRow)
-          set((state) => {
-            if (state.budgets.some((b) => b.id === budget.id)) return state
-            return { budgets: [...state.budgets, budget] }
-          })
-        } else if (payload.eventType === 'UPDATE') {
-          const budget = mapRow(payload.new as BudgetRow)
-          set((state) => ({
-            budgets: state.budgets.map((b) => (b.id === budget.id ? budget : b)),
-          }))
-        } else if (payload.eventType === 'DELETE') {
-          const id = (payload.old as { id: string }).id
-          set((state) => ({
-            budgets: state.budgets.filter((b) => b.id !== id),
-          }))
-        }
-      })
-      set({ _unsub: unsub })
-    }
-  },
-
-  add: async (data) => {
-    set({ error: null })
-    const { data: inserted, error } = await supabase
-      .from('budgets')
-      .insert(mapKeysToSnake(data) as Database['public']['Tables']['budgets']['Insert'])
-      .select()
-      .single()
-    if (error) {
-      set({ error: error.message, loading: false })
-      throw error
-    }
-    const budget = mapRow(inserted as BudgetRow)
-    set((state) => {
-      if (state.budgets.some((item) => item.id === budget.id)) return state
-      return { budgets: [...state.budgets, budget] }
-    })
-    return budget
-  },
-
-  update: async (id, data) => {
-    set({ error: null })
-    const { error } = await supabase
-      .from('budgets')
-      .update(mapKeysToSnake(data) as Database['public']['Tables']['budgets']['Update'])
-      .eq('id', id)
-    if (error) {
-      set({ error: error.message, loading: false })
-      throw error
-    }
-
-    set((state) => ({
-      budgets: state.budgets.map((item) => (item.id === id ? { ...item, ...data } : item)),
-    }))
-  },
-
-  remove: async (id) => {
-    set({ error: null })
-    const { error } = await supabase.from('budgets').delete().eq('id', id)
-    if (error) {
-      set({ error: error.message, loading: false })
-      throw error
-    }
-
-    set((state) => ({
-      budgets: state.budgets.filter((item) => item.id !== id),
-    }))
-  },
-
-  getById: (id) => {
-    return get().budgets.find((b) => b.id === id)
-  },
-
-  unsubscribe: () => {
-    get()._unsub?.()
-    set({ _unsub: null })
-  },
-}))
+export const useBudgetsStore = create<BudgetsState>()((set, get) => {
+  const { _add, _update, ...base } = crud(set, get)
+  return {
+    budgets: [],
+    ...base,
+    add: (data) => _add(mapKeysToSnake(data) as Database['public']['Tables']['budgets']['Insert']),
+    update: (id, data) =>
+      _update(id, mapKeysToSnake(data) as Database['public']['Tables']['budgets']['Update']),
+  }
+})
