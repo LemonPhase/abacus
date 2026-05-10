@@ -162,7 +162,7 @@
 /* ── Modern Zen utility classes ── */
 
 .ink-shadow {
-  box-shadow: 0 20px 40px rgba(28, 25, 23, 0.04);
+  box-shadow: 0 0 24px rgba(28, 25, 23, 0.06);
 }
 
 .tabular-nums {
