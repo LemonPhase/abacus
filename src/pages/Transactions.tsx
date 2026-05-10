@@ -228,6 +228,17 @@ export default function Transactions() {
             const rate = await getExchangeRate(currency, toCurrency)
             convertedAmount = Math.round(amount * rate * 100) / 100
 
+            // Save original data for rollback
+            const originalTx = tx && {
+              accountId: tx.accountId,
+              categoryId: tx.categoryId || '',
+              type: tx.type,
+              amount: tx.amount,
+              currency: tx.currency,
+              date: tx.date,
+              description: tx.description,
+            }
+
             await update(editing, {
               accountId: form.accountId,
               categoryId: form.categoryId,
@@ -238,18 +249,27 @@ export default function Transactions() {
               description: form.description.trim() || undefined,
             })
 
-            const inTx = await add({
-              accountId: form.toAccountId,
-              categoryId: form.categoryId,
-              type: 'transfer',
-              amount: convertedAmount,
-              currency: toCurrency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
-              correlativeId: editing,
-            })
+            try {
+              const inTx = await add({
+                accountId: form.toAccountId,
+                categoryId: form.categoryId,
+                type: 'transfer',
+                amount: convertedAmount,
+                currency: toCurrency,
+                date: new Date(form.date),
+                description: form.description.trim() || undefined,
+                correlativeId: editing,
+              })
 
-            await update(editing, { correlativeId: inTx.id })
+              await update(editing, { correlativeId: inTx.id })
+            } catch (err) {
+              // Rollback: revert to original non-transfer state
+              if (originalTx) {
+                await remove(editing)
+                await add(originalTx)
+              }
+              throw err
+            }
           }
         } else {
           // Add two transactions
@@ -268,18 +288,25 @@ export default function Transactions() {
             description: form.description.trim() || undefined,
           })
 
-          const inTx = await add({
-            accountId: form.toAccountId,
-            categoryId: form.categoryId,
-            type: 'transfer',
-            amount: convertedAmount,
-            currency: toCurrency,
-            date: new Date(form.date),
-            description: form.description.trim() || undefined,
-            correlativeId: outTx.id,
-          })
+          try {
+            const inTx = await add({
+              accountId: form.toAccountId,
+              categoryId: form.categoryId,
+              type: 'transfer',
+              amount: convertedAmount,
+              currency: toCurrency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+              correlativeId: outTx.id,
+            })
 
-          await update(outTx.id, { correlativeId: inTx.id })
+            await update(outTx.id, { correlativeId: inTx.id })
+          } catch (err) {
+            // Rollback: if the incoming side or linkage fails, remove the
+            // already-inserted outgoing transaction to avoid dangling data.
+            await remove(outTx.id)
+            throw err
+          }
         }
       } else {
         if (editing) {
