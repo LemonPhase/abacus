@@ -1,7 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { supabase } from '@/supabase/client'
+import { unsubscribeAll } from '@/supabase/realtime'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useBudgetsStore } from '@/stores/budgetsStore'
+import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import type { User, Session } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 
@@ -32,7 +38,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        unsubscribeAll()
+        // Reset all data stores to prevent stale data appearing on next sign-in.
+        // setState is typed per-store, so we cast to the shared shape.
+        ;(
+          [
+            useAccountsStore,
+            useCategoriesStore,
+            useTransactionsStore,
+            useBudgetsStore,
+            useInvestmentPlansStore,
+          ] as const
+        ).forEach((store) => {
+          store.getState().unsubscribe?.()
+          ;(store.setState as (s: Record<string, unknown>) => void)({
+            items: [],
+            loading: false,
+            error: null,
+            _unsub: null,
+          })
+        })
+      }
       setSession(session)
       setUser(session?.user ?? null)
     })
@@ -68,22 +96,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message)
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        resetPasswordForEmail,
-        updatePassword,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      loading,
+      signIn,
+      signUp,
+      signOut,
+      resetPasswordForEmail,
+      updatePassword,
+    }),
+    [user, session, loading, signIn, signUp, signOut, resetPasswordForEmail, updatePassword],
   )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
