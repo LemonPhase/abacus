@@ -114,9 +114,10 @@ export default function Dashboard() {
       const s = new Date(b.startDate)
       if (s.getFullYear() !== now.getFullYear() || s.getMonth() !== now.getMonth()) continue
       let spent = 0
-      for (const t of transactions) {
-        if (t.type !== "expense") continue
-        if (!b.categoryIds.includes(t.categoryId)) continue
+for (const t of transactions) {
+                   if (t.type !== "expense") continue
+                   if (!t.categoryId) continue
+                   if (!b.categoryIds.includes(t.categoryId)) continue
         const d = new Date(t.date)
         if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
           spent += t.baseAmount
@@ -223,13 +224,13 @@ export default function Dashboard() {
           ) : (
             <div className="space-y-2">
               {recentTransactions.map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between py-1.5 border-b border-muted last:border-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{tx.description || categories.find((c) => c.id === tx.categoryId)?.name || "Transaction"}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {accounts.find((a) => a.id === tx.accountId)?.name}</p>
-                  </div>
-                  <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
-                    {tx.type === "income" ? "+" : "−"}{formatCurrency(tx.baseAmount, baseCurrency)}
+<div key={tx.id} className="flex items-center justify-between py-1.5 border-b border-muted last:border-0">
+                   <div className="min-w-0">
+                     <p className="text-sm font-medium truncate">{tx.description || (tx.type === "transfer" ? "Transfer" : categories.find((c) => c.id === tx.categoryId)?.name || "Transaction")}</p>
+                     <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {accounts.find((a) => a.id === tx.accountId)?.name}</p>
+                   </div>
+                   <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "text-emerald-600" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "text-rose-600" : ""}`}>
+                    {tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "+" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "−" : "↔"}{formatCurrency(Math.abs(tx.baseAmount), baseCurrency)}
                   </span>
                 </div>
               ))}
@@ -251,7 +252,8 @@ export default function Dashboard() {
                 let spent = 0
                 for (const t of transactions) {
                   if (t.type !== "expense") continue
-                  if (!b.categoryIds.includes(t.categoryId)) continue
+        if (!t.categoryId) continue
+        if (!b.categoryIds.includes(t.categoryId)) continue
                   const d = new Date(t.date)
                   if (b.period === "monthly" ? (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) : d.getFullYear() === now.getFullYear()) {
                     spent += t.baseAmount

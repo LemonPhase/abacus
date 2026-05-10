@@ -136,6 +136,31 @@ describe("TransactionDialog", () => {
     expect(screen.getByRole("button", { name: "Add Transaction" })).toBeDisabled()
   })
 
+  it("disables save for transfers when toAccountId is missing", () => {
+    render(
+      <TransactionDialog
+        open
+        editing={false}
+        form={{
+          accountId: "acc-1",
+          categoryId: "cat-1",
+          type: "transfer",
+          amount: "100",
+          date: "2026-05-01",
+          description: "",
+          toAccountId: "",
+        }}
+        accounts={[accountFixture]}
+        categories={[categoryFixture]}
+        onOpenChange={vi.fn()}
+        onFormChange={vi.fn()}
+        onSave={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole("button", { name: "Add Transaction" })).toBeDisabled()
+  })
+
   it("calls onSave when clicking Add Transaction", async () => {
     const onSave = vi.fn()
     const user = userEvent.setup()
@@ -153,6 +178,35 @@ describe("TransactionDialog", () => {
           toAccountId: "",
         }}
         accounts={[accountFixture]}
+        categories={[categoryFixture]}
+        onOpenChange={vi.fn()}
+        onFormChange={vi.fn()}
+        onSave={onSave}
+      />
+    )
+
+    await user.click(screen.getByRole("button", { name: "Add Transaction" }))
+
+    expect(onSave).toHaveBeenCalled()
+  })
+
+  it("calls onSave with transfer data when clicking Add Transaction for transfer type", async () => {
+    const onSave = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <TransactionDialog
+        open
+        editing={false}
+        form={{
+          accountId: accountFixture.id,
+          categoryId: categoryFixture.id,
+          type: "transfer",
+          amount: "12.34",
+          date: "2026-05-01",
+          description: "Transfer",
+          toAccountId: "acc-2",
+        }}
+        accounts={[accountFixture, { ...accountFixture, id: "acc-2", name: "Savings" }]}
         categories={[categoryFixture]}
         onOpenChange={vi.fn()}
         onFormChange={vi.fn()}

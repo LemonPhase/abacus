@@ -78,7 +78,7 @@ export function TransactionDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Account</Label>
+            <Label>Account {form.type === "transfer" ? "(From)" : ""}</Label>
             <Select
               value={form.accountId}
               onValueChange={(v) => onFormChange({ ...form, accountId: v ?? "" })}
@@ -94,8 +94,39 @@ export function TransactionDialog({
               </SelectContent>
             </Select>
           </div>
+          {form.type === "transfer" && (
+            <div className="grid gap-2">
+              <Label>Account (To)</Label>
+              <Select
+                value={form.toAccountId}
+                onValueChange={(v) => onFormChange({ ...form, toAccountId: v ?? "" })}
+                items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select destination account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id} disabled={a.id === form.accountId}>{a.name} ({a.currency})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.accountId && form.toAccountId && (() => {
+                const fromAcc = accounts.find((a) => a.id === form.accountId)
+                const toAcc = accounts.find((a) => a.id === form.toAccountId)
+                if (fromAcc && toAcc && fromAcc.currency !== toAcc.currency) {
+                  return (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                      Converting from {fromAcc.currency} to {toAcc.currency}. The exchange rate will be applied automatically.
+                    </div>
+                  )
+                }
+                return null
+              })()}
+            </div>
+          )}
           <div className="grid gap-2">
-            <Label>Category</Label>
+            <Label>Category{form.type === "transfer" ? " (optional)" : ""}</Label>
             <Select
               value={form.categoryId}
               onValueChange={(v) => onFormChange({ ...form, categoryId: v ?? "" })}
@@ -150,7 +181,7 @@ export function TransactionDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={onSave} disabled={!form.accountId || !form.categoryId || !form.amount}>
+          <Button onClick={onSave} disabled={!form.accountId || (!form.categoryId && form.type !== "transfer") || !form.amount || (form.type === "transfer" && !form.toAccountId)}>
             {editing ? "Save" : "Add Transaction"}
           </Button>
         </DialogFooter>

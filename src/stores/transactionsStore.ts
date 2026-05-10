@@ -88,6 +88,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
       ...data,
       baseAmount: data.baseAmount ?? data.amount,
       baseCurrency: data.baseCurrency ?? data.currency,
+      categoryId: data.categoryId || null,
     }
     const { data: inserted, error } = await supabase
       .from("transactions")
@@ -105,9 +106,13 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
 
   update: async (id, data) => {
     set({ error: null })
+    const clean: Record<string, unknown> = { ...data }
+    if ("categoryId" in data && !data.categoryId) {
+      clean.categoryId = null
+    }
     const { error } = await supabase
       .from("transactions")
-      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["transactions"]["Update"])
+      .update(mapKeysToSnake(clean) as Database["public"]["Tables"]["transactions"]["Update"])
       .eq("id", id)
     if (error) { set({ error: error.message, loading: false }); throw error }
 

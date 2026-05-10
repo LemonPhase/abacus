@@ -37,6 +37,38 @@ create policy "Users can manage their own accounts" on accounts
   for all using (auth.uid() = user_id);
 create trigger set_updated_at before update on accounts
   for each row execute function update_updated_at_column();
+
+create or replace function update_account_balance()
+returns trigger as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.type = 'income' or new.type = 'transfer' then
+      update accounts set balance = balance + new.amount where id = new.account_id;
+    elsif new.type = 'expense' then
+      update accounts set balance = balance - new.amount where id = new.account_id;
+    end if;
+  elsif tg_op = 'UPDATE' then
+    if old.type = 'income' or old.type = 'transfer' then
+      update accounts set balance = balance - old.amount where id = old.account_id;
+    elsif old.type = 'expense' then
+      update accounts set balance = balance + old.amount where id = old.account_id;
+    end if;
+    
+    if new.type = 'income' or new.type = 'transfer' then
+      update accounts set balance = balance + new.amount where id = new.account_id;
+    elsif new.type = 'expense' then
+      update accounts set balance = balance - new.amount where id = new.account_id;
+    end if;
+  elsif tg_op = 'DELETE' then
+    if old.type = 'income' or old.type = 'transfer' then
+      update accounts set balance = balance - old.amount where id = old.account_id;
+    elsif old.type = 'expense' then
+      update accounts set balance = balance + old.amount where id = old.account_id;
+    end if;
+  end if;
+  return null;
+end;
+$$ language plpgsql;
 create trigger set_user_id before insert on accounts
   for each row execute function set_user_id();
 
@@ -89,6 +121,9 @@ create policy "Users can manage their own transactions" on transactions
   for all using (auth.uid() = user_id);
 create trigger set_updated_at before update on transactions
   for each row execute function update_updated_at_column();
+create trigger maintain_account_balance
+  after insert or update or delete on transactions
+  for each row execute function update_account_balance();
 create trigger set_user_id before insert on transactions
   for each row execute function set_user_id();
 

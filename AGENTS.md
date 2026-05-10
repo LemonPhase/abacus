@@ -22,7 +22,7 @@
 
 - **React 19 + React Router v7** SPA. 10 page routes in `src/pages/`.
 - **Supabase** backend (`@supabase/supabase-js`). Auth is mandatory — all routes except `/auth` and `/reset-password` are behind `AuthGuard` (`src/supabase/auth.tsx`). Client configured in `src/supabase/client.ts`.
-- **Database schema** source of truth: `src/supabase/migration.sql`. 6 tables: `accounts`, `categories`, `transactions`, `budgets`, `exchange_rates`, `investment_plans`. All tables have RLS via `auth.uid() = user_id`. Generated types in `src/supabase/database.types.ts`.
+- **Database schema** source of truth: `supabase/migrations/`. Use `npm run db:push` to apply migrations to the remote database. 6 tables: `accounts`, `categories`, `transactions`, `budgets`, `exchange_rates`, `investment_plans`. All tables have RLS via `auth.uid() = user_id`. A `maintain_account_balance` trigger on `transactions` keeps account balances in sync. Generated types in `src/supabase/database.types.ts`.
 - **Realtime**: Supabase Realtime subscriptions via `src/lib/realtime.ts` — `subscribeToTable(table, handler)` wraps Postgres changes channels.
 - **Tauri v2 desktop wrapper** (`src-tauri/`). Frontend build output is `dist/`. Tauri commands via `npm run tauri`.
 - **Zustand stores** in `src/stores/` — one per domain: `accountsStore`, `budgetsStore`, `categoriesStore`, `investmentPlansStore`, `transactionsStore`, `settingsStore`.

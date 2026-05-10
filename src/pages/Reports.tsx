@@ -59,7 +59,7 @@ export default function Reports() {
     const map = new Map<string, { name: string; color: string; icon: string | null; income: number; expense: number }>()
     for (const t of filteredTxn) {
       const cat = categories.find((c) => c.id === t.categoryId)
-      const key = cat?.id ?? t.categoryId
+      const key = cat?.id ?? (t.categoryId ?? "__uncategorized__")
       if (!map.has(key)) {
         map.set(key, { name: cat?.name ?? "Unknown", color: cat?.color ?? "#888", icon: cat?.icon ?? null, income: 0, expense: 0 })
       }

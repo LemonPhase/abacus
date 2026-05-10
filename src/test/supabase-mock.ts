@@ -1,6 +1,7 @@
 // In-memory mock of @supabase/supabase-js for tests
 // Stores data in arrays, mimicking Supabase PostgREST behavior
 // Data is stored with snake_case keys (matching Postgres)
+// Simulates the maintain_account_balance DB trigger on transactions
 import { vi } from "vitest"
 
 const tables = new Map<string, Record<string, unknown>[]>()
@@ -33,6 +34,41 @@ function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
     updated_at: now,
     ...overrides,
   }
+}
+
+function adjustBalance(accountId: string, delta: number) {
+  const accounts = tables.get("accounts")
+  if (!accounts) return
+  const account = accounts.find((r) => r.id === accountId)
+  if (!account) return
+  account.balance = ((account.balance as number) ?? 0) + delta
+}
+
+function applyInsertBalanceEffect(row: Record<string, unknown>) {
+  const type = row.type as string
+  const amount = (row.amount as number) ?? 0
+  const accountId = row.account_id as string
+  if (type === "income" || type === "transfer") {
+    adjustBalance(accountId, amount)
+  } else if (type === "expense") {
+    adjustBalance(accountId, -amount)
+  }
+}
+
+function applyDeleteBalanceEffect(row: Record<string, unknown>) {
+  const type = row.type as string
+  const amount = (row.amount as number) ?? 0
+  const accountId = row.account_id as string
+  if (type === "income" || type === "transfer") {
+    adjustBalance(accountId, -amount)
+  } else if (type === "expense") {
+    adjustBalance(accountId, amount)
+  }
+}
+
+function applyUpdateBalanceEffect(oldRow: Record<string, unknown>, newRow: Record<string, unknown>) {
+  applyDeleteBalanceEffect(oldRow)
+  applyInsertBalanceEffect(newRow)
 }
 
 type Filter = { col: string; val: unknown }
@@ -157,6 +193,7 @@ function createBuilder(tableName: string): any {
         const inserted = toInsert.map((d) => {
           const row = newRow(d as Record<string, unknown>)
           rows.push(row)
+          if (tableName === "transactions") applyInsertBalanceEffect(row)
           return row
         })
 
@@ -175,7 +212,9 @@ function createBuilder(tableName: string): any {
           targets = targets.filter((r) => r[f.col] === f.val)
         }
         for (const target of targets) {
+          const oldRow = { ...target }
           Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
+          if (tableName === "transactions") applyUpdateBalanceEffect(oldRow, target)
         }
         if (_returning) {
           resolve({ data: targets.length === 1 && _single ? targets[0] : targets, error: null })
@@ -186,6 +225,7 @@ function createBuilder(tableName: string): any {
         if (_filters.length > 0) {
           const matched = rows.filter((r) => _filters.every((f) => r[f.col] === f.val))
           for (const r of matched) {
+            if (tableName === "transactions") applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)
             if (idx >= 0) rows.splice(idx, 1)
           }

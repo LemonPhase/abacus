@@ -29,7 +29,7 @@ export type TransactionKind = "income" | "expense" | "transfer"
 export interface Transaction {
   id: string
   accountId: string
-  categoryId: string
+  categoryId: string | null
   type: TransactionKind
   amount: number
   currency: string

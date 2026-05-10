@@ -20,6 +20,7 @@ import { useTransactionsStore } from "@/stores/transactionsStore"
 import { useAccountsStore } from "@/stores/accountsStore"
 import { useCategoriesStore } from "@/stores/categoriesStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { supabase } from "@/supabase/client"
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
 import type { TransactionKind } from "@/types"
 import { ICON_MAP } from "@/lib/icons"
@@ -99,45 +100,199 @@ export default function Transactions() {
 
   function openEdit(tx: (typeof transactions)[0]) {
     setEditing(tx.id)
+    let accountId = tx.accountId
+    let toAccountId = ""
+    
+    if (tx.type === "transfer" && tx.correlativeId) {
+      const correlative = transactions.find(t => t.id === tx.correlativeId)
+      if (tx.amount < 0) {
+        accountId = tx.accountId
+        toAccountId = correlative?.accountId ?? ""
+      } else {
+        accountId = correlative?.accountId ?? ""
+        toAccountId = tx.accountId
+      }
+    }
+    
     setForm({
-      accountId: tx.accountId,
-      categoryId: tx.categoryId,
+      accountId,
+      categoryId: tx.categoryId ?? "",
       type: tx.type,
-      amount: String(tx.amount),
+      amount: String(Math.abs(tx.amount)),
       date: new Date(tx.date).toISOString().slice(0, 10),
       description: tx.description ?? "",
-      toAccountId: "",
+      toAccountId,
     })
     setDialogOpen(true)
   }
 
+  async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
+    if (fromCurrency === toCurrency) return 1
+    // Try exact pair
+    const { data } = await supabase
+      .from("exchange_rates")
+      .select("rate")
+      .eq("from_currency", fromCurrency)
+      .eq("to_currency", toCurrency)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single()
+    if (data) return data.rate
+    // Try inverse
+    const { data: inverse } = await supabase
+      .from("exchange_rates")
+      .select("rate")
+      .eq("from_currency", toCurrency)
+      .eq("to_currency", fromCurrency)
+      .order("date", { ascending: false })
+      .limit(1)
+      .single()
+    if (inverse) return 1 / inverse.rate
+    return 1
+  }
+
   async function handleSave() {
     const amount = parseFloat(form.amount) || 0
-    if (!form.accountId || !form.categoryId || !amount) return
+    if (!form.accountId || (!form.categoryId && form.type !== "transfer") || !amount) return
 
     const account = accounts.find((a) => a.id === form.accountId)
     const currency = account?.currency ?? baseCurrency
 
-    if (editing) {
-      await update(editing, {
-        accountId: form.accountId,
-        categoryId: form.categoryId,
-        type: form.type,
-        amount,
-        currency,
-        date: new Date(form.date),
-        description: form.description.trim() || undefined,
-      })
+    if (form.type === "transfer") {
+      if (!form.toAccountId) return
+      let convertedAmount: number
+      
+      if (editing) {
+        // Find if this transaction already has a correlative
+        const tx = transactions.find(t => t.id === editing)
+        if (tx && tx.correlativeId) {
+          // Update both
+          const isOutgoing = tx.amount < 0
+          const outId = isOutgoing ? tx.id : tx.correlativeId
+          const inId = isOutgoing ? tx.correlativeId : tx.id
+          
+          const toAccount = accounts.find((a) => a.id === form.toAccountId)
+          const toCurrency = toAccount?.currency ?? currency
+          const rate = await getExchangeRate(currency, toCurrency)
+          convertedAmount = Math.round(amount * rate * 100) / 100
+
+          await update(outId, {
+            accountId: form.accountId,
+            categoryId: form.categoryId,
+            type: "transfer",
+            amount: -amount,
+            currency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+          })
+          
+          await update(inId, {
+            accountId: form.toAccountId,
+            categoryId: form.categoryId,
+            type: "transfer",
+            amount: convertedAmount,
+            currency: toCurrency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+          })
+        } else {
+          // Changed from another type to transfer, need to create the missing correlative
+          const toAccount = accounts.find((a) => a.id === form.toAccountId)
+          const toCurrency = toAccount?.currency ?? currency
+          const rate = await getExchangeRate(currency, toCurrency)
+          convertedAmount = Math.round(amount * rate * 100) / 100
+
+          await update(editing, {
+            accountId: form.accountId,
+            categoryId: form.categoryId,
+            type: form.type,
+            amount: -amount,
+            currency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+          })
+          
+          const inTx = await add({
+            accountId: form.toAccountId,
+            categoryId: form.categoryId,
+            type: "transfer",
+            amount: convertedAmount,
+            currency: toCurrency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+            correlativeId: editing
+          })
+          
+          await update(editing, { correlativeId: inTx.id })
+        }
+      } else {
+        // Add two transactions
+        const toAccount = accounts.find((a) => a.id === form.toAccountId)
+        const toCurrency = toAccount?.currency ?? currency
+        const rate = await getExchangeRate(currency, toCurrency)
+        convertedAmount = Math.round(amount * rate * 100) / 100
+
+        const outTx = await add({
+          accountId: form.accountId,
+          categoryId: form.categoryId,
+          type: "transfer",
+          amount: -amount,
+          currency,
+          date: new Date(form.date),
+          description: form.description.trim() || undefined,
+        })
+        
+        const inTx = await add({
+          accountId: form.toAccountId,
+          categoryId: form.categoryId,
+          type: "transfer",
+          amount: convertedAmount,
+          currency: toCurrency,
+          date: new Date(form.date),
+          description: form.description.trim() || undefined,
+          correlativeId: outTx.id
+        })
+        
+        await update(outTx.id, { correlativeId: inTx.id })
+      }
     } else {
-      await add({
-        accountId: form.accountId,
-        categoryId: form.categoryId,
-        type: form.type,
-        amount,
-        currency,
-        date: new Date(form.date),
-        description: form.description.trim() || undefined,
-      })
+      if (editing) {
+        const tx = transactions.find(t => t.id === editing)
+        if (tx && tx.type === "transfer" && tx.correlativeId) {
+          // Changed from transfer to another type, remove the correlative
+          await remove(tx.correlativeId)
+          await update(editing, {
+            accountId: form.accountId,
+            categoryId: form.categoryId,
+            type: form.type,
+            amount,
+            currency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+            correlativeId: null as unknown as string,
+          })
+        } else {
+          await update(editing, {
+            accountId: form.accountId,
+            categoryId: form.categoryId,
+            type: form.type,
+            amount,
+            currency,
+            date: new Date(form.date),
+            description: form.description.trim() || undefined,
+          })
+        }
+      } else {
+        await add({
+          accountId: form.accountId,
+          categoryId: form.categoryId,
+          type: form.type,
+          amount,
+          currency,
+          date: new Date(form.date),
+          description: form.description.trim() || undefined,
+        })
+      }
     }
 
     setDialogOpen(false)
@@ -145,11 +300,21 @@ export default function Transactions() {
     if (!editing) {
       setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
     }
+    loadAccounts()
   }
 
   async function handleDelete() {
     if (!deleteTarget) return
+    const tx = transactions.find((t) => t.id === deleteTarget)
+
+    if (tx?.type === "transfer" && tx.correlativeId) {
+      const corr = transactions.find((t) => t.id === tx.correlativeId)
+      if (corr) {
+        await remove(tx.correlativeId)
+      }
+    }
     await remove(deleteTarget)
+    loadAccounts()
     setDeleteTarget(null)
   }
 
@@ -167,22 +332,24 @@ export default function Transactions() {
     const currency = account?.currency ?? baseCurrency
 
     for (const row of csvMappedRows) {
-      const amount = parseAmount(row.amount)
-      if (!amount) continue
+      const parsedAmount = parseAmount(row.amount)
+      if (!parsedAmount) continue
       const date = parseDate(row.date)
       if (!date) continue
 
       let type: TransactionKind = row.type ?? "expense"
       // Auto-detect: negative amount = expense, positive = income
       if (!row.type) {
-        type = amount < 0 ? "expense" : "income"
+        type = parsedAmount < 0 ? "expense" : "income"
       }
+
+      const dbAmount = Math.abs(parsedAmount)
 
       await add({
         accountId: csvAccountId,
         categoryId: csvCategoryId,
         type,
-        amount: Math.abs(amount),
+        amount: dbAmount,
         currency,
         date,
         description: row.description.trim() || undefined,
@@ -195,12 +362,13 @@ export default function Transactions() {
     setCsvRawRows([])
     setCsvMappedRows([])
     setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
+    loadAccounts()
   }
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown"
-  const getCategoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "Unknown"
-  const getCategoryIcon = (id: string) => categories.find((c) => c.id === id)?.icon ?? null
-  const getCategoryColor = (id: string) => categories.find((c) => c.id === id)?.color ?? "#888"
+  const getCategoryName = (id: string | null) => id ? (categories.find((c) => c.id === id)?.name ?? "Unknown") : "—"
+  const getCategoryIcon = (id: string | null) => id ? (categories.find((c) => c.id === id)?.icon ?? null) : null
+  const getCategoryColor = (id: string | null) => id ? (categories.find((c) => c.id === id)?.color ?? "#888") : "#888"
 
   return (
     <div className="space-y-6">
@@ -272,8 +440,8 @@ export default function Transactions() {
                     </div>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground truncate max-w-48">{tx.description || "—"}</TableCell>
-                  <TableCell className={`text-right text-xs tabular-nums font-medium ${tx.type === "income" ? "text-emerald-600" : tx.type === "expense" ? "text-rose-600" : ""}`}>
-                    {tx.type === "income" ? "+" : tx.type === "expense" ? "−" : "↔"} {formatCurrency(tx.amount, tx.currency)}
+                  <TableCell className={`text-right text-xs tabular-nums font-medium ${tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "text-emerald-600" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "text-rose-600" : ""}`}>
+                    {tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "+" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "−" : "↔"} {formatCurrency(Math.abs(tx.amount), tx.currency)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">

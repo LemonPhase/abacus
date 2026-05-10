@@ -78,7 +78,7 @@ export default function Budgets() {
     const spent = transactions
       .filter((t) => {
         if (t.type !== "expense") return false
-        if (!budget.categoryIds.includes(t.categoryId)) return false
+        if (!t.categoryId || !budget.categoryIds.includes(t.categoryId)) return false
         const d = new Date(t.date)
         return d >= start && d <= end
       })

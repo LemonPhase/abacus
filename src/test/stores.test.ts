@@ -96,6 +96,118 @@ describe("Accounts Store", () => {
     const store = useAccountsStore.getState()
     expect(store.getById("nonexistent")).toBeUndefined()
   })
+
+  describe("balance updates from transactions (DB trigger simulation)", () => {
+    let accountId: string
+
+    beforeEach(async () => {
+      useAccountsStore.setState({ accounts: [], loading: false, _unsub: null })
+      useTransactionsStore.setState({ transactions: [], loading: false, _unsub: null })
+      const account = await useAccountsStore.getState().add({
+        name: "Checking",
+        type: "checking",
+        currency: "USD",
+        balance: 1000,
+      })
+      accountId = account.id
+    })
+
+    async function reloadAccounts() {
+      await useAccountsStore.getState().load()
+    }
+
+    it("decreases account balance when an expense transaction is added", async () => {
+      const txStore = useTransactionsStore.getState()
+      await txStore.add({
+        accountId,
+        categoryId: "cat-1",
+        type: "expense",
+        amount: 100,
+        currency: "USD",
+        date: new Date("2026-05-01"),
+      })
+      await reloadAccounts()
+
+      const updated = useAccountsStore.getState().getById(accountId)
+      expect(updated!.balance).toBe(900)
+    })
+
+    it("increases account balance when an income transaction is added", async () => {
+      const txStore = useTransactionsStore.getState()
+      await txStore.add({
+        accountId,
+        categoryId: "cat-1",
+        type: "income",
+        amount: 500,
+        currency: "USD",
+        date: new Date("2026-05-01"),
+      })
+      await reloadAccounts()
+
+      const updated = useAccountsStore.getState().getById(accountId)
+      expect(updated!.balance).toBe(1500)
+    })
+
+    it("reverses balance when an expense transaction is deleted", async () => {
+      const txStore = useTransactionsStore.getState()
+      const tx = await txStore.add({
+        accountId,
+        categoryId: "cat-1",
+        type: "expense",
+        amount: 250,
+        currency: "USD",
+        date: new Date("2026-05-01"),
+      })
+      await reloadAccounts()
+      expect(useAccountsStore.getState().getById(accountId)!.balance).toBe(750)
+
+      await txStore.remove(tx.id)
+      await reloadAccounts()
+
+      const restored = useAccountsStore.getState().getById(accountId)
+      expect(restored!.balance).toBe(1000)
+    })
+
+    it("adjusts balance when a transaction amount is updated", async () => {
+      const txStore = useTransactionsStore.getState()
+      const tx = await txStore.add({
+        accountId,
+        categoryId: "cat-1",
+        type: "expense",
+        amount: 100,
+        currency: "USD",
+        date: new Date("2026-05-01"),
+      })
+      await reloadAccounts()
+      expect(useAccountsStore.getState().getById(accountId)!.balance).toBe(900)
+
+      await txStore.update(tx.id, { amount: 200 })
+      await reloadAccounts()
+
+      const updated = useAccountsStore.getState().getById(accountId)
+      expect(updated!.balance).toBe(800)
+    })
+
+    it("adjusts balance when transaction type changes", async () => {
+      const txStore = useTransactionsStore.getState()
+      const tx = await txStore.add({
+        accountId,
+        categoryId: "cat-1",
+        type: "expense",
+        amount: 100,
+        currency: "USD",
+        date: new Date("2026-05-01"),
+      })
+      await reloadAccounts()
+      expect(useAccountsStore.getState().getById(accountId)!.balance).toBe(900)
+
+      await txStore.update(tx.id, { type: "income", amount: 100 })
+      await reloadAccounts()
+
+      const updated = useAccountsStore.getState().getById(accountId)
+      expect(updated!.balance).toBe(1100)
+    })
+  })
 })
 
 describe("Categories Store", () => {
