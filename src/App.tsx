@@ -6,6 +6,8 @@ import { AuthProvider, AuthGuard } from '@/auth/auth'
 import ThemeProvider from '@/components/providers/ThemeProvider'
 import Sidebar from '@/components/layout/Sidebar'
 import MobileNav from '@/components/layout/MobileNav'
+import TopHeader from '@/components/layout/TopHeader'
+import FAB from '@/components/layout/FAB'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner'
 import { Loader2 } from 'lucide-react'
 
@@ -39,25 +41,29 @@ function AppLayout() {
     <div className="flex min-h-screen">
       <GlobalErrorBanner />
       <Sidebar />
-      <main className="flex-1 overflow-auto pb-20 md:pb-0">
-        <div className="container mx-auto p-4 md:p-6 max-w-5xl">
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
-            <Suspense fallback={<PageFallback />}>
-              <Routes location={location}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/accounts" element={<Accounts />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/budgets" element={<Budgets />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/investments" element={<Investments />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Suspense>
+      <div className="flex flex-1 flex-col">
+        <TopHeader />
+        <main className="flex-1 overflow-auto pb-20 md:pb-0">
+          <div className="container mx-auto p-4 md:p-6 max-w-[1400px]">
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
+              <Suspense fallback={<PageFallback />}>
+                <Routes location={location}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/accounts" element={<Accounts />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/budgets" element={<Budgets />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/categories" element={<Categories />} />
+                  <Route path="/investments" element={<Investments />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </Suspense>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
       <MobileNav />
+      <FAB />
     </div>
   )
 }

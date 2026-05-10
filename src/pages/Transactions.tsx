@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, Pencil, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -104,6 +105,17 @@ export default function Transactions() {
     loadAccounts()
     loadCategories()
   }, [loadTx, loadAccounts, loadCategories])
+
+  // Auto-open add dialog when arriving via FAB (?add=true)
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('add') === 'true' && !loading) {
+      openAdd()
+      const next = new URLSearchParams(searchParams)
+      next.delete('add')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, loading])
 
   const filteredTxn = useMemo(() => {
     return transactions.filter((t) => {
