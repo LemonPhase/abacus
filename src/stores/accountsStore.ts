@@ -109,7 +109,7 @@ export const useAccountsStore = create<AccountsState>()((set, get) => ({
     }
 
     set((state) => ({
-      accounts: state.accounts.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+      accounts: state.accounts.map((item) => (item.id === id ? { ...item, ...data } : item)),
     }))
   },
 

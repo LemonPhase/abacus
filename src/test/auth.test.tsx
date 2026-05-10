@@ -52,7 +52,7 @@ describe('AuthProvider', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })
@@ -82,6 +82,7 @@ describe('AuthProvider', () => {
 
     function CaptureReset() {
       const { resetPasswordForEmail } = useAuth()
+      // eslint-disable-next-line react-hooks/globals -- test helper capturing hook value
       capturedResetPassword = resetPasswordForEmail
       return null
     }
@@ -109,6 +110,7 @@ describe('AuthProvider', () => {
 
     function CaptureReset() {
       const { resetPasswordForEmail } = useAuth()
+      // eslint-disable-next-line react-hooks/globals -- test helper capturing hook value
       capturedResetPassword = resetPasswordForEmail
       return null
     }
@@ -132,6 +134,7 @@ describe('AuthProvider', () => {
 
     function CaptureUpdate() {
       const { updatePassword } = useAuth()
+      // eslint-disable-next-line react-hooks/globals -- test helper capturing hook value
       capturedUpdatePassword = updatePassword
       return null
     }
@@ -157,6 +160,7 @@ describe('AuthProvider', () => {
 
     function CaptureUpdate() {
       const { updatePassword } = useAuth()
+      // eslint-disable-next-line react-hooks/globals -- test helper capturing hook value
       capturedUpdatePassword = updatePassword
       return null
     }
@@ -195,7 +199,7 @@ describe('AuthGuard', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })

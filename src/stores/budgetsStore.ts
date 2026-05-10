@@ -109,7 +109,7 @@ export const useBudgetsStore = create<BudgetsState>()((set, get) => ({
     }
 
     set((state) => ({
-      budgets: state.budgets.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+      budgets: state.budgets.map((item) => (item.id === id ? { ...item, ...data } : item)),
     }))
   },
 

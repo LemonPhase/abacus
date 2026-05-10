@@ -108,7 +108,7 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
     }
 
     set((state) => ({
-      plans: state.plans.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+      plans: state.plans.map((item) => (item.id === id ? { ...item, ...data } : item)),
     }))
   },
 

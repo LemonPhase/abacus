@@ -63,7 +63,7 @@ describe('ResetPassword Page', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })
@@ -82,7 +82,7 @@ describe('ResetPassword Page', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })
@@ -110,7 +110,7 @@ describe('ResetPassword Page', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })
@@ -139,7 +139,7 @@ describe('ResetPassword Page', () => {
       data: {
         session: {
           user: { id: 'user-1', email: 'test@example.com' },
-        } as any,
+        },
       },
       error: null,
     })

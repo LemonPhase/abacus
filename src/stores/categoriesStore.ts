@@ -113,7 +113,7 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
     set((state) => ({
       categories: state.categories.map((item) =>
         item.id === id ? { ...item, ...data } : item,
-      ) as any,
+      ),
     }))
   },
 

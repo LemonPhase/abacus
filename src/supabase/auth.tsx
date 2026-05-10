@@ -54,9 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  const appUrl = import.meta.env.VITE_APP_URL as string | undefined
+
   const resetPasswordForEmail = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${appUrl ?? window.location.origin}/reset-password`,
     })
     if (error) throw new Error(error.message)
   }

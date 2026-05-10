@@ -129,7 +129,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
     set((state) => ({
       transactions: state.transactions.map((item) =>
         item.id === id ? { ...item, ...data } : item,
-      ) as any,
+      ),
     }))
   },
 
