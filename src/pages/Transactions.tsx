@@ -402,13 +402,15 @@ export default function Transactions() {
     }
   }
 
-  const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? 'Unknown'
+  const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+  const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+
+  const getAccountName = (id: string) => accountById.get(id)?.name ?? 'Unknown'
   const getCategoryName = (id: string | null) =>
-    id ? (categories.find((c) => c.id === id)?.name ?? 'Unknown') : '—'
-  const getCategoryIcon = (id: string | null) =>
-    id ? (categories.find((c) => c.id === id)?.icon ?? null) : null
+    id ? (categoryById.get(id)?.name ?? 'Unknown') : '—'
+  const getCategoryIcon = (id: string | null) => (id ? (categoryById.get(id)?.icon ?? null) : null)
   const getCategoryColor = (id: string | null) =>
-    id ? (categories.find((c) => c.id === id)?.color ?? '#888') : '#888'
+    id ? (categoryById.get(id)?.color ?? '#888') : '#888'
 
   return (
     <div className="space-y-6">
