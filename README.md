@@ -99,6 +99,8 @@ Comment/uncomment the `VITE_SUPABASE_*` lines in `.env` and restart the dev serv
 | `npm run dev`           | Start dev server                              |
 | `npm run build`         | Typecheck then production build to `dist/`    |
 | `npm run lint`          | ESLint                                        |
+| `npm run format`        | Prettier (write)                              |
+| `npm run format:check`  | Prettier (check only)                         |
 | `npm test`              | Vitest unit tests (jsdom + in-memory mock DB) |
 | `npm run test:e2e`      | Playwright E2E tests (requires dev server)    |
 | `npm run tauri dev`     | Tauri desktop dev mode                        |
@@ -126,7 +128,19 @@ e2e/                  # Playwright E2E specs
 src-tauri/            # Tauri v2 Rust backend
 ```
 
+## CI/CD
+
+| Event                 | What happens                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Push to any branch    | Vercel deploys a preview URL                                                                                                                                                                           |
+| PR opened to `master` | GitHub Actions runs format check → lint → build → unit tests (parallel)                                                                                                                                |
+| Merge to `master`     | GitHub Actions runs the same checks, then deploys to production via `vercel deploy --prod`. Vercel's own build for `master` is skipped (Ignored Build Step) so production only goes live if CI passes. |
+
+**Secrets required in GitHub** (Settings → Secrets and variables → Actions):
+`VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+
 ## Notes
 
+- Staged files are auto-linted and formatted on commit (husky + lint-staged).
 - The DB is auto-seeded with default categories on first open.
 - Tailwind CSS v4 has no config file — everything lives in `src/index.css`.
