@@ -10,10 +10,10 @@ interface BudgetProgress {
 }
 
 const STATUS_COLORS: Record<BudgetProgress['status'], { bar: string; text: string }> = {
-  good: { bar: 'bg-emerald-500', text: 'text-emerald-600' },
+  good: { bar: 'bg-jade', text: 'text-jade' },
   warning: { bar: 'bg-amber-500', text: 'text-amber-600' },
   danger: { bar: 'bg-orange-500', text: 'text-orange-600' },
-  over: { bar: 'bg-rose-500', text: 'text-rose-600' },
+  over: { bar: 'bg-cinnabar', text: 'text-cinnabar' },
 }
 
 interface BudgetListProps {

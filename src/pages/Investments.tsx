@@ -229,7 +229,7 @@ export default function Investments() {
             </div>
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Returns</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">
+              <p className="text-2xl font-bold text-jade mt-1">
                 {finalYear ? formatInvestmentValue(finalYear.returns, baseCurrency) : '$0'}
               </p>
             </div>
@@ -319,7 +319,7 @@ export default function Investments() {
                       <TableCell className="text-right">
                         {formatInvestmentValue(year.principal, baseCurrency)}
                       </TableCell>
-                      <TableCell className="text-right text-emerald-600">
+                      <TableCell className="text-right text-jade">
                         {formatInvestmentValue(year.returns, baseCurrency)}
                       </TableCell>
                       <TableCell className="text-right font-semibold">

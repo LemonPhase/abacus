@@ -170,7 +170,7 @@ describe('BudgetList', () => {
       computeProgress: vi.fn().mockReturnValue(makeProgress({ status: 'good' })),
     })
     const spentText = screen.getByText(formatCurrency(250, 'USD'))
-    expect(spentText).toHaveClass('text-emerald-600')
+    expect(spentText).toHaveClass('text-jade')
   })
 
   it('uses correct status color for "warning" status', () => {
@@ -200,7 +200,7 @@ describe('BudgetList', () => {
         .mockReturnValue(makeProgress({ status: 'over', spent: 500, percentage: 100 })),
     })
     const spentText = screen.getByText(formatCurrency(500, 'USD'))
-    expect(spentText).toHaveClass('text-rose-600')
+    expect(spentText).toHaveClass('text-cinnabar')
   })
 
   it('progress bar width matches percentage', () => {

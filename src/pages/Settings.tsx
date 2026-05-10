@@ -224,8 +224,8 @@ export default function Settings() {
               Import Data
             </Button>
           </div>
-          {exportStatus === 'success' && <p className="text-xs text-emerald-600">{exportMsg}</p>}
-          {exportStatus === 'error' && <p className="text-xs text-rose-600">{exportMsg}</p>}
+          {exportStatus === 'success' && <p className="text-xs text-jade">{exportMsg}</p>}
+          {exportStatus === 'error' && <p className="text-xs text-cinnabar">{exportMsg}</p>}
         </div>
 
         {/* Account */}
@@ -271,7 +271,7 @@ export default function Settings() {
           )}
           {importStatus === 'success' && (
             <div className="py-4 text-center">
-              <p className="text-emerald-600 font-medium">Import successful</p>
+              <p className="text-jade font-medium">Import successful</p>
               <p className="text-sm text-muted-foreground mt-1">{importMsg}</p>
               <Button className="mt-4" onClick={() => setImportDialog(false)}>
                 Done
@@ -280,7 +280,7 @@ export default function Settings() {
           )}
           {importStatus === 'error' && (
             <div className="py-4 text-center">
-              <p className="text-rose-600 font-medium">Import failed</p>
+              <p className="text-cinnabar font-medium">Import failed</p>
               <p className="text-sm text-muted-foreground mt-1">{importMsg}</p>
               <div className="flex gap-2 justify-center mt-4">
                 <Button variant="outline" onClick={() => setImportDialog(false)}>

@@ -215,7 +215,7 @@ export default function Accounts() {
             {(() => {
               const count = transactions.filter((t) => t.accountId === deleteTarget?.id).length
               return count > 0 ? (
-                <span className="block mt-1 text-rose-600 font-medium">
+                <span className="block mt-1 text-cinnabar font-medium">
                   {count} transaction{count !== 1 ? 's' : ''} will become unlinked.
                 </span>
               ) : null

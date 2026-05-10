@@ -27,25 +27,46 @@ function StatCard({
   value,
   icon: Icon,
   trend,
+  variant = 'default',
 }: {
   title: string
   value: string
   icon: React.ElementType
   trend?: 'up' | 'down'
+  variant?: 'default' | 'primary'
 }) {
+  const isPrimary = variant === 'primary'
   return (
-    <div className="group flex flex-col gap-3 rounded-xl bg-card p-5 ring-1 ring-foreground/10 transition-shadow duration-200 hover:ring-foreground/15">
+    <div
+      className={`group flex flex-col gap-3 rounded-xl p-5 transition-shadow duration-200 ${
+        isPrimary
+          ? 'bg-primary text-primary-foreground border border-primary/20'
+          : 'bg-card border border-border/30 hover:border-primary/10'
+      }`}
+    >
       <div className="flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">{title}</p>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-muted">
-          <Icon className="size-4 text-muted-foreground" />
+        <p
+          className={`text-sm font-medium tracking-wide uppercase ${
+            isPrimary ? 'text-primary-foreground/70' : 'text-muted-foreground'
+          }`}
+        >
+          {title}
+        </p>
+        <div
+          className={`flex size-8 items-center justify-center rounded-lg ${
+            isPrimary ? 'bg-primary-foreground/10' : 'bg-muted'
+          }`}
+        >
+          <Icon
+            className={`size-4 ${isPrimary ? 'text-primary-foreground/60' : 'text-muted-foreground'}`}
+          />
         </div>
       </div>
       <div className="flex items-baseline gap-2">
         <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
         {trend && (
           <span
-            className={`inline-flex items-center gap-0.5 text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}
+            className={`inline-flex items-center gap-0.5 text-xs font-medium ${trend === 'up' ? 'text-jade' : 'text-cinnabar'}`}
           >
             {trend === 'up' ? (
               <TrendingUp className="size-3" />
@@ -60,16 +81,16 @@ function StatCard({
 }
 
 const CHART_COLORS = [
-  '#3b82f6',
-  '#ef4444',
-  '#22c55e',
-  '#f59e0b',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-  '#6366f1',
-  '#eab308',
+  '#006b4d',
+  '#e23636',
+  '#5d5f5e',
+  '#c6c0ba',
+  '#8a807d',
+  '#4d4540',
+  '#ab8f70',
+  '#1c1917',
+  '#7e7570',
+  '#a09088',
 ]
 
 export default function Dashboard() {
@@ -192,6 +213,7 @@ export default function Dashboard() {
               title="Net Worth"
               value={formatCurrency(netWorth, baseCurrency)}
               icon={Wallet}
+              variant="primary"
             />
             <StatCard
               title="Income"
@@ -213,7 +235,7 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
+            <div className="rounded-xl bg-card p-5 border border-border/30">
               <h2 className="text-sm font-semibold tracking-tight mb-4">Income vs Expenses</h2>
               {monthlyData.every((m) => m.income === 0 && m.expense === 0) ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
@@ -233,14 +255,14 @@ export default function Dashboard() {
                     />
                     <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
                     <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
-                    <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
-                    <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expense" />
+                    <Bar dataKey="income" fill="#006b4d" radius={[4, 4, 0, 0]} name="Income" />
+                    <Bar dataKey="expense" fill="#e23636" radius={[4, 4, 0, 0]} name="Expense" />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
 
-            <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
+            <div className="rounded-xl bg-card p-5 border border-border/30">
               <h2 className="text-sm font-semibold tracking-tight mb-4">Spending by Category</h2>
               {categorySpending.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
@@ -300,7 +322,7 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
+            <div className="rounded-xl bg-card p-5 border border-border/30">
               <h2 className="text-sm font-semibold tracking-tight mb-3">Recent Transactions</h2>
               {recentTransactions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
@@ -333,7 +355,7 @@ export default function Dashboard() {
                         </p>
                       </div>
                       <span
-                        className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                        className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-jade' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-cinnabar' : ''}`}
                       >
                         {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
                           ? '+'
@@ -348,7 +370,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
+            <div className="rounded-xl bg-card p-5 border border-border/30">
               <h2 className="text-sm font-semibold tracking-tight mb-3">Active Budgets</h2>
               {budgets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
@@ -378,12 +400,12 @@ export default function Dashboard() {
                     const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
                     const color =
                       pct >= 100
-                        ? 'bg-rose-500'
+                        ? 'bg-cinnabar'
                         : pct >= 80
                           ? 'bg-orange-500'
                           : pct >= 50
                             ? 'bg-amber-500'
-                            : 'bg-emerald-500'
+                            : 'bg-jade'
                     return (
                       <div key={b.id}>
                         <div className="flex items-center justify-between mb-1">

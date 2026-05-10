@@ -531,7 +531,7 @@ export default function Transactions() {
                           {tx.description || '—'}
                         </TableCell>
                         <TableCell
-                          className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                          className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-jade' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-cinnabar' : ''}`}
                         >
                           {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
                             ? '+'

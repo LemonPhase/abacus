@@ -205,20 +205,20 @@ export default function Reports() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Income</p>
-                  <p className="text-2xl font-bold text-emerald-600 mt-1">
+                  <p className="text-2xl font-bold text-jade mt-1">
                     {formatCurrency(summary.income, baseCurrency)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Expenses</p>
-                  <p className="text-2xl font-bold text-rose-600 mt-1">
+                  <p className="text-2xl font-bold text-cinnabar mt-1">
                     {formatCurrency(summary.expense, baseCurrency)}
                   </p>
                 </div>
                 <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
                   <p className="text-xs text-muted-foreground uppercase tracking-wide">Net</p>
                   <p
-                    className={`text-2xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                    className={`text-2xl font-bold mt-1 ${summary.net >= 0 ? 'text-jade' : 'text-cinnabar'}`}
                   >
                     {formatCurrency(summary.net, baseCurrency)}
                   </p>
@@ -294,14 +294,14 @@ export default function Reports() {
                             {cat.name}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right text-emerald-600">
+                        <TableCell className="text-right text-jade">
                           {formatCurrency(cat.income, baseCurrency)}
                         </TableCell>
-                        <TableCell className="text-right text-rose-600">
+                        <TableCell className="text-right text-cinnabar">
                           {formatCurrency(cat.expense, baseCurrency)}
                         </TableCell>
                         <TableCell
-                          className={`text-right font-medium ${cat.income - cat.expense >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                          className={`text-right font-medium ${cat.income - cat.expense >= 0 ? 'text-jade' : 'text-cinnabar'}`}
                         >
                           {formatCurrency(cat.income - cat.expense, baseCurrency)}
                         </TableCell>
