@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }
 
-  const appUrl = import.meta.env.VITE_APP_URL as string | undefined
+  const appUrl = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/+$/, '')
 
   const resetPasswordForEmail = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
