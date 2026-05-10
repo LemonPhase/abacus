@@ -2,7 +2,7 @@
 // Stores data in arrays, mimicking Supabase PostgREST behavior
 // Data is stored with snake_case keys (matching Postgres)
 // Simulates the maintain_account_balance DB trigger on transactions
-import { vi } from "vitest"
+import { vi } from 'vitest'
 
 const tables = new Map<string, Record<string, unknown>[]>()
 
@@ -37,7 +37,7 @@ function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
 }
 
 function adjustBalance(accountId: string, delta: number) {
-  const accounts = tables.get("accounts")
+  const accounts = tables.get('accounts')
   if (!accounts) return
   const account = accounts.find((r) => r.id === accountId)
   if (!account) return
@@ -48,9 +48,9 @@ function applyInsertBalanceEffect(row: Record<string, unknown>) {
   const type = row.type as string
   const amount = (row.amount as number) ?? 0
   const accountId = row.account_id as string
-  if (type === "income" || type === "transfer") {
+  if (type === 'income' || type === 'transfer') {
     adjustBalance(accountId, amount)
-  } else if (type === "expense") {
+  } else if (type === 'expense') {
     adjustBalance(accountId, -amount)
   }
 }
@@ -59,14 +59,17 @@ function applyDeleteBalanceEffect(row: Record<string, unknown>) {
   const type = row.type as string
   const amount = (row.amount as number) ?? 0
   const accountId = row.account_id as string
-  if (type === "income" || type === "transfer") {
+  if (type === 'income' || type === 'transfer') {
     adjustBalance(accountId, -amount)
-  } else if (type === "expense") {
+  } else if (type === 'expense') {
     adjustBalance(accountId, amount)
   }
 }
 
-function applyUpdateBalanceEffect(oldRow: Record<string, unknown>, newRow: Record<string, unknown>) {
+function applyUpdateBalanceEffect(
+  oldRow: Record<string, unknown>,
+  newRow: Record<string, unknown>,
+) {
   applyDeleteBalanceEffect(oldRow)
   applyInsertBalanceEffect(newRow)
 }
@@ -92,7 +95,7 @@ function applyOrder(
 function createBuilder(tableName: string): any {
   const rows = ensureTable(tableName)
 
-  let _action: "select" | "insert" | "update" | "delete" = "select"
+  let _action: 'select' | 'insert' | 'update' | 'delete' = 'select'
   let _payload: Record<string, unknown> | Record<string, unknown>[] | null = null
   const _filters: Filter[] = []
   let _orderCol: string | null = null
@@ -106,34 +109,34 @@ function createBuilder(tableName: string): any {
   const builder: any = {}
 
   builder.select = vi.fn(() => {
-    if (_action === "insert") {
+    if (_action === 'insert') {
       _returning = true
     } else {
-      _action = "select"
+      _action = 'select'
     }
     return builder
   })
 
   builder.insert = vi.fn((data: Record<string, unknown> | Record<string, unknown>[]) => {
-    _action = "insert"
+    _action = 'insert'
     _payload = data
     return builder
   })
 
   builder.upsert = vi.fn((data: Record<string, unknown> | Record<string, unknown>[]) => {
-    _action = "insert"
+    _action = 'insert'
     _payload = data
     return builder
   })
 
   builder.update = vi.fn((data: Record<string, unknown>) => {
-    _action = "update"
+    _action = 'update'
     _payload = data
     return builder
   })
 
   builder.delete = vi.fn(() => {
-    _action = "delete"
+    _action = 'delete'
     return builder
   })
 
@@ -173,7 +176,7 @@ function createBuilder(tableName: string): any {
   // Make thenable
   builder.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
     try {
-      if (_action === "select") {
+      if (_action === 'select') {
         let result = [...rows]
         // neq filter: exclude rows matching the value
         // eq filter: include rows matching the value
@@ -188,12 +191,12 @@ function createBuilder(tableName: string): any {
         } else {
           resolve({ data: result, error: null })
         }
-      } else if (_action === "insert") {
+      } else if (_action === 'insert') {
         const toInsert = Array.isArray(_payload) ? _payload : [_payload ?? {}]
         const inserted = toInsert.map((d) => {
           const row = newRow(d as Record<string, unknown>)
           rows.push(row)
-          if (tableName === "transactions") applyInsertBalanceEffect(row)
+          if (tableName === 'transactions') applyInsertBalanceEffect(row)
           return row
         })
 
@@ -206,7 +209,7 @@ function createBuilder(tableName: string): any {
         } else {
           resolve({ data: null, error: null })
         }
-      } else if (_action === "update") {
+      } else if (_action === 'update') {
         let targets = [...rows]
         for (const f of _filters) {
           targets = targets.filter((r) => r[f.col] === f.val)
@@ -214,18 +217,18 @@ function createBuilder(tableName: string): any {
         for (const target of targets) {
           const oldRow = { ...target }
           Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
-          if (tableName === "transactions") applyUpdateBalanceEffect(oldRow, target)
+          if (tableName === 'transactions') applyUpdateBalanceEffect(oldRow, target)
         }
         if (_returning) {
           resolve({ data: targets.length === 1 && _single ? targets[0] : targets, error: null })
         } else {
           resolve({ data: null, error: null })
         }
-      } else if (_action === "delete") {
+      } else if (_action === 'delete') {
         if (_filters.length > 0) {
           const matched = rows.filter((r) => _filters.every((f) => r[f.col] === f.val))
           for (const r of matched) {
-            if (tableName === "transactions") applyDeleteBalanceEffect(r)
+            if (tableName === 'transactions') applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)
             if (idx >= 0) rows.splice(idx, 1)
           }

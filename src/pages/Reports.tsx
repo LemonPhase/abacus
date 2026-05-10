@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from "recharts"
-import { ChartTooltip } from "@/components/ChartTooltip"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useEffect, useMemo, useState } from 'react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+} from 'recharts'
+import { ChartTooltip } from '@/components/ChartTooltip'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableHeader,
@@ -10,15 +19,13 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from "@/components/ui/table"
-import { useAccountsStore } from "@/stores/accountsStore"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { ICON_MAP } from "@/lib/icons"
-import { formatCurrency } from "@/lib/format"
-
-
+} from '@/components/ui/table'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { ICON_MAP } from '@/lib/icons'
+import { formatCurrency } from '@/lib/format'
 
 export default function Reports() {
   const { load: loadAccounts } = useAccountsStore()
@@ -27,7 +34,9 @@ export default function Reports() {
   const { baseCurrency } = useSettingsStore()
 
   const now = new Date()
-  const [dateFrom, setDateFrom] = useState(new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10))
+  const [dateFrom, setDateFrom] = useState(
+    new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10),
+  )
   const [dateTo, setDateTo] = useState(now.toISOString().slice(0, 10))
 
   useEffect(() => {
@@ -38,7 +47,7 @@ export default function Reports() {
 
   const filteredTxn = useMemo(() => {
     const from = new Date(dateFrom)
-    const to = new Date(dateTo + "T23:59:59")
+    const to = new Date(dateTo + 'T23:59:59')
     return transactions.filter((t) => {
       const d = new Date(t.date)
       return d >= from && d <= to
@@ -49,35 +58,44 @@ export default function Reports() {
     let income = 0
     let expense = 0
     for (const t of filteredTxn) {
-      if (t.type === "income") income += t.baseAmount
-      if (t.type === "expense") expense += t.baseAmount
+      if (t.type === 'income') income += t.baseAmount
+      if (t.type === 'expense') expense += t.baseAmount
     }
     return { income, expense, net: income - expense }
   }, [filteredTxn])
 
   const categoryBreakdown = useMemo(() => {
-    const map = new Map<string, { name: string; color: string; icon: string | null; income: number; expense: number }>()
+    const map = new Map<
+      string,
+      { name: string; color: string; icon: string | null; income: number; expense: number }
+    >()
     for (const t of filteredTxn) {
       const cat = categories.find((c) => c.id === t.categoryId)
-      const key = cat?.id ?? (t.categoryId ?? "__uncategorized__")
+      const key = cat?.id ?? t.categoryId ?? '__uncategorized__'
       if (!map.has(key)) {
-        map.set(key, { name: cat?.name ?? "Unknown", color: cat?.color ?? "#888", icon: cat?.icon ?? null, income: 0, expense: 0 })
+        map.set(key, {
+          name: cat?.name ?? 'Unknown',
+          color: cat?.color ?? '#888',
+          icon: cat?.icon ?? null,
+          income: 0,
+          expense: 0,
+        })
       }
       const entry = map.get(key)!
-      if (t.type === "income") entry.income += t.baseAmount
-      if (t.type === "expense") entry.expense += t.baseAmount
+      if (t.type === 'income') entry.income += t.baseAmount
+      if (t.type === 'expense') entry.expense += t.baseAmount
     }
     return Array.from(map.values()).sort((a, b) => b.expense + b.income - (a.expense + a.income))
   }, [filteredTxn, categories])
 
   const netWorthTimeline = useMemo(() => {
     const from = new Date(dateFrom)
-    const to = new Date(dateTo + "T23:59:59")
+    const to = new Date(dateTo + 'T23:59:59')
     const months: { label: string; netWorth: number }[] = []
     let current = new Date(from.getFullYear(), from.getMonth(), 1)
     while (current <= to) {
       months.push({
-        label: current.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
+        label: current.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
         netWorth: 0,
       })
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
@@ -86,7 +104,9 @@ export default function Reports() {
     // Simple net worth: cumulative income - expense
     let running = 0
     let monthIdx = 0
-    const sorted = [...filteredTxn].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    const sorted = [...filteredTxn].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    )
     for (const t of sorted) {
       const d = new Date(t.date)
       while (monthIdx < months.length) {
@@ -96,8 +116,8 @@ export default function Reports() {
         months[monthIdx].netWorth = running
         monthIdx++
       }
-      if (t.type === "income") running += t.baseAmount
-      if (t.type === "expense") running -= t.baseAmount
+      if (t.type === 'income') running += t.baseAmount
+      if (t.type === 'expense') running -= t.baseAmount
     }
     while (monthIdx < months.length) {
       months[monthIdx].netWorth = running
@@ -108,12 +128,12 @@ export default function Reports() {
 
   const incomeVsExpense = useMemo(() => {
     const from = new Date(dateFrom)
-    const to = new Date(dateTo + "T23:59:59")
+    const to = new Date(dateTo + 'T23:59:59')
     const months: { label: string; income: number; expense: number }[] = []
     let current = new Date(from.getFullYear(), from.getMonth(), 1)
     while (current <= to) {
       months.push({
-        label: current.toLocaleDateString("en-US", { month: "short" }),
+        label: current.toLocaleDateString('en-US', { month: 'short' }),
         income: 0,
         expense: 0,
       })
@@ -126,8 +146,8 @@ export default function Reports() {
         return d >= ms && d < new Date(from.getFullYear(), from.getMonth() + i + 1, 1)
       })
       if (idx === -1) continue
-      if (t.type === "income") months[idx].income += t.baseAmount
-      if (t.type === "expense") months[idx].expense += t.baseAmount
+      if (t.type === 'income') months[idx].income += t.baseAmount
+      if (t.type === 'expense') months[idx].expense += t.baseAmount
     }
     return months
   }, [filteredTxn, dateFrom, dateTo])
@@ -142,11 +162,21 @@ export default function Reports() {
       <div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4">
         <div className="grid gap-1.5">
           <Label className="text-xs">From</Label>
-          <Input type="date" className="h-8 w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <Input
+            type="date"
+            className="h-8 w-36"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
         </div>
         <div className="grid gap-1.5">
           <Label className="text-xs">To</Label>
-          <Input type="date" className="h-8 w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Input
+            type="date"
+            className="h-8 w-36"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
         </div>
       </div>
 
@@ -160,15 +190,21 @@ export default function Reports() {
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Income</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(summary.income, baseCurrency)}</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">
+                {formatCurrency(summary.income, baseCurrency)}
+              </p>
             </div>
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Expenses</p>
-              <p className="text-2xl font-bold text-rose-600 mt-1">{formatCurrency(summary.expense, baseCurrency)}</p>
+              <p className="text-2xl font-bold text-rose-600 mt-1">
+                {formatCurrency(summary.expense, baseCurrency)}
+              </p>
             </div>
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Net</p>
-              <p className={`text-2xl font-bold mt-1 ${summary.net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              <p
+                className={`text-2xl font-bold mt-1 ${summary.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+              >
                 {formatCurrency(summary.net, baseCurrency)}
               </p>
             </div>
@@ -197,7 +233,14 @@ export default function Reports() {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
                   <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
-                  <Line type="monotone" dataKey="netWorth" stroke="#3b82f6" strokeWidth={2} dot={false} name="Net Worth" />
+                  <Line
+                    type="monotone"
+                    dataKey="netWorth"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Net Worth"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -224,15 +267,24 @@ export default function Reports() {
                           return IconComp ? (
                             <IconComp className="size-4 shrink-0" style={{ color: cat.color }} />
                           ) : (
-                            <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+                            <span
+                              className="size-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: cat.color }}
+                            />
                           )
                         })()}
                         {cat.name}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right text-emerald-600">{formatCurrency(cat.income, baseCurrency)}</TableCell>
-                    <TableCell className="text-right text-rose-600">{formatCurrency(cat.expense, baseCurrency)}</TableCell>
-                    <TableCell className={`text-right font-medium ${cat.income - cat.expense >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    <TableCell className="text-right text-emerald-600">
+                      {formatCurrency(cat.income, baseCurrency)}
+                    </TableCell>
+                    <TableCell className="text-right text-rose-600">
+                      {formatCurrency(cat.expense, baseCurrency)}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-medium ${cat.income - cat.expense >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                    >
                       {formatCurrency(cat.income - cat.expense, baseCurrency)}
                     </TableCell>
                   </TableRow>

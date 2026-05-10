@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+coverage
+*.local
+.env
+.vscode
+.idea
+pnpm-lock.yaml
+package-lock.json
+supabase/snippets
+src/supabase/database.types.ts
+src-tauri/target
+src-tauri/gen

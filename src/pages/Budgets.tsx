@@ -1,32 +1,30 @@
-import { useEffect, useState, useMemo } from "react"
-import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState, useMemo } from 'react'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { useBudgetsStore } from "@/stores/budgetsStore"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import type { Budget, BudgetPeriod } from "@/types"
-import { BudgetDialog, type BudgetFormData } from "@/pages/budgets/BudgetDialog"
-import { BudgetList } from "@/pages/budgets/BudgetList"
-
-
+} from '@/components/ui/dialog'
+import { useBudgetsStore } from '@/stores/budgetsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import type { Budget, BudgetPeriod } from '@/types'
+import { BudgetDialog, type BudgetFormData } from '@/pages/budgets/BudgetDialog'
+import { BudgetList } from '@/pages/budgets/BudgetList'
 
 function getPeriodLabel(date: Date, period: BudgetPeriod): string {
-  if (period === "monthly") {
-    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+  if (period === 'monthly') {
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   }
   return date.getFullYear().toString()
 }
 
 function getPeriodBounds(date: Date, period: BudgetPeriod): { start: Date; end: Date } {
-  if (period === "monthly") {
+  if (period === 'monthly') {
     const y = date.getFullYear()
     const m = date.getMonth()
     return {
@@ -44,15 +42,15 @@ function getPeriodBounds(date: Date, period: BudgetPeriod): { start: Date; end: 
 interface BudgetProgress {
   spent: number
   percentage: number
-  status: "good" | "warning" | "danger" | "over"
+  status: 'good' | 'warning' | 'danger' | 'over'
 }
 
 const emptyForm: BudgetFormData = {
-  name: "",
+  name: '',
   categoryIds: [],
-  amount: "",
-  period: "monthly",
-  startDate: new Date().toISOString().slice(0, 7) + "-01",
+  amount: '',
+  period: 'monthly',
+  startDate: new Date().toISOString().slice(0, 7) + '-01',
 }
 
 export default function Budgets() {
@@ -77,7 +75,7 @@ export default function Budgets() {
     const { start, end } = getPeriodBounds(currentPeriod, budget.period)
     const spent = transactions
       .filter((t) => {
-        if (t.type !== "expense") return false
+        if (t.type !== 'expense') return false
         if (!t.categoryId || !budget.categoryIds.includes(t.categoryId)) return false
         const d = new Date(t.date)
         return d >= start && d <= end
@@ -85,14 +83,14 @@ export default function Budgets() {
       .reduce((sum, t) => sum + t.baseAmount, 0)
 
     const pct = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
-    const status: BudgetProgress["status"] =
-      pct < 50 ? "good" : pct < 80 ? "warning" : pct < 100 ? "danger" : "over"
+    const status: BudgetProgress['status'] =
+      pct < 50 ? 'good' : pct < 80 ? 'warning' : pct < 100 ? 'danger' : 'over'
 
     return { spent, percentage: pct, status }
   }
 
   function getCategoryName(id: string) {
-    return categories.find((c) => c.id === id)?.name ?? "Unknown"
+    return categories.find((c) => c.id === id)?.name ?? 'Unknown'
   }
 
   function openAdd() {
@@ -150,7 +148,10 @@ export default function Budgets() {
     setDeleteTarget(null)
   }
 
-  const expenseCategories = useMemo(() => categories.filter((c) => c.type === "expense"), [categories])
+  const expenseCategories = useMemo(
+    () => categories.filter((c) => c.type === 'expense'),
+    [categories],
+  )
 
   return (
     <div className="space-y-6">
@@ -198,7 +199,12 @@ export default function Budgets() {
       />
 
       {/* Delete Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Budget</DialogTitle>
@@ -207,8 +213,12 @@ export default function Budgets() {
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,11 +1,11 @@
-import { create } from "zustand"
-import { supabase } from "@/supabase/client"
-import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
-import { subscribeToTable } from "@/lib/realtime"
-import type { Category, NewCategory, CategoryKind } from "@/types"
-import type { Database } from "@/supabase/database.types"
+import { create } from 'zustand'
+import { supabase } from '@/supabase/client'
+import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
+import { subscribeToTable } from '@/lib/realtime'
+import type { Category, NewCategory, CategoryKind } from '@/types'
+import type { Database } from '@/supabase/database.types'
 
-type CategoryRow = Database["public"]["Tables"]["categories"]["Row"]
+type CategoryRow = Database['public']['Tables']['categories']['Row']
 
 function mapRow(row: CategoryRow): Category {
   return {
@@ -42,31 +42,34 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   load: async (options) => {
     set({ loading: true, error: null })
     const { limit, offset } = options ?? {}
-    let query = supabase.from("categories").select("*")
+    let query = supabase.from('categories').select('*')
     if (offset !== undefined && limit !== undefined) {
       query = query.range(offset, offset + limit - 1)
     } else if (limit !== undefined) {
       query = query.limit(limit)
     }
     const { data, error } = await query
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const categories: Category[] = (data ?? []).map(mapRow)
     set({ categories, loading: false })
 
     if (!get()._unsub) {
-      const unsub = subscribeToTable("categories", (payload) => {
-        if (payload.eventType === "INSERT") {
+      const unsub = subscribeToTable('categories', (payload) => {
+        if (payload.eventType === 'INSERT') {
           const category = mapRow(payload.new as CategoryRow)
           set((state) => {
             if (state.categories.some((c) => c.id === category.id)) return state
             return { categories: [...state.categories, category] }
           })
-        } else if (payload.eventType === "UPDATE") {
+        } else if (payload.eventType === 'UPDATE') {
           const category = mapRow(payload.new as CategoryRow)
           set((state) => ({
             categories: state.categories.map((c) => (c.id === category.id ? category : c)),
           }))
-        } else if (payload.eventType === "DELETE") {
+        } else if (payload.eventType === 'DELETE') {
           const id = (payload.old as { id: string }).id
           set((state) => ({
             categories: state.categories.filter((c) => c.id !== id),
@@ -80,11 +83,14 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   add: async (data) => {
     set({ error: null })
     const { data: inserted, error } = await supabase
-      .from("categories")
-      .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Insert"])
+      .from('categories')
+      .insert(mapKeysToSnake(data) as Database['public']['Tables']['categories']['Insert'])
       .select()
       .single()
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const category = mapRow(inserted as CategoryRow)
     set((state) => {
       if (state.categories.some((item) => item.id === category.id)) return state
@@ -96,20 +102,28 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => ({
   update: async (id, data) => {
     set({ error: null })
     const { error } = await supabase
-      .from("categories")
-      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["categories"]["Update"])
-      .eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+      .from('categories')
+      .update(mapKeysToSnake(data) as Database['public']['Tables']['categories']['Update'])
+      .eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
-      categories: state.categories.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+      categories: state.categories.map((item) =>
+        item.id === id ? { ...item, ...data } : item,
+      ) as any,
     }))
   },
 
   remove: async (id) => {
     set({ error: null })
-    const { error } = await supabase.from("categories").delete().eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
       categories: state.categories.filter((item) => item.id !== id),

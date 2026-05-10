@@ -1,7 +1,7 @@
-import { supabase } from "@/supabase/client"
+import { supabase } from '@/supabase/client'
 
 type ChangeHandler = (payload: {
-  eventType: "INSERT" | "UPDATE" | "DELETE"
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE'
   new: Record<string, unknown>
   old: Record<string, unknown>
 }) => void
@@ -19,16 +19,18 @@ export function subscribeToTable(table: string, handler: ChangeHandler): () => v
   const ch = supabase
     .channel(channelName)
     .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table },
-      (payload: {
-        eventType: string
-        new: Record<string, unknown>
-        old: Record<string, unknown>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } & any) => {
+      'postgres_changes',
+      { event: '*', schema: 'public', table },
+      (
+        payload: {
+          eventType: string
+          new: Record<string, unknown>
+          old: Record<string, unknown>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } & any,
+      ) => {
         handler({
-          eventType: payload.eventType as "INSERT" | "UPDATE" | "DELETE",
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
           new: payload.new ?? {},
           old: payload.old ?? {},
         })

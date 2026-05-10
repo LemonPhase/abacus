@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -7,15 +7,15 @@ import {
   TableHeader,
   TableRow,
   TableCell,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   calculateProjection,
   formatInvestmentValue,
   INVESTMENT_TYPE_COLORS,
   INVESTMENT_TYPE_LABELS,
-} from "@/lib/investments"
-import type { InvestmentPlan } from "@/types"
-import { Pencil, Trash2 } from "lucide-react"
+} from '@/lib/investments'
+import type { InvestmentPlan } from '@/types'
+import { Pencil, Trash2 } from 'lucide-react'
 
 interface InvestmentListProps {
   plans: InvestmentPlan[]
@@ -67,9 +67,7 @@ export function InvestmentList({
                 <TableCell className="text-right">
                   {formatInvestmentValue(plan.monthlyContribution, baseCurrency)}
                 </TableCell>
-                <TableCell className="text-right">
-                  {plan.annualReturnRate}%
-                </TableCell>
+                <TableCell className="text-right">{plan.annualReturnRate}%</TableCell>
                 <TableCell className="text-right font-semibold">
                   {final && formatInvestmentValue(final.totalValue, baseCurrency)}
                 </TableCell>
@@ -78,11 +76,7 @@ export function InvestmentList({
                     <Button variant="ghost" size="icon-xs" onClick={() => onEdit(plan)}>
                       <Pencil className="size-3" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => onDelete(plan)}
-                    >
+                    <Button variant="ghost" size="icon-xs" onClick={() => onDelete(plan)}>
                       <Trash2 className="size-3" />
                     </Button>
                   </div>

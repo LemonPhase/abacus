@@ -1,22 +1,22 @@
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 
-import { AuthProvider, AuthGuard } from "@/supabase/auth"
+import { AuthProvider, AuthGuard } from '@/supabase/auth'
 
-import ThemeProvider from "@/components/ThemeProvider"
-import Sidebar from "@/components/layout/Sidebar"
-import MobileNav from "@/components/layout/MobileNav"
-import GlobalErrorBanner from "@/components/GlobalErrorBanner"
+import ThemeProvider from '@/components/ThemeProvider'
+import Sidebar from '@/components/layout/Sidebar'
+import MobileNav from '@/components/layout/MobileNav'
+import GlobalErrorBanner from '@/components/GlobalErrorBanner'
 
-import Auth from "@/pages/Auth"
-import ResetPassword from "@/pages/ResetPassword"
-import Dashboard from "@/pages/Dashboard"
-import Accounts from "@/pages/Accounts"
-import Transactions from "@/pages/Transactions"
-import Budgets from "@/pages/Budgets"
-import Reports from "@/pages/Reports"
-import Categories from "@/pages/Categories"
-import Investments from "@/pages/Investments"
-import Settings from "@/pages/Settings"
+import Auth from '@/pages/Auth'
+import ResetPassword from '@/pages/ResetPassword'
+import Dashboard from '@/pages/Dashboard'
+import Accounts from '@/pages/Accounts'
+import Transactions from '@/pages/Transactions'
+import Budgets from '@/pages/Budgets'
+import Reports from '@/pages/Reports'
+import Categories from '@/pages/Categories'
+import Investments from '@/pages/Investments'
+import Settings from '@/pages/Settings'
 
 function AppLayout() {
   const location = useLocation()
@@ -27,10 +27,7 @@ function AppLayout() {
       <Sidebar />
       <main className="flex-1 overflow-auto pb-20 md:pb-0">
         <div className="container mx-auto p-4 md:p-6 max-w-5xl">
-          <div
-            
-            className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out"
-          >
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
             <Routes location={location}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/accounts" element={<Accounts />} />
@@ -57,7 +54,14 @@ export default function App() {
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="*" element={<AuthGuard><AppLayout /></AuthGuard>} />
+            <Route
+              path="*"
+              element={
+                <AuthGuard>
+                  <AppLayout />
+                </AuthGuard>
+              }
+            />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

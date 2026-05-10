@@ -1,11 +1,11 @@
-import { create } from "zustand"
-import { supabase } from "@/supabase/client"
-import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
-import { subscribeToTable } from "@/lib/realtime"
-import type { InvestmentPlan, NewInvestmentPlan } from "@/types"
-import type { Database } from "@/supabase/database.types"
+import { create } from 'zustand'
+import { supabase } from '@/supabase/client'
+import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
+import { subscribeToTable } from '@/lib/realtime'
+import type { InvestmentPlan, NewInvestmentPlan } from '@/types'
+import type { Database } from '@/supabase/database.types'
 
-type InvestmentPlanRow = Database["public"]["Tables"]["investment_plans"]["Row"]
+type InvestmentPlanRow = Database['public']['Tables']['investment_plans']['Row']
 
 function mapRow(row: InvestmentPlanRow): InvestmentPlan {
   return {
@@ -39,31 +39,34 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   load: async (options) => {
     set({ loading: true, error: null })
     const { limit, offset } = options ?? {}
-    let query = supabase.from("investment_plans").select("*")
+    let query = supabase.from('investment_plans').select('*')
     if (offset !== undefined && limit !== undefined) {
       query = query.range(offset, offset + limit - 1)
     } else if (limit !== undefined) {
       query = query.limit(limit)
     }
     const { data, error } = await query
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const plans: InvestmentPlan[] = (data ?? []).map(mapRow)
     set({ plans, loading: false })
 
     if (!get()._unsub) {
-      const unsub = subscribeToTable("investment_plans", (payload) => {
-        if (payload.eventType === "INSERT") {
+      const unsub = subscribeToTable('investment_plans', (payload) => {
+        if (payload.eventType === 'INSERT') {
           const plan = mapRow(payload.new as InvestmentPlanRow)
           set((state) => {
             if (state.plans.some((p) => p.id === plan.id)) return state
             return { plans: [...state.plans, plan] }
           })
-        } else if (payload.eventType === "UPDATE") {
+        } else if (payload.eventType === 'UPDATE') {
           const plan = mapRow(payload.new as InvestmentPlanRow)
           set((state) => ({
             plans: state.plans.map((p) => (p.id === plan.id ? plan : p)),
           }))
-        } else if (payload.eventType === "DELETE") {
+        } else if (payload.eventType === 'DELETE') {
           const id = (payload.old as { id: string }).id
           set((state) => ({
             plans: state.plans.filter((p) => p.id !== id),
@@ -77,11 +80,14 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   add: async (data) => {
     set({ error: null })
     const { data: inserted, error } = await supabase
-      .from("investment_plans")
-      .insert(mapKeysToSnake(data) as Database["public"]["Tables"]["investment_plans"]["Insert"])
+      .from('investment_plans')
+      .insert(mapKeysToSnake(data) as Database['public']['Tables']['investment_plans']['Insert'])
       .select()
       .single()
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const plan = mapRow(inserted as InvestmentPlanRow)
     set((state) => {
       if (state.plans.some((item) => item.id === plan.id)) return state
@@ -93,10 +99,13 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
   update: async (id, data) => {
     set({ error: null })
     const { error } = await supabase
-      .from("investment_plans")
-      .update(mapKeysToSnake(data) as Database["public"]["Tables"]["investment_plans"]["Update"])
-      .eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+      .from('investment_plans')
+      .update(mapKeysToSnake(data) as Database['public']['Tables']['investment_plans']['Update'])
+      .eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
       plans: state.plans.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
@@ -105,8 +114,11 @@ export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get)
 
   remove: async (id) => {
     set({ error: null })
-    const { error } = await supabase.from("investment_plans").delete().eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    const { error } = await supabase.from('investment_plans').delete().eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
       plans: state.plans.filter((item) => item.id !== id),

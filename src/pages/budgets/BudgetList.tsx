@@ -1,19 +1,19 @@
-import { Button } from "@/components/ui/button"
-import { formatCurrency } from "@/lib/format"
-import type { Budget, BudgetPeriod } from "@/types"
-import { Pencil, Trash2 } from "lucide-react"
+import { Button } from '@/components/ui/button'
+import { formatCurrency } from '@/lib/format'
+import type { Budget, BudgetPeriod } from '@/types'
+import { Pencil, Trash2 } from 'lucide-react'
 
 interface BudgetProgress {
   spent: number
   percentage: number
-  status: "good" | "warning" | "danger" | "over"
+  status: 'good' | 'warning' | 'danger' | 'over'
 }
 
-const STATUS_COLORS: Record<BudgetProgress["status"], { bar: string; text: string }> = {
-  good: { bar: "bg-emerald-500", text: "text-emerald-600" },
-  warning: { bar: "bg-amber-500", text: "text-amber-600" },
-  danger: { bar: "bg-orange-500", text: "text-orange-600" },
-  over: { bar: "bg-rose-500", text: "text-rose-600" },
+const STATUS_COLORS: Record<BudgetProgress['status'], { bar: string; text: string }> = {
+  good: { bar: 'bg-emerald-500', text: 'text-emerald-600' },
+  warning: { bar: 'bg-amber-500', text: 'text-amber-600' },
+  danger: { bar: 'bg-orange-500', text: 'text-orange-600' },
+  over: { bar: 'bg-rose-500', text: 'text-rose-600' },
 }
 
 interface BudgetListProps {
@@ -46,7 +46,7 @@ export function BudgetList({
               <div>
                 <h3 className="font-semibold">{budget.name}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {budget.categoryIds.map(getCategoryName).join(", ")} ·{" "}
+                  {budget.categoryIds.map(getCategoryName).join(', ')} ·{' '}
                   {getPeriodLabel(new Date(budget.startDate), budget.period)}
                 </p>
               </div>
@@ -81,7 +81,7 @@ export function BudgetList({
                 <span>{progress.percentage.toFixed(0)}% used</span>
                 <span>
                   {progress.percentage >= 100
-                    ? "Over budget!"
+                    ? 'Over budget!'
                     : `${formatCurrency(budget.amount - progress.spent, baseCurrency)} left`}
                 </span>
               </div>

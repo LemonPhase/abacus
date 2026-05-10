@@ -1,20 +1,38 @@
-import { useEffect, useMemo } from "react"
-import { useNavigate } from "react-router-dom"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { ChartTooltip } from "@/components/ChartTooltip"
-import { TrendingDown, TrendingUp, Wallet, PiggyBank } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { useAccountsStore } from "@/stores/accountsStore"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import { useBudgetsStore } from "@/stores/budgetsStore"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { ICON_MAP } from "@/lib/icons"
-import { formatCurrency } from "@/lib/format"
+import { useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
+import { ChartTooltip } from '@/components/ChartTooltip'
+import { TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useBudgetsStore } from '@/stores/budgetsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { ICON_MAP } from '@/lib/icons'
+import { formatCurrency } from '@/lib/format'
 
-
-
-function StatCard({ title, value, icon: Icon, trend }: { title: string; value: string; icon: React.ElementType; trend?: "up" | "down" }) {
+function StatCard({
+  title,
+  value,
+  icon: Icon,
+  trend,
+}: {
+  title: string
+  value: string
+  icon: React.ElementType
+  trend?: 'up' | 'down'
+}) {
   return (
     <div className="group flex flex-col gap-3 rounded-xl bg-card p-5 ring-1 ring-foreground/10 transition-shadow duration-200 hover:ring-foreground/15">
       <div className="flex items-center justify-between">
@@ -26,8 +44,14 @@ function StatCard({ title, value, icon: Icon, trend }: { title: string; value: s
       <div className="flex items-baseline gap-2">
         <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
         {trend && (
-          <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${trend === "up" ? "text-emerald-600" : "text-rose-600"}`}>
-            {trend === "up" ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+          <span
+            className={`inline-flex items-center gap-0.5 text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : 'text-rose-600'}`}
+          >
+            {trend === 'up' ? (
+              <TrendingUp className="size-3" />
+            ) : (
+              <TrendingDown className="size-3" />
+            )}
           </span>
         )}
       </div>
@@ -35,7 +59,18 @@ function StatCard({ title, value, icon: Icon, trend }: { title: string; value: s
   )
 }
 
-const CHART_COLORS = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#6366f1", "#eab308"]
+const CHART_COLORS = [
+  '#3b82f6',
+  '#ef4444',
+  '#22c55e',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
+  '#6366f1',
+  '#eab308',
+]
 
 export default function Dashboard() {
   const { accounts, load: loadAccounts } = useAccountsStore()
@@ -60,7 +95,7 @@ export default function Dashboard() {
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
       months.push({
-        label: d.toLocaleDateString("en-US", { month: "short" }),
+        label: d.toLocaleDateString('en-US', { month: 'short' }),
         income: 0,
         expense: 0,
       })
@@ -73,8 +108,8 @@ export default function Dashboard() {
         return md.getTime() === nowd.getTime()
       })
       if (idx === -1) continue
-      if (t.type === "income") months[idx].income += t.baseAmount
-      if (t.type === "expense") months[idx].expense += t.baseAmount
+      if (t.type === 'income') months[idx].income += t.baseAmount
+      if (t.type === 'expense') months[idx].expense += t.baseAmount
     }
     return months
   }, [transactions])
@@ -85,10 +120,10 @@ export default function Dashboard() {
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     const map = new Map<string, number>()
     for (const t of transactions) {
-      if (t.type !== "expense") continue
+      if (t.type !== 'expense') continue
       const d = new Date(t.date)
       if (d < start || d > end) continue
-      const name = categories.find((c) => c.id === t.categoryId)?.name ?? "Other"
+      const name = categories.find((c) => c.id === t.categoryId)?.name ?? 'Other'
       map.set(name, (map.get(name) ?? 0) + t.baseAmount)
     }
     return Array.from(map.entries())
@@ -110,14 +145,14 @@ export default function Dashboard() {
     const now = new Date()
     let total = 0
     for (const b of budgets) {
-      if (b.period !== "monthly") continue
+      if (b.period !== 'monthly') continue
       const s = new Date(b.startDate)
       if (s.getFullYear() !== now.getFullYear() || s.getMonth() !== now.getMonth()) continue
       let spent = 0
-for (const t of transactions) {
-                   if (t.type !== "expense") continue
-                   if (!t.categoryId) continue
-                   if (!b.categoryIds.includes(t.categoryId)) continue
+      for (const t of transactions) {
+        if (t.type !== 'expense') continue
+        if (!t.categoryId) continue
+        if (!b.categoryIds.includes(t.categoryId)) continue
         const d = new Date(t.date)
         if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
           spent += t.baseAmount
@@ -139,9 +174,23 @@ for (const t of transactions) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Net Worth" value={formatCurrency(netWorth, baseCurrency)} icon={Wallet} />
-        <StatCard title="Income" value={formatCurrency(currentMonthIncome, baseCurrency)} icon={TrendingUp} trend="up" />
-        <StatCard title="Expenses" value={formatCurrency(currentMonthExpense, baseCurrency)} icon={TrendingDown} trend="down" />
-        <StatCard title="Budget Left" value={formatCurrency(budgetRemaining, baseCurrency)} icon={PiggyBank} />
+        <StatCard
+          title="Income"
+          value={formatCurrency(currentMonthIncome, baseCurrency)}
+          icon={TrendingUp}
+          trend="up"
+        />
+        <StatCard
+          title="Expenses"
+          value={formatCurrency(currentMonthExpense, baseCurrency)}
+          icon={TrendingDown}
+          trend="down"
+        />
+        <StatCard
+          title="Budget Left"
+          value={formatCurrency(budgetRemaining, baseCurrency)}
+          icon={PiggyBank}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -150,7 +199,9 @@ for (const t of transactions) {
           {monthlyData.every((m) => m.income === 0 && m.expense === 0) ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
               <p className="text-sm">No transaction data yet</p>
-              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
+                Add Transaction
+              </Button>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={250}>
@@ -171,7 +222,9 @@ for (const t of transactions) {
           {categorySpending.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
               <p className="text-sm">No spending data this month</p>
-              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
+                Add Transaction
+              </Button>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={250}>
@@ -196,13 +249,22 @@ for (const t of transactions) {
           {categorySpending.length > 0 && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
               {categorySpending.slice(0, 6).map((cat, i) => {
-                const CatIcon = ICON_MAP[categories.find((c) => c.name === cat.name)?.icon ?? ""]
+                const CatIcon = ICON_MAP[categories.find((c) => c.name === cat.name)?.icon ?? '']
                 return (
-                  <div key={cat.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <div
+                    key={cat.name}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                  >
                     {CatIcon ? (
-                      <CatIcon className="size-3.5 shrink-0" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <CatIcon
+                        className="size-3.5 shrink-0"
+                        style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
                     ) : (
-                      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <span
+                        className="size-2 rounded-full shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
                     )}
                     {cat.name}
                   </div>
@@ -219,18 +281,41 @@ for (const t of transactions) {
           {recentTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
               <p className="text-sm">No transactions yet</p>
-              <Button variant="outline" size="sm" onClick={() => navigate("/transactions")}>Add Transaction</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
+                Add Transaction
+              </Button>
             </div>
           ) : (
             <div className="space-y-2">
               {recentTransactions.map((tx) => (
-<div key={tx.id} className="flex items-center justify-between py-1.5 border-b border-muted last:border-0">
-                   <div className="min-w-0">
-                     <p className="text-sm font-medium truncate">{tx.description || (tx.type === "transfer" ? "Transfer" : categories.find((c) => c.id === tx.categoryId)?.name || "Transaction")}</p>
-                     <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {accounts.find((a) => a.id === tx.accountId)?.name}</p>
-                   </div>
-                   <span className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "text-emerald-600" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "text-rose-600" : ""}`}>
-                    {tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "+" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "−" : "↔"}{formatCurrency(Math.abs(tx.baseAmount), baseCurrency)}
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between py-1.5 border-b border-muted last:border-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {tx.description ||
+                        (tx.type === 'transfer'
+                          ? 'Transfer'
+                          : categories.find((c) => c.id === tx.categoryId)?.name || 'Transaction')}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(tx.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}{' '}
+                      · {accounts.find((a) => a.id === tx.accountId)?.name}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-sm font-semibold tabular-nums shrink-0 ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                  >
+                    {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
+                      ? '+'
+                      : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
+                        ? '−'
+                        : '↔'}
+                    {formatCurrency(Math.abs(tx.baseAmount), baseCurrency)}
                   </span>
                 </div>
               ))}
@@ -243,7 +328,9 @@ for (const t of transactions) {
           {budgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
               <p className="text-sm">No budgets yet</p>
-              <Button variant="outline" size="sm" onClick={() => navigate("/budgets")}>Create Budget</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/app/budgets')}>
+                Create Budget
+              </Button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -251,24 +338,40 @@ for (const t of transactions) {
                 const now = new Date()
                 let spent = 0
                 for (const t of transactions) {
-                  if (t.type !== "expense") continue
-        if (!t.categoryId) continue
-        if (!b.categoryIds.includes(t.categoryId)) continue
+                  if (t.type !== 'expense') continue
+                  if (!t.categoryId) continue
+                  if (!b.categoryIds.includes(t.categoryId)) continue
                   const d = new Date(t.date)
-                  if (b.period === "monthly" ? (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) : d.getFullYear() === now.getFullYear()) {
+                  if (
+                    b.period === 'monthly'
+                      ? d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+                      : d.getFullYear() === now.getFullYear()
+                  ) {
                     spent += t.baseAmount
                   }
                 }
                 const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
-                const color = pct >= 100 ? "bg-rose-500" : pct >= 80 ? "bg-orange-500" : pct >= 50 ? "bg-amber-500" : "bg-emerald-500"
+                const color =
+                  pct >= 100
+                    ? 'bg-rose-500'
+                    : pct >= 80
+                      ? 'bg-orange-500'
+                      : pct >= 50
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
                 return (
                   <div key={b.id}>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium">{b.name}</span>
-                      <span className="text-xs text-muted-foreground tabular-nums">{pct.toFixed(0)}%</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {pct.toFixed(0)}%
+                      </span>
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+                      <div
+                        className={`h-full rounded-full transition-all ${color}`}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                   </div>
                 )

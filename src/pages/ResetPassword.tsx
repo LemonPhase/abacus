@@ -1,17 +1,17 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { KeyRound, Loader2 } from "lucide-react"
-import { useAuth } from "@/supabase/auth"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { KeyRound, Loader2 } from 'lucide-react'
+import { useAuth } from '@/supabase/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 
 export default function ResetPassword() {
   const { user, loading, updatePassword } = useAuth()
   const navigate = useNavigate()
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -35,7 +35,7 @@ export default function ResetPassword() {
             This reset link is invalid or has expired.
           </CardDescription>
           <CardFooter className="pt-2">
-            <Button className="w-full" onClick={() => navigate("/auth")}>
+            <Button className="w-full" onClick={() => navigate('/auth')}>
               Back to sign in
             </Button>
           </CardFooter>
@@ -46,14 +46,14 @@ export default function ResetPassword() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError("")
+    setError('')
     setSubmitting(true)
 
     try {
       await updatePassword(password)
       setSuccess(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update password")
+      setError(err instanceof Error ? err.message : 'Failed to update password')
     } finally {
       setSubmitting(false)
     }
@@ -71,7 +71,7 @@ export default function ResetPassword() {
             Your password has been reset successfully.
           </CardDescription>
           <CardFooter className="pt-2">
-            <Button className="w-full" onClick={() => navigate("/")}>
+            <Button className="w-full" onClick={() => navigate('/app')}>
               Go to dashboard
             </Button>
           </CardFooter>
@@ -87,9 +87,7 @@ export default function ResetPassword() {
           <KeyRound className="size-5" />
           Set new password
         </CardTitle>
-        <CardDescription className="px-4">
-          Enter a new password for your account.
-        </CardDescription>
+        <CardDescription className="px-4">Enter a new password for your account.</CardDescription>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -107,12 +105,10 @@ export default function ResetPassword() {
               />
             </div>
 
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Updating..." : "Set new password"}
+              {submitting ? 'Updating...' : 'Set new password'}
             </Button>
           </form>
         </CardContent>

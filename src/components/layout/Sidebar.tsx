@@ -1,7 +1,7 @@
-import { NavLink } from "react-router-dom"
+import { NavLink } from 'react-router-dom'
 
-import { NAV_LINKS } from "@/lib/navigation"
-import { cn } from "@/lib/utils"
+import { NAV_LINKS } from '@/lib/navigation'
+import { cn } from '@/lib/utils'
 
 export default function Sidebar() {
   return (
@@ -17,20 +17,20 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            end={to === "/"}
+            end={to === '/app'}
             className={({ isActive }) =>
               cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
                 isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
+                  : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground',
               )
             }
           >
             <Icon
               className={cn(
-                "size-4 shrink-0 transition-transform duration-200",
-                "group-hover:scale-110"
+                'size-4 shrink-0 transition-transform duration-200',
+                'group-hover:scale-110',
               )}
             />
             {label}

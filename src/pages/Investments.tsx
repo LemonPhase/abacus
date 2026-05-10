@@ -1,7 +1,7 @@
-import { useEffect, useState, useMemo } from "react"
-import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
+import { useEffect, useState, useMemo } from 'react'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import {
   Table,
   TableHeader,
@@ -9,36 +9,46 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-} from "recharts"
-import { ChartTooltip } from "@/components/ChartTooltip"
-import { useInvestmentPlansStore } from "@/stores/investmentPlansStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import type { InvestmentPlan } from "@/types"
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts'
+import { ChartTooltip } from '@/components/ChartTooltip'
+import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import type { InvestmentPlan } from '@/types'
 import {
-  calculateProjection, calculateTotalProjection,
-  formatInvestmentValue, INVESTMENT_TYPE_COLORS,
-} from "@/lib/investments"
-import { InvestmentDialog, type InvestmentFormData } from "@/pages/investments/InvestmentDialog"
-import { InvestmentList } from "@/pages/investments/InvestmentList"
+  calculateProjection,
+  calculateTotalProjection,
+  formatInvestmentValue,
+  INVESTMENT_TYPE_COLORS,
+} from '@/lib/investments'
+import { InvestmentDialog, type InvestmentFormData } from '@/pages/investments/InvestmentDialog'
+import { InvestmentList } from '@/pages/investments/InvestmentList'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 
 const emptyForm: InvestmentFormData = {
-  name: "",
-  type: "index_fund",
-  initialAmount: "",
-  monthlyContribution: "",
-  annualReturnRate: "",
-  notes: "",
+  name: '',
+  type: 'index_fund',
+  initialAmount: '',
+  monthlyContribution: '',
+  annualReturnRate: '',
+  notes: '',
 }
 
 export default function Investments() {
@@ -50,7 +60,9 @@ export default function Investments() {
   const [deleteTarget, setDeleteTarget] = useState<InvestmentPlan | null>(null)
   const [horizonYears, setHorizonYears] = useState(20)
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   function openAdd() {
     setEditing(null)
@@ -66,7 +78,7 @@ export default function Investments() {
       initialAmount: String(plan.initialAmount),
       monthlyContribution: String(plan.monthlyContribution),
       annualReturnRate: String(plan.annualReturnRate),
-      notes: plan.notes ?? "",
+      notes: plan.notes ?? '',
     })
     setDialogOpen(true)
   }
@@ -94,7 +106,10 @@ export default function Investments() {
     setDeleteTarget(null)
   }
 
-  const totalProjection = useMemo(() => calculateTotalProjection(plans, horizonYears), [plans, horizonYears])
+  const totalProjection = useMemo(
+    () => calculateTotalProjection(plans, horizonYears),
+    [plans, horizonYears],
+  )
   const finalYear = totalProjection[totalProjection.length - 1]
 
   const planProjections = useMemo(() => {
@@ -136,14 +151,25 @@ export default function Investments() {
     })
   }, [plans, horizonYears, finalYear])
 
-  const GROWTH_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"]
+  const GROWTH_COLORS = [
+    '#3b82f6',
+    '#22c55e',
+    '#f59e0b',
+    '#ef4444',
+    '#8b5cf6',
+    '#ec4899',
+    '#14b8a6',
+    '#f97316',
+  ]
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Investments</h1>
-          <p className="text-muted-foreground">Plan and project your investment growth over time.</p>
+          <p className="text-muted-foreground">
+            Plan and project your investment growth over time.
+          </p>
         </div>
         <Button onClick={openAdd}>
           <Plus className="size-4" />
@@ -169,22 +195,34 @@ export default function Investments() {
               onChange={(e) => setHorizonYears(Number(e.target.value))}
               className="flex-1"
             />
-            <span className="text-sm font-medium tabular-nums w-16 text-right">{horizonYears} years</span>
+            <span className="text-sm font-medium tabular-nums w-16 text-right">
+              {horizonYears} years
+            </span>
           </div>
 
           {/* Summary cards */}
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Invested</p>
-              <p className="text-2xl font-bold mt-1">{finalYear ? formatInvestmentValue(finalYear.principal, baseCurrency) : "$0"}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Total Invested
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                {finalYear ? formatInvestmentValue(finalYear.principal, baseCurrency) : '$0'}
+              </p>
             </div>
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Returns</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-1">{finalYear ? formatInvestmentValue(finalYear.returns, baseCurrency) : "$0"}</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">
+                {finalYear ? formatInvestmentValue(finalYear.returns, baseCurrency) : '$0'}
+              </p>
             </div>
             <div className="rounded-xl bg-card p-5 ring-1 ring-foreground/10">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Final Portfolio Value</p>
-              <p className="text-2xl font-bold mt-1">{finalYear ? formatInvestmentValue(finalYear.totalValue, baseCurrency) : "$0"}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Final Portfolio Value
+              </p>
+              <p className="text-2xl font-bold mt-1">
+                {finalYear ? formatInvestmentValue(finalYear.totalValue, baseCurrency) : '$0'}
+              </p>
             </div>
           </div>
 
@@ -196,10 +234,20 @@ export default function Investments() {
                 <LineChart data={growthChartData}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: number) => formatInvestmentValue(v, baseCurrency)}
+                  />
                   <ChartTooltip formatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
                   {plans.map((plan, i) => (
-                    <Line key={plan.id} type="monotone" dataKey={plan.name} stroke={GROWTH_COLORS[i % GROWTH_COLORS.length]} strokeWidth={2} dot={false} />
+                    <Line
+                      key={plan.id}
+                      type="monotone"
+                      dataKey={plan.name}
+                      stroke={GROWTH_COLORS[i % GROWTH_COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                    />
                   ))}
                 </LineChart>
               </ResponsiveContainer>
@@ -210,12 +258,22 @@ export default function Investments() {
               {allocationData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie data={allocationData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
+                    <Pie
+                      data={allocationData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
                       {allocationData.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
-                  <ChartTooltip formatter={(v: number) => formatInvestmentValue(v, baseCurrency)} />
+                    <ChartTooltip
+                      formatter={(v: number) => formatInvestmentValue(v, baseCurrency)}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -241,11 +299,20 @@ export default function Investments() {
                   {totalProjection.map((year) => (
                     <TableRow key={year.year}>
                       <TableCell className="font-medium">{year.year}</TableCell>
-                      <TableCell className="text-right">{formatInvestmentValue(year.principal, baseCurrency)}</TableCell>
-                      <TableCell className="text-right text-emerald-600">{formatInvestmentValue(year.returns, baseCurrency)}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatInvestmentValue(year.totalValue, baseCurrency)}</TableCell>
                       <TableCell className="text-right">
-                        {year.principal > 0 ? ((year.returns / year.principal) * 100).toFixed(1) : "0.0"}%
+                        {formatInvestmentValue(year.principal, baseCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right text-emerald-600">
+                        {formatInvestmentValue(year.returns, baseCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {formatInvestmentValue(year.totalValue, baseCurrency)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {year.principal > 0
+                          ? ((year.returns / year.principal) * 100).toFixed(1)
+                          : '0.0'}
+                        %
                       </TableCell>
                     </TableRow>
                   ))}
@@ -279,13 +346,26 @@ export default function Investments() {
       />
 
       {/* Delete Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
-          <DialogHeader><DialogTitle>Delete Investment</DialogTitle></DialogHeader>
-          <p className="text-muted-foreground">Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?</p>
+          <DialogHeader>
+            <DialogTitle>Delete Investment</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
+          </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

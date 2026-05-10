@@ -25,3 +25,6 @@ coverage
 *.sw?
 
 .env
+
+# Supabase SQL snippets (personal scratchpad queries from the dashboard)
+supabase/snippets/

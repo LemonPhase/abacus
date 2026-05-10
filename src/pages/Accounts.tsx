@@ -1,16 +1,16 @@
-import { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from 'react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Table,
   TableHeader,
@@ -18,28 +18,28 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from "@/components/ui/table"
+} from '@/components/ui/table'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { useAccountsStore } from "@/stores/accountsStore"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import type { Account, AccountType } from "@/types"
-import { formatCurrency } from "@/lib/format"
+} from '@/components/ui/select'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import type { Account, AccountType } from '@/types'
+import { formatCurrency } from '@/lib/format'
 
-const CURRENCIES = ["USD", "EUR", "GBP", "CNY", "JPY", "CAD", "AUD", "CHF", "INR", "BRL"]
-const ACCOUNT_TYPES: AccountType[] = ["checking", "savings", "investment", "credit", "cash"]
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
+const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'investment', 'credit', 'cash']
 
 const TYPE_COLORS: Record<AccountType, string> = {
-  checking: "default",
-  savings: "secondary",
-  investment: "default",
-  credit: "destructive",
-  cash: "outline",
+  checking: 'default',
+  savings: 'secondary',
+  investment: 'default',
+  credit: 'destructive',
+  cash: 'outline',
 }
 
 interface FormData {
@@ -51,14 +51,12 @@ interface FormData {
 }
 
 const emptyForm: FormData = {
-  name: "",
-  type: "checking",
-  currency: "USD",
-  balance: "",
-  notes: "",
+  name: '',
+  type: 'checking',
+  currency: 'USD',
+  balance: '',
+  notes: '',
 }
-
-
 
 export default function Accounts() {
   const { accounts, load, add, update, remove } = useAccountsStore()
@@ -85,7 +83,7 @@ export default function Accounts() {
       type: account.type,
       currency: account.currency,
       balance: String(account.balance),
-      notes: account.notes ?? "",
+      notes: account.notes ?? '',
     })
     setDialogOpen(true)
   }
@@ -156,13 +154,21 @@ export default function Accounts() {
                 <TableRow key={account.id}>
                   <TableCell className="font-medium">{account.name}</TableCell>
                   <TableCell>
-                    <Badge variant={TYPE_COLORS[account.type] as "default" | "secondary" | "destructive" | "outline"}>
+                    <Badge
+                      variant={
+                        TYPE_COLORS[account.type] as
+                          | 'default'
+                          | 'secondary'
+                          | 'destructive'
+                          | 'outline'
+                      }
+                    >
                       {account.type}
                     </Badge>
                   </TableCell>
                   <TableCell>{account.currency}</TableCell>
                   <TableCell className="text-right tabular-nums">
-                    <span className={account.balance < 0 ? "text-destructive" : ""}>
+                    <span className={account.balance < 0 ? 'text-destructive' : ''}>
                       {formatCurrency(account.balance, account.currency)}
                     </span>
                   </TableCell>
@@ -183,10 +189,16 @@ export default function Accounts() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Account" : "Add Account"}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Account' : 'Add Account'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
@@ -200,13 +212,22 @@ export default function Accounts() {
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as AccountType })} items={ACCOUNT_TYPES.map((t) => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}>
+              <Select
+                value={form.type}
+                onValueChange={(v) => setForm({ ...form, type: v as AccountType })}
+                items={ACCOUNT_TYPES.map((t) => ({
+                  value: t,
+                  label: t.charAt(0).toUpperCase() + t.slice(1),
+                }))}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {ACCOUNT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -214,13 +235,18 @@ export default function Accounts() {
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
                 <Label>Currency</Label>
-                <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v ?? "USD" })}>
+                <Select
+                  value={form.currency}
+                  onValueChange={(v) => setForm({ ...form, currency: v ?? 'USD' })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {CURRENCIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -239,31 +265,45 @@ export default function Accounts() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Save" : "Add Account"}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={!form.name.trim()}>
+              {editing ? 'Save' : 'Add Account'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Account</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action
+            cannot be undone.
             {(() => {
               const count = transactions.filter((t) => t.accountId === deleteTarget?.id).length
               return count > 0 ? (
                 <span className="block mt-1 text-rose-600 font-medium">
-                  {count} transaction{count !== 1 ? "s" : ""} will become unlinked.
+                  {count} transaction{count !== 1 ? 's' : ''} will become unlinked.
                 </span>
               ) : null
             })()}
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-export type AccountType = "checking" | "savings" | "investment" | "credit" | "cash"
+export type AccountType = 'checking' | 'savings' | 'investment' | 'credit' | 'cash'
 
 export interface Account {
   id: string
@@ -11,7 +11,7 @@ export interface Account {
   updatedAt: Date | string
 }
 
-export type CategoryKind = "income" | "expense"
+export type CategoryKind = 'income' | 'expense'
 
 export interface Category {
   id: string
@@ -24,7 +24,7 @@ export interface Category {
   updatedAt: Date | string
 }
 
-export type TransactionKind = "income" | "expense" | "transfer"
+export type TransactionKind = 'income' | 'expense' | 'transfer'
 
 export interface Transaction {
   id: string
@@ -42,7 +42,7 @@ export interface Transaction {
   updatedAt: Date | string
 }
 
-export type BudgetPeriod = "monthly" | "yearly"
+export type BudgetPeriod = 'monthly' | 'yearly'
 
 export interface Budget {
   id: string
@@ -63,7 +63,14 @@ export interface ExchangeRate {
   date: Date
 }
 
-export type InvestmentType = "fixed_income" | "index_fund" | "stock" | "real_estate" | "cash" | "crypto" | "other"
+export type InvestmentType =
+  | 'fixed_income'
+  | 'index_fund'
+  | 'stock'
+  | 'real_estate'
+  | 'cash'
+  | 'crypto'
+  | 'other'
 
 export interface InvestmentPlan {
   id: string
@@ -85,9 +92,9 @@ export interface ProjectionYear {
   totalValue: number
 }
 
-export type NewInvestmentPlan = Omit<InvestmentPlan, "id" | "createdAt" | "updatedAt">
+export type NewInvestmentPlan = Omit<InvestmentPlan, 'id' | 'createdAt' | 'updatedAt'>
 
-export type ThemeMode = "light" | "dark" | "system"
+export type ThemeMode = 'light' | 'dark' | 'system'
 
 export interface UserSettings {
   baseCurrency: string
@@ -95,7 +102,10 @@ export interface UserSettings {
   onboarded: boolean
 }
 
-export type NewAccount = Omit<Account, "id" | "createdAt" | "updatedAt">
-export type NewCategory = Omit<Category, "id" | "createdAt" | "updatedAt">
-export type NewTransaction = Omit<Transaction, "id" | "baseAmount" | "baseCurrency" | "createdAt" | "updatedAt">
-export type NewBudget = Omit<Budget, "id" | "createdAt" | "updatedAt">
+export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
+export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+export type NewTransaction = Omit<
+  Transaction,
+  'id' | 'baseAmount' | 'baseCurrency' | 'createdAt' | 'updatedAt'
+>
+export type NewBudget = Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>

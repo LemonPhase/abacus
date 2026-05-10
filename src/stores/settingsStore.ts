@@ -1,11 +1,11 @@
-import { create } from "zustand"
-import type { UserSettings, ThemeMode } from "@/types"
+import { create } from 'zustand'
+import type { UserSettings, ThemeMode } from '@/types'
 
-const SETTINGS_KEY = "abacus-settings"
+const SETTINGS_KEY = 'abacus-settings'
 
 const defaultSettings: UserSettings = {
-  baseCurrency: "USD",
-  theme: "system",
+  baseCurrency: 'USD',
+  theme: 'system',
   onboarded: false,
 }
 

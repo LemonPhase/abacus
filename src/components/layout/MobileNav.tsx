@@ -1,7 +1,7 @@
-import { NavLink } from "react-router-dom"
+import { NavLink } from 'react-router-dom'
 
-import { NAV_LINKS } from "@/lib/navigation"
-import { cn } from "@/lib/utils"
+import { NAV_LINKS } from '@/lib/navigation'
+import { cn } from '@/lib/utils'
 
 export default function MobileNav() {
   return (
@@ -11,13 +11,11 @@ export default function MobileNav() {
           <NavLink
             key={to}
             to={to}
-            end={to === "/"}
+            end={to === '/app'}
             className={({ isActive }) =>
               cn(
-                "flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[11px] font-medium transition-all duration-200",
-                isActive
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                'flex min-w-0 flex-1 flex-col items-center gap-1 py-1 text-[11px] font-medium transition-all duration-200',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )
             }
           >
@@ -25,14 +23,14 @@ export default function MobileNav() {
               <>
                 <div
                   className={cn(
-                    "flex size-8 items-center justify-center rounded-lg transition-all duration-200",
-                    isActive && "bg-primary/10"
+                    'flex size-8 items-center justify-center rounded-lg transition-all duration-200',
+                    isActive && 'bg-primary/10',
                   )}
                 >
                   <Icon
                     className={cn(
-                      "size-5 transition-transform duration-200",
-                      isActive && "scale-110"
+                      'size-5 transition-transform duration-200',
+                      isActive && 'scale-110',
                     )}
                   />
                 </div>

@@ -1,31 +1,31 @@
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { INVESTMENT_TYPE_LABELS } from "@/lib/investments"
-import type { InvestmentPlan, InvestmentType } from "@/types"
+} from '@/components/ui/select'
+import { INVESTMENT_TYPE_LABELS } from '@/lib/investments'
+import type { InvestmentPlan, InvestmentType } from '@/types'
 
 const INVESTMENT_TYPES: InvestmentType[] = [
-  "fixed_income",
-  "index_fund",
-  "stock",
-  "real_estate",
-  "cash",
-  "crypto",
-  "other",
+  'fixed_income',
+  'index_fund',
+  'stock',
+  'real_estate',
+  'cash',
+  'crypto',
+  'other',
 ]
 
 export interface InvestmentFormData {
@@ -58,7 +58,7 @@ export function InvestmentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Investment" : "Add Investment"}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Investment' : 'Add Investment'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -77,7 +77,7 @@ export function InvestmentDialog({
               onValueChange={(v: string | null) =>
                 onFormChange({
                   ...form,
-                  type: (v ?? "index_fund") as InvestmentType,
+                  type: (v ?? 'index_fund') as InvestmentType,
                 })
               }
               items={INVESTMENT_TYPES.map((t) => ({
@@ -106,9 +106,7 @@ export function InvestmentDialog({
                 step="0.01"
                 min="0"
                 value={form.initialAmount}
-                onChange={(e) =>
-                  onFormChange({ ...form, initialAmount: e.target.value })
-                }
+                onChange={(e) => onFormChange({ ...form, initialAmount: e.target.value })}
                 placeholder="0"
               />
             </div>
@@ -146,8 +144,7 @@ export function InvestmentDialog({
               placeholder="e.g. 7"
             />
             <p className="text-xs text-muted-foreground">
-              Typical: Fixed Income 2-5%, Index Funds 7-10%, Stocks 8-12%, Crypto
-              20%+
+              Typical: Fixed Income 2-5%, Index Funds 7-10%, Stocks 8-12%, Crypto 20%+
             </p>
           </div>
           <div className="grid gap-2">
@@ -165,7 +162,7 @@ export function InvestmentDialog({
             Cancel
           </Button>
           <Button onClick={onSave} disabled={!form.name.trim()}>
-            {editing ? "Save" : "Add Investment"}
+            {editing ? 'Save' : 'Add Investment'}
           </Button>
         </DialogFooter>
       </DialogContent>

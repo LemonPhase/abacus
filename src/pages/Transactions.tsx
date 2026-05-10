@@ -1,13 +1,13 @@
-import { useEffect, useState, useMemo } from "react"
-import { Plus, Pencil, Trash2, Upload } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState, useMemo } from 'react'
+import { Plus, Pencil, Trash2, Upload } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Table,
   TableHeader,
@@ -15,34 +15,35 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from "@/components/ui/table"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import { useAccountsStore } from "@/stores/accountsStore"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import { supabase } from "@/supabase/client"
-import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from "@/lib/csv"
-import type { TransactionKind } from "@/types"
-import { ICON_MAP } from "@/lib/icons"
-import { formatCurrency } from "@/lib/format"
-import { TransactionDialog, type TxFormData } from "@/pages/transactions/TransactionDialog"
-import { TransactionFilters, type TransactionFiltersValue } from "@/pages/transactions/TransactionFilters"
-import { CsvImportDialog, type CsvMappedRow } from "@/pages/transactions/CsvImportDialog"
-
-
+} from '@/components/ui/table'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { supabase } from '@/supabase/client'
+import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
+import type { TransactionKind } from '@/types'
+import { ICON_MAP } from '@/lib/icons'
+import { formatCurrency } from '@/lib/format'
+import { TransactionDialog, type TxFormData } from '@/pages/transactions/TransactionDialog'
+import {
+  TransactionFilters,
+  type TransactionFiltersValue,
+} from '@/pages/transactions/TransactionFilters'
+import { CsvImportDialog, type CsvMappedRow } from '@/pages/transactions/CsvImportDialog'
 
 function formatDate(d: Date) {
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const emptyTxForm: TxFormData = {
-  accountId: "",
-  categoryId: "",
-  type: "expense",
-  amount: "",
+  accountId: '',
+  categoryId: '',
+  type: 'expense',
+  amount: '',
   date: new Date().toISOString().slice(0, 10),
-  description: "",
-  toAccountId: "",
+  description: '',
+  toAccountId: '',
 }
 
 export default function Transactions() {
@@ -58,22 +59,27 @@ export default function Transactions() {
 
   // Filters
   const [filters, setFilters] = useState<TransactionFiltersValue>({
-    account: "all",
-    category: "all",
-    type: "all",
-    dateFrom: "",
-    dateTo: "",
+    account: 'all',
+    category: 'all',
+    type: 'all',
+    dateFrom: '',
+    dateTo: '',
   })
 
   // CSV import state
   const [csvDialogOpen, setCsvDialogOpen] = useState(false)
-  const [csvStep, setCsvStep] = useState<"upload" | "map" | "preview">("upload")
+  const [csvStep, setCsvStep] = useState<'upload' | 'map' | 'preview'>('upload')
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvRawRows, setCsvRawRows] = useState<Record<string, string>[]>([])
-  const [csvMapping, setCsvMapping] = useState<ColumnMapping>({ date: "", description: "", amount: "", type: "" })
+  const [csvMapping, setCsvMapping] = useState<ColumnMapping>({
+    date: '',
+    description: '',
+    amount: '',
+    type: '',
+  })
   const [csvMappedRows, setCsvMappedRows] = useState<CsvMappedRow[]>([])
-  const [csvAccountId, setCsvAccountId] = useState("")
-  const [csvCategoryId, setCsvCategoryId] = useState("")
+  const [csvAccountId, setCsvAccountId] = useState('')
+  const [csvCategoryId, setCsvCategoryId] = useState('')
 
   useEffect(() => {
     loadTx()
@@ -83,11 +89,11 @@ export default function Transactions() {
 
   const filteredTxn = useMemo(() => {
     return transactions.filter((t) => {
-      if (filters.account !== "all" && t.accountId !== filters.account) return false
-      if (filters.category !== "all" && t.categoryId !== filters.category) return false
-      if (filters.type !== "all" && t.type !== filters.type) return false
+      if (filters.account !== 'all' && t.accountId !== filters.account) return false
+      if (filters.category !== 'all' && t.categoryId !== filters.category) return false
+      if (filters.type !== 'all' && t.type !== filters.type) return false
       if (filters.dateFrom && new Date(t.date) < new Date(filters.dateFrom)) return false
-      if (filters.dateTo && new Date(t.date) > new Date(filters.dateTo + "T23:59:59")) return false
+      if (filters.dateTo && new Date(t.date) > new Date(filters.dateTo + 'T23:59:59')) return false
       return true
     })
   }, [transactions, filters])
@@ -101,26 +107,26 @@ export default function Transactions() {
   function openEdit(tx: (typeof transactions)[0]) {
     setEditing(tx.id)
     let accountId = tx.accountId
-    let toAccountId = ""
-    
-    if (tx.type === "transfer" && tx.correlativeId) {
-      const correlative = transactions.find(t => t.id === tx.correlativeId)
+    let toAccountId = ''
+
+    if (tx.type === 'transfer' && tx.correlativeId) {
+      const correlative = transactions.find((t) => t.id === tx.correlativeId)
       if (tx.amount < 0) {
         accountId = tx.accountId
-        toAccountId = correlative?.accountId ?? ""
+        toAccountId = correlative?.accountId ?? ''
       } else {
-        accountId = correlative?.accountId ?? ""
+        accountId = correlative?.accountId ?? ''
         toAccountId = tx.accountId
       }
     }
-    
+
     setForm({
       accountId,
-      categoryId: tx.categoryId ?? "",
+      categoryId: tx.categoryId ?? '',
       type: tx.type,
       amount: String(Math.abs(tx.amount)),
       date: new Date(tx.date).toISOString().slice(0, 10),
-      description: tx.description ?? "",
+      description: tx.description ?? '',
       toAccountId,
     })
     setDialogOpen(true)
@@ -130,21 +136,21 @@ export default function Transactions() {
     if (fromCurrency === toCurrency) return 1
     // Try exact pair
     const { data } = await supabase
-      .from("exchange_rates")
-      .select("rate")
-      .eq("from_currency", fromCurrency)
-      .eq("to_currency", toCurrency)
-      .order("date", { ascending: false })
+      .from('exchange_rates')
+      .select('rate')
+      .eq('from_currency', fromCurrency)
+      .eq('to_currency', toCurrency)
+      .order('date', { ascending: false })
       .limit(1)
       .single()
     if (data) return data.rate
     // Try inverse
     const { data: inverse } = await supabase
-      .from("exchange_rates")
-      .select("rate")
-      .eq("from_currency", toCurrency)
-      .eq("to_currency", fromCurrency)
-      .order("date", { ascending: false })
+      .from('exchange_rates')
+      .select('rate')
+      .eq('from_currency', toCurrency)
+      .eq('to_currency', fromCurrency)
+      .order('date', { ascending: false })
       .limit(1)
       .single()
     if (inverse) return 1 / inverse.rate
@@ -153,24 +159,24 @@ export default function Transactions() {
 
   async function handleSave() {
     const amount = parseFloat(form.amount) || 0
-    if (!form.accountId || (!form.categoryId && form.type !== "transfer") || !amount) return
+    if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
 
     const account = accounts.find((a) => a.id === form.accountId)
     const currency = account?.currency ?? baseCurrency
 
-    if (form.type === "transfer") {
+    if (form.type === 'transfer') {
       if (!form.toAccountId) return
       let convertedAmount: number
-      
+
       if (editing) {
         // Find if this transaction already has a correlative
-        const tx = transactions.find(t => t.id === editing)
+        const tx = transactions.find((t) => t.id === editing)
         if (tx && tx.correlativeId) {
           // Update both
           const isOutgoing = tx.amount < 0
           const outId = isOutgoing ? tx.id : tx.correlativeId
           const inId = isOutgoing ? tx.correlativeId : tx.id
-          
+
           const toAccount = accounts.find((a) => a.id === form.toAccountId)
           const toCurrency = toAccount?.currency ?? currency
           const rate = await getExchangeRate(currency, toCurrency)
@@ -179,17 +185,17 @@ export default function Transactions() {
           await update(outId, {
             accountId: form.accountId,
             categoryId: form.categoryId,
-            type: "transfer",
+            type: 'transfer',
             amount: -amount,
             currency,
             date: new Date(form.date),
             description: form.description.trim() || undefined,
           })
-          
+
           await update(inId, {
             accountId: form.toAccountId,
             categoryId: form.categoryId,
-            type: "transfer",
+            type: 'transfer',
             amount: convertedAmount,
             currency: toCurrency,
             date: new Date(form.date),
@@ -211,18 +217,18 @@ export default function Transactions() {
             date: new Date(form.date),
             description: form.description.trim() || undefined,
           })
-          
+
           const inTx = await add({
             accountId: form.toAccountId,
             categoryId: form.categoryId,
-            type: "transfer",
+            type: 'transfer',
             amount: convertedAmount,
             currency: toCurrency,
             date: new Date(form.date),
             description: form.description.trim() || undefined,
-            correlativeId: editing
+            correlativeId: editing,
           })
-          
+
           await update(editing, { correlativeId: inTx.id })
         }
       } else {
@@ -235,30 +241,30 @@ export default function Transactions() {
         const outTx = await add({
           accountId: form.accountId,
           categoryId: form.categoryId,
-          type: "transfer",
+          type: 'transfer',
           amount: -amount,
           currency,
           date: new Date(form.date),
           description: form.description.trim() || undefined,
         })
-        
+
         const inTx = await add({
           accountId: form.toAccountId,
           categoryId: form.categoryId,
-          type: "transfer",
+          type: 'transfer',
           amount: convertedAmount,
           currency: toCurrency,
           date: new Date(form.date),
           description: form.description.trim() || undefined,
-          correlativeId: outTx.id
+          correlativeId: outTx.id,
         })
-        
+
         await update(outTx.id, { correlativeId: inTx.id })
       }
     } else {
       if (editing) {
-        const tx = transactions.find(t => t.id === editing)
-        if (tx && tx.type === "transfer" && tx.correlativeId) {
+        const tx = transactions.find((t) => t.id === editing)
+        if (tx && tx.type === 'transfer' && tx.correlativeId) {
           // Changed from transfer to another type, remove the correlative
           await remove(tx.correlativeId)
           await update(editing, {
@@ -298,7 +304,7 @@ export default function Transactions() {
     setDialogOpen(false)
     setEditing(null)
     if (!editing) {
-      setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
+      setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
     }
     loadAccounts()
   }
@@ -307,7 +313,7 @@ export default function Transactions() {
     if (!deleteTarget) return
     const tx = transactions.find((t) => t.id === deleteTarget)
 
-    if (tx?.type === "transfer" && tx.correlativeId) {
+    if (tx?.type === 'transfer' && tx.correlativeId) {
       const corr = transactions.find((t) => t.id === tx.correlativeId)
       if (corr) {
         await remove(tx.correlativeId)
@@ -324,7 +330,7 @@ export default function Transactions() {
     setCsvRawRows(result.rows)
     const detected = detectColumns(result.headers)
     setCsvMapping(detected)
-    setCsvStep("map")
+    setCsvStep('map')
   }
 
   async function handleCsvImport() {
@@ -337,10 +343,10 @@ export default function Transactions() {
       const date = parseDate(row.date)
       if (!date) continue
 
-      let type: TransactionKind = row.type ?? "expense"
+      let type: TransactionKind = row.type ?? 'expense'
       // Auto-detect: negative amount = expense, positive = income
       if (!row.type) {
-        type = parsedAmount < 0 ? "expense" : "income"
+        type = parsedAmount < 0 ? 'expense' : 'income'
       }
 
       const dbAmount = Math.abs(parsedAmount)
@@ -357,18 +363,21 @@ export default function Transactions() {
     }
 
     setCsvDialogOpen(false)
-    setCsvStep("upload")
+    setCsvStep('upload')
     setCsvHeaders([])
     setCsvRawRows([])
     setCsvMappedRows([])
-    setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })
+    setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
     loadAccounts()
   }
 
-  const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? "Unknown"
-  const getCategoryName = (id: string | null) => id ? (categories.find((c) => c.id === id)?.name ?? "Unknown") : "—"
-  const getCategoryIcon = (id: string | null) => id ? (categories.find((c) => c.id === id)?.icon ?? null) : null
-  const getCategoryColor = (id: string | null) => id ? (categories.find((c) => c.id === id)?.color ?? "#888") : "#888"
+  const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? 'Unknown'
+  const getCategoryName = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.name ?? 'Unknown') : '—'
+  const getCategoryIcon = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.icon ?? null) : null
+  const getCategoryColor = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.color ?? '#888') : '#888'
 
   return (
     <div className="space-y-6">
@@ -395,16 +404,22 @@ export default function Transactions() {
         categories={categories}
         value={filters}
         onChange={setFilters}
-        onClear={() => setFilters({ account: "all", category: "all", type: "all", dateFrom: "", dateTo: "" })}
+        onClear={() =>
+          setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
+        }
       />
 
       {filteredTxn.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
           <p className="text-lg font-medium mb-1">
-            {transactions.length === 0 ? "No transactions yet" : "No transactions match your filters"}
+            {transactions.length === 0
+              ? 'No transactions yet'
+              : 'No transactions match your filters'}
           </p>
           <p className="text-sm">
-            {transactions.length === 0 ? "Add your first transaction or import a CSV file to get started." : "Try adjusting your filters."}
+            {transactions.length === 0
+              ? 'Add your first transaction or import a CSV file to get started.'
+              : 'Try adjusting your filters.'}
           </p>
         </div>
       ) : (
@@ -423,7 +438,9 @@ export default function Transactions() {
             <TableBody>
               {filteredTxn.map((tx) => (
                 <TableRow key={tx.id}>
-                  <TableCell className="text-xs tabular-nums">{formatDate(new Date(tx.date))}</TableCell>
+                  <TableCell className="text-xs tabular-nums">
+                    {formatDate(new Date(tx.date))}
+                  </TableCell>
                   <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
@@ -431,17 +448,32 @@ export default function Transactions() {
                         const iconName = getCategoryIcon(tx.categoryId)
                         const IconComp = iconName ? ICON_MAP[iconName] : null
                         return IconComp ? (
-                          <IconComp className="size-3.5 shrink-0" style={{ color: getCategoryColor(tx.categoryId) }} />
+                          <IconComp
+                            className="size-3.5 shrink-0"
+                            style={{ color: getCategoryColor(tx.categoryId) }}
+                          />
                         ) : (
-                          <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: getCategoryColor(tx.categoryId) }} />
+                          <span
+                            className="size-2 rounded-full shrink-0"
+                            style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
+                          />
                         )
                       })()}
                       <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground truncate max-w-48">{tx.description || "—"}</TableCell>
-                  <TableCell className={`text-right text-xs tabular-nums font-medium ${tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "text-emerald-600" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "text-rose-600" : ""}`}>
-                    {tx.type === "income" || (tx.type === "transfer" && tx.amount > 0) ? "+" : tx.type === "expense" || (tx.type === "transfer" && tx.amount < 0) ? "−" : "↔"} {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                  <TableCell className="text-xs text-muted-foreground truncate max-w-48">
+                    {tx.description || '—'}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                  >
+                    {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
+                      ? '+'
+                      : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
+                        ? '−'
+                        : '↔'}{' '}
+                    {formatCurrency(Math.abs(tx.amount), tx.currency)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-0.5">
@@ -476,15 +508,24 @@ export default function Transactions() {
       />
 
       {/* Delete Dialog */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Transaction</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">Are you sure you want to delete this transaction?</p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -504,7 +545,7 @@ export default function Transactions() {
         onOpenChange={(open) => {
           setCsvDialogOpen(open)
           if (!open) {
-            setCsvStep("upload")
+            setCsvStep('upload')
             setCsvHeaders([])
             setCsvRawRows([])
             setCsvMappedRows([])

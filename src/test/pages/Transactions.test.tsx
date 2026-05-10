@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { MemoryRouter } from "react-router-dom"
-import Transactions from "@/pages/Transactions"
-import { TransactionFilters } from "@/pages/transactions/TransactionFilters"
-import { TransactionDialog } from "@/pages/transactions/TransactionDialog"
-import { CsvImportDialog } from "@/pages/transactions/CsvImportDialog"
-import { useAccountsStore } from "@/stores/accountsStore"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import { useTransactionsStore } from "@/stores/transactionsStore"
-import { useSettingsStore } from "@/stores/settingsStore"
-import type { Account, Category } from "@/types"
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
+import Transactions from '@/pages/Transactions'
+import { TransactionFilters } from '@/pages/transactions/TransactionFilters'
+import { TransactionDialog } from '@/pages/transactions/TransactionDialog'
+import { CsvImportDialog } from '@/pages/transactions/CsvImportDialog'
+import { useAccountsStore } from '@/stores/accountsStore'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import type { Account, Category } from '@/types'
 
 function renderWithRouter(ui: React.ReactElement) {
   return {
@@ -20,20 +20,20 @@ function renderWithRouter(ui: React.ReactElement) {
 }
 
 const accountFixture: Account = {
-  id: "acc-1",
-  name: "Checking",
-  type: "checking",
-  currency: "USD",
+  id: 'acc-1',
+  name: 'Checking',
+  type: 'checking',
+  currency: 'USD',
   balance: 0,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }
 
 const categoryFixture: Category = {
-  id: "cat-1",
-  name: "Groceries",
-  type: "expense",
-  color: "#ff0000",
+  id: 'cat-1',
+  name: 'Groceries',
+  type: 'expense',
+  color: '#ff0000',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 }
@@ -46,122 +46,122 @@ beforeEach(() => {
   useTransactionsStore.setState({ transactions: [], loading: false, error: null, _unsub: null })
 })
 
-describe("Transactions Page", () => {
-  it("mounts and opens the add transaction dialog", async () => {
+describe('Transactions Page', () => {
+  it('mounts and opens the add transaction dialog', async () => {
     const { user } = renderWithRouter(<Transactions />)
 
-    await screen.findByText("Transactions")
-    await user.click(screen.getByRole("button", { name: "Add Transaction" }))
+    await screen.findByText('Transactions')
+    await user.click(screen.getByRole('button', { name: 'Add Transaction' }))
 
-    expect(await screen.findByLabelText("Amount")).toBeInTheDocument()
+    expect(await screen.findByLabelText('Amount')).toBeInTheDocument()
   })
 
-  it("opens the CSV import dialog", async () => {
+  it('opens the CSV import dialog', async () => {
     const { user } = renderWithRouter(<Transactions />)
 
-    await screen.findByText("Transactions")
-    await user.click(screen.getByRole("button", { name: "Import CSV" }))
+    await screen.findByText('Transactions')
+    await user.click(screen.getByRole('button', { name: 'Import CSV' }))
 
-    expect(await screen.findByText("Click to upload a CSV file")).toBeInTheDocument()
+    expect(await screen.findByText('Click to upload a CSV file')).toBeInTheDocument()
   })
 })
 
-describe("TransactionFilters", () => {
-  it("shows clear filters when active and calls onClear", async () => {
+describe('TransactionFilters', () => {
+  it('shows clear filters when active and calls onClear', async () => {
     const onClear = vi.fn()
     const user = userEvent.setup()
     render(
       <TransactionFilters
         accounts={[accountFixture]}
         categories={[categoryFixture]}
-        value={{ account: "all", category: "all", type: "all", dateFrom: "2026-05-01", dateTo: "" }}
+        value={{ account: 'all', category: 'all', type: 'all', dateFrom: '2026-05-01', dateTo: '' }}
         onChange={vi.fn()}
         onClear={onClear}
-      />
+      />,
     )
 
-    const clearButton = screen.getByRole("button", { name: "Clear filters" })
+    const clearButton = screen.getByRole('button', { name: 'Clear filters' })
     await user.click(clearButton)
 
     expect(onClear).toHaveBeenCalled()
   })
 
-  it("notifies onChange when dates change", () => {
+  it('notifies onChange when dates change', () => {
     const onChange = vi.fn()
     render(
       <TransactionFilters
         accounts={[accountFixture]}
         categories={[categoryFixture]}
-        value={{ account: "all", category: "all", type: "all", dateFrom: "2026-05-01", dateTo: "" }}
+        value={{ account: 'all', category: 'all', type: 'all', dateFrom: '2026-05-01', dateTo: '' }}
         onChange={onChange}
         onClear={vi.fn()}
-      />
+      />,
     )
 
-    fireEvent.change(screen.getByDisplayValue("2026-05-01"), { target: { value: "2026-05-02" } })
+    fireEvent.change(screen.getByDisplayValue('2026-05-01'), { target: { value: '2026-05-02' } })
 
     expect(onChange).toHaveBeenCalledWith({
-      account: "all",
-      category: "all",
-      type: "all",
-      dateFrom: "2026-05-02",
-      dateTo: "",
+      account: 'all',
+      category: 'all',
+      type: 'all',
+      dateFrom: '2026-05-02',
+      dateTo: '',
     })
   })
 })
 
-describe("TransactionDialog", () => {
-  it("disables save when required fields are missing", () => {
+describe('TransactionDialog', () => {
+  it('disables save when required fields are missing', () => {
     render(
       <TransactionDialog
         open
         editing={false}
         form={{
-          accountId: "",
-          categoryId: "",
-          type: "expense",
-          amount: "",
-          date: "2026-05-01",
-          description: "",
-          toAccountId: "",
+          accountId: '',
+          categoryId: '',
+          type: 'expense',
+          amount: '',
+          date: '2026-05-01',
+          description: '',
+          toAccountId: '',
         }}
         accounts={[accountFixture]}
         categories={[categoryFixture]}
         onOpenChange={vi.fn()}
         onFormChange={vi.fn()}
         onSave={vi.fn()}
-      />
+      />,
     )
 
-    expect(screen.getByRole("button", { name: "Add Transaction" })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeDisabled()
   })
 
-  it("disables save for transfers when toAccountId is missing", () => {
+  it('disables save for transfers when toAccountId is missing', () => {
     render(
       <TransactionDialog
         open
         editing={false}
         form={{
-          accountId: "acc-1",
-          categoryId: "cat-1",
-          type: "transfer",
-          amount: "100",
-          date: "2026-05-01",
-          description: "",
-          toAccountId: "",
+          accountId: 'acc-1',
+          categoryId: 'cat-1',
+          type: 'transfer',
+          amount: '100',
+          date: '2026-05-01',
+          description: '',
+          toAccountId: '',
         }}
         accounts={[accountFixture]}
         categories={[categoryFixture]}
         onOpenChange={vi.fn()}
         onFormChange={vi.fn()}
         onSave={vi.fn()}
-      />
+      />,
     )
 
-    expect(screen.getByRole("button", { name: "Add Transaction" })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeDisabled()
   })
 
-  it("calls onSave when clicking Add Transaction", async () => {
+  it('calls onSave when clicking Add Transaction', async () => {
     const onSave = vi.fn()
     const user = userEvent.setup()
     render(
@@ -171,26 +171,26 @@ describe("TransactionDialog", () => {
         form={{
           accountId: accountFixture.id,
           categoryId: categoryFixture.id,
-          type: "expense",
-          amount: "12.34",
-          date: "2026-05-01",
-          description: "Test",
-          toAccountId: "",
+          type: 'expense',
+          amount: '12.34',
+          date: '2026-05-01',
+          description: 'Test',
+          toAccountId: '',
         }}
         accounts={[accountFixture]}
         categories={[categoryFixture]}
         onOpenChange={vi.fn()}
         onFormChange={vi.fn()}
         onSave={onSave}
-      />
+      />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Add Transaction" }))
+    await user.click(screen.getByRole('button', { name: 'Add Transaction' }))
 
     expect(onSave).toHaveBeenCalled()
   })
 
-  it("calls onSave with transfer data when clicking Add Transaction for transfer type", async () => {
+  it('calls onSave with transfer data when clicking Add Transaction for transfer type', async () => {
     const onSave = vi.fn()
     const user = userEvent.setup()
     render(
@@ -200,35 +200,35 @@ describe("TransactionDialog", () => {
         form={{
           accountId: accountFixture.id,
           categoryId: categoryFixture.id,
-          type: "transfer",
-          amount: "12.34",
-          date: "2026-05-01",
-          description: "Transfer",
-          toAccountId: "acc-2",
+          type: 'transfer',
+          amount: '12.34',
+          date: '2026-05-01',
+          description: 'Transfer',
+          toAccountId: 'acc-2',
         }}
-        accounts={[accountFixture, { ...accountFixture, id: "acc-2", name: "Savings" }]}
+        accounts={[accountFixture, { ...accountFixture, id: 'acc-2', name: 'Savings' }]}
         categories={[categoryFixture]}
         onOpenChange={vi.fn()}
         onFormChange={vi.fn()}
         onSave={onSave}
-      />
+      />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Add Transaction" }))
+    await user.click(screen.getByRole('button', { name: 'Add Transaction' }))
 
     expect(onSave).toHaveBeenCalled()
   })
 })
 
-describe("CsvImportDialog", () => {
-  it("renders the upload step", () => {
+describe('CsvImportDialog', () => {
+  it('renders the upload step', () => {
     render(
       <CsvImportDialog
         open
         step="upload"
         headers={[]}
         rawRows={[]}
-        mapping={{ date: "", description: "", amount: "", type: "" }}
+        mapping={{ date: '', description: '', amount: '', type: '' }}
         mappedRows={[]}
         accountId=""
         categoryId=""
@@ -242,13 +242,13 @@ describe("CsvImportDialog", () => {
         onAccountChange={vi.fn()}
         onCategoryChange={vi.fn()}
         onImport={vi.fn()}
-      />
+      />,
     )
 
-    expect(screen.getByText("Click to upload a CSV file")).toBeInTheDocument()
+    expect(screen.getByText('Click to upload a CSV file')).toBeInTheDocument()
   })
 
-  it("maps rows and advances to preview", async () => {
+  it('maps rows and advances to preview', async () => {
     const onMappedRowsChange = vi.fn()
     const onStepChange = vi.fn()
     const user = userEvent.setup()
@@ -257,9 +257,9 @@ describe("CsvImportDialog", () => {
       <CsvImportDialog
         open
         step="map"
-        headers={["Date", "Description", "Amount", "Type"]}
-        rawRows={[{ Date: "2026-05-01", Description: "Coffee", Amount: "4.50", Type: "expense" }]}
-        mapping={{ date: "Date", description: "Description", amount: "Amount", type: "Type" }}
+        headers={['Date', 'Description', 'Amount', 'Type']}
+        rawRows={[{ Date: '2026-05-01', Description: 'Coffee', Amount: '4.50', Type: 'expense' }]}
+        mapping={{ date: 'Date', description: 'Description', amount: 'Amount', type: 'Type' }}
         mappedRows={[]}
         accountId=""
         categoryId=""
@@ -273,19 +273,19 @@ describe("CsvImportDialog", () => {
         onAccountChange={vi.fn()}
         onCategoryChange={vi.fn()}
         onImport={vi.fn()}
-      />
+      />,
     )
 
-    await user.click(screen.getByRole("button", { name: "Preview" }))
+    await user.click(screen.getByRole('button', { name: 'Preview' }))
 
     expect(onMappedRowsChange).toHaveBeenCalledWith([
       {
-        date: "2026-05-01",
-        description: "Coffee",
-        amount: "4.50",
-        type: "expense",
+        date: '2026-05-01',
+        description: 'Coffee',
+        amount: '4.50',
+        type: 'expense',
       },
     ])
-    expect(onStepChange).toHaveBeenCalledWith("preview")
+    expect(onStepChange).toHaveBeenCalledWith('preview')
   })
 })

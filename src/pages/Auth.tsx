@@ -1,37 +1,37 @@
-import { useState } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
-import { LogIn, ArrowLeft } from "lucide-react"
-import { useAuth } from "@/supabase/auth"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
+import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { LogIn, ArrowLeft } from 'lucide-react'
+import { useAuth } from '@/supabase/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 
-type AuthMode = "signin" | "signup" | "forgot_password"
+type AuthMode = 'signin' | 'signup' | 'forgot_password'
 
 export default function Auth() {
-  const [mode, setMode] = useState<AuthMode>("signin")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const [mode, setMode] = useState<AuthMode>('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [resetSent, setResetSent] = useState(false)
 
   const { signIn, signUp, resetPasswordForEmail } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/"
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/app'
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError("")
+    setError('')
     setSubmitting(true)
 
     try {
-      if (mode === "forgot_password") {
+      if (mode === 'forgot_password') {
         await resetPasswordForEmail(email)
         setResetSent(true)
-      } else if (mode === "signin") {
+      } else if (mode === 'signin') {
         await signIn(email, password)
         navigate(from, { replace: true })
       } else {
@@ -39,7 +39,7 @@ export default function Auth() {
         navigate(from, { replace: true })
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setSubmitting(false)
     }
@@ -47,7 +47,7 @@ export default function Auth() {
 
   function switchMode(newMode: AuthMode) {
     setMode(newMode)
-    setError("")
+    setError('')
     setResetSent(false)
   }
 
@@ -59,23 +59,25 @@ export default function Auth() {
           Abacus
         </CardTitle>
         <CardDescription className="px-4">
-          {mode === "signin" && "Sign in to your account"}
-          {mode === "signup" && "Create a new account"}
-          {mode === "forgot_password" && !resetSent && "Reset your password"}
-          {mode === "forgot_password" && resetSent && "Check your email"}
+          {mode === 'signin' && 'Sign in to your account'}
+          {mode === 'signup' && 'Create a new account'}
+          {mode === 'forgot_password' && !resetSent && 'Reset your password'}
+          {mode === 'forgot_password' && resetSent && 'Check your email'}
         </CardDescription>
 
         <CardContent>
-          {mode === "forgot_password" && resetSent ? (
+          {mode === 'forgot_password' && resetSent ? (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                If an account exists for <span className="font-medium text-foreground">{email}</span>, you will receive a password reset link shortly.
+                If an account exists for{' '}
+                <span className="font-medium text-foreground">{email}</span>, you will receive a
+                password reset link shortly.
               </p>
               <Button
                 variant="link"
                 size="sm"
                 className="h-auto p-0"
-                onClick={() => switchMode("signin")}
+                onClick={() => switchMode('signin')}
               >
                 <ArrowLeft className="mr-1 size-3" />
                 Back to sign in
@@ -96,7 +98,7 @@ export default function Auth() {
                 />
               </div>
 
-              {mode !== "forgot_password" && (
+              {mode !== 'forgot_password' && (
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
@@ -111,55 +113,53 @@ export default function Auth() {
                 </div>
               )}
 
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
 
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting
-                  ? "Please wait..."
-                  : mode === "signin"
-                    ? "Sign In"
-                    : mode === "signup"
-                      ? "Sign Up"
-                      : "Send reset link"}
+                  ? 'Please wait...'
+                  : mode === 'signin'
+                    ? 'Sign In'
+                    : mode === 'signup'
+                      ? 'Sign Up'
+                      : 'Send reset link'}
               </Button>
             </form>
           )}
         </CardContent>
 
         <CardFooter className="flex-col gap-1">
-          {mode !== "forgot_password" && (
+          {mode !== 'forgot_password' && (
             <>
               <p className="text-sm text-muted-foreground">
-                {mode === "signin" ? "Don't have an account?" : "Already have an account?"}
+                {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
               </p>
               <Button
                 variant="link"
                 size="sm"
                 className="h-auto p-0"
-                onClick={() => switchMode(mode === "signin" ? "signup" : "signin")}
+                onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
               >
-                {mode === "signin" ? "Sign up" : "Sign in"}
+                {mode === 'signin' ? 'Sign up' : 'Sign in'}
               </Button>
             </>
           )}
-          {mode === "signin" && (
+          {mode === 'signin' && (
             <Button
               variant="link"
               size="sm"
               className="h-auto p-0"
-              onClick={() => switchMode("forgot_password")}
+              onClick={() => switchMode('forgot_password')}
             >
               Forgot password?
             </Button>
           )}
-          {mode === "forgot_password" && !resetSent && (
+          {mode === 'forgot_password' && !resetSent && (
             <Button
               variant="link"
               size="sm"
               className="h-auto p-0"
-              onClick={() => switchMode("signin")}
+              onClick={() => switchMode('signin')}
             >
               <ArrowLeft className="mr-1 size-3" />
               Back to sign in

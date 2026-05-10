@@ -1,10 +1,10 @@
-import { useEffect, useSyncExternalStore } from "react"
-import { useSettingsStore } from "@/stores/settingsStore"
+import { useEffect, useSyncExternalStore } from 'react'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 function resolveTheme(theme: string) {
-  if (theme === "dark") return "dark"
-  if (theme === "light") return "light"
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+  if (theme === 'dark') return 'dark'
+  if (theme === 'light') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 function themeSnapshot() {
@@ -22,18 +22,18 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     const resolved = resolveTheme(theme)
-    document.documentElement.classList.toggle("dark", resolved === "dark")
+    document.documentElement.classList.toggle('dark', resolved === 'dark')
   }, [theme])
 
   useEffect(() => {
-    if (theme !== "system") return
+    if (theme !== 'system') return
 
-    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e: MediaQueryListEvent) => {
-      document.documentElement.classList.toggle("dark", e.matches)
+      document.documentElement.classList.toggle('dark', e.matches)
     }
-    mq.addEventListener("change", handler)
-    return () => mq.removeEventListener("change", handler)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
   }, [theme])
 
   return <>{children}</>

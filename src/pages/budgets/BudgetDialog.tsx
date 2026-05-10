@@ -1,23 +1,23 @@
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { ICON_MAP } from "@/lib/icons"
-import type { Budget, BudgetPeriod, Category } from "@/types"
+} from '@/components/ui/select'
+import { ICON_MAP } from '@/lib/icons'
+import type { Budget, BudgetPeriod, Category } from '@/types'
 
 export interface BudgetFormData {
   name: string
@@ -52,7 +52,7 @@ export function BudgetDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Budget" : "Add Budget"}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -71,12 +71,12 @@ export function BudgetDialog({
               onValueChange={(v: string | null) =>
                 onFormChange({
                   ...form,
-                  period: (v ?? "monthly") as BudgetPeriod,
+                  period: (v ?? 'monthly') as BudgetPeriod,
                 })
               }
               items={[
-                { value: "monthly", label: "Monthly" },
-                { value: "yearly", label: "Yearly" },
+                { value: 'monthly', label: 'Monthly' },
+                { value: 'yearly', label: 'Yearly' },
               ]}
             >
               <SelectTrigger>
@@ -115,12 +115,10 @@ export function BudgetDialog({
             <Label>Categories</Label>
             <div className="max-h-48 overflow-y-auto rounded-lg border p-3 space-y-1">
               {expenseCategories.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No expense categories available.
-                </p>
+                <p className="text-xs text-muted-foreground">No expense categories available.</p>
               ) : (
                 expenseCategories.map((cat) => {
-                  const CatIcon = ICON_MAP[cat.icon ?? ""]
+                  const CatIcon = ICON_MAP[cat.icon ?? '']
                   return (
                     <label
                       key={cat.id}
@@ -131,10 +129,7 @@ export function BudgetDialog({
                         onCheckedChange={() => onToggleCategory(cat.id)}
                       />
                       {CatIcon ? (
-                        <CatIcon
-                          className="size-4 shrink-0"
-                          style={{ color: cat.color }}
-                        />
+                        <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
                       ) : (
                         <span
                           className="size-2.5 rounded-full shrink-0"
@@ -160,7 +155,7 @@ export function BudgetDialog({
             onClick={onSave}
             disabled={!form.name.trim() || !form.amount || form.categoryIds.length === 0}
           >
-            {editing ? "Save" : "Add Budget"}
+            {editing ? 'Save' : 'Add Budget'}
           </Button>
         </DialogFooter>
       </DialogContent>

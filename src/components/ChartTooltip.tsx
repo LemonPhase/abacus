@@ -1,8 +1,11 @@
-import { Tooltip } from "recharts"
-import type { TooltipProps } from "recharts"
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent"
+import { Tooltip } from 'recharts'
+import type { TooltipProps } from 'recharts'
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent'
 
-interface ChartTooltipProps extends Omit<TooltipProps<ValueType, NameType>, "content" | "formatter"> {
+interface ChartTooltipProps extends Omit<
+  TooltipProps<ValueType, NameType>,
+  'content' | 'formatter'
+> {
   formatter: (value: number) => string
 }
 
@@ -16,9 +19,7 @@ export function ChartTooltip({ formatter, ...props }: ChartTooltipProps) {
         if (!active || !payload?.length) return null
         return (
           <div className="rounded-xl border bg-popover px-3 py-2.5 text-popover-foreground shadow-lg">
-            {label && (
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>
-            )}
+            {label && <p className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</p>}
             <div className="flex flex-col gap-1.5">
               {payload.map((entry, i) => {
                 const value = entry.value as number
@@ -30,9 +31,7 @@ export function ChartTooltip({ formatter, ...props }: ChartTooltipProps) {
                       style={{ backgroundColor: entry.color }}
                     />
                     <span className="flex-1 text-xs text-muted-foreground">{entry.name}</span>
-                    <span className="text-sm font-semibold tabular-nums">
-                      {formatter(value)}
-                    </span>
+                    <span className="text-sm font-semibold tabular-nums">{formatter(value)}</span>
                   </div>
                 )
               })}

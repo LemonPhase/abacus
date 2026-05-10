@@ -1,9 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-import { Navigate, useLocation } from "react-router-dom"
-import { supabase } from "@/supabase/client"
-import type { User, Session } from "@supabase/supabase-js"
-import { Loader2 } from "lucide-react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
+import { supabase } from '@/supabase/client'
+import type { User, Session } from '@supabase/supabase-js'
+import { Loader2 } from 'lucide-react'
 
 interface AuthState {
   user: User | null
@@ -30,7 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
     })
@@ -65,7 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, resetPasswordForEmail, updatePassword }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        resetPasswordForEmail,
+        updatePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
@@ -73,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
 

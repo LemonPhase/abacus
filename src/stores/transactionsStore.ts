@@ -1,11 +1,11 @@
-import { create } from "zustand"
-import { supabase } from "@/supabase/client"
-import { mapKeysToCamel, mapKeysToSnake } from "@/lib/case"
-import { subscribeToTable } from "@/lib/realtime"
-import type { Transaction, NewTransaction, TransactionKind } from "@/types"
-import type { Database } from "@/supabase/database.types"
+import { create } from 'zustand'
+import { supabase } from '@/supabase/client'
+import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
+import { subscribeToTable } from '@/lib/realtime'
+import type { Transaction, NewTransaction, TransactionKind } from '@/types'
+import type { Database } from '@/supabase/database.types'
 
-type TransactionRow = Database["public"]["Tables"]["transactions"]["Row"]
+type TransactionRow = Database['public']['Tables']['transactions']['Row']
 
 function mapRow(row: TransactionRow): Transaction {
   return {
@@ -23,7 +23,9 @@ interface TransactionsState {
   _unsub: (() => void) | null
   clearError: () => void
   load: (options?: { limit?: number; offset?: number }) => Promise<void>
-  add: (data: NewTransaction & { baseAmount?: number; baseCurrency?: string }) => Promise<Transaction>
+  add: (
+    data: NewTransaction & { baseAmount?: number; baseCurrency?: string },
+  ) => Promise<Transaction>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>
   getByAccount: (accountId: string) => Transaction[]
@@ -44,34 +46,36 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   load: async (options) => {
     set({ loading: true, error: null })
     const { limit, offset } = options ?? {}
-    let query = supabase
-      .from("transactions")
-      .select("*")
-      .order("date", { ascending: false })
+    let query = supabase.from('transactions').select('*').order('date', { ascending: false })
     if (offset !== undefined && limit !== undefined) {
       query = query.range(offset, offset + limit - 1)
     } else if (limit !== undefined) {
       query = query.limit(limit)
     }
     const { data, error } = await query
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const transactions: Transaction[] = (data ?? []).map(mapRow)
     set({ transactions, loading: false })
 
     if (!get()._unsub) {
-      const unsub = subscribeToTable("transactions", (payload) => {
-        if (payload.eventType === "INSERT") {
+      const unsub = subscribeToTable('transactions', (payload) => {
+        if (payload.eventType === 'INSERT') {
           const transaction = mapRow(payload.new as TransactionRow)
           set((state) => {
             if (state.transactions.some((t) => t.id === transaction.id)) return state
             return { transactions: [transaction, ...state.transactions] }
           })
-        } else if (payload.eventType === "UPDATE") {
+        } else if (payload.eventType === 'UPDATE') {
           const transaction = mapRow(payload.new as TransactionRow)
           set((state) => ({
-            transactions: state.transactions.map((t) => (t.id === transaction.id ? transaction : t)),
+            transactions: state.transactions.map((t) =>
+              t.id === transaction.id ? transaction : t,
+            ),
           }))
-        } else if (payload.eventType === "DELETE") {
+        } else if (payload.eventType === 'DELETE') {
           const id = (payload.old as { id: string }).id
           set((state) => ({
             transactions: state.transactions.filter((t) => t.id !== id),
@@ -91,11 +95,14 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
       categoryId: data.categoryId || null,
     }
     const { data: inserted, error } = await supabase
-      .from("transactions")
-      .insert(mapKeysToSnake(payload) as Database["public"]["Tables"]["transactions"]["Insert"])
+      .from('transactions')
+      .insert(mapKeysToSnake(payload) as Database['public']['Tables']['transactions']['Insert'])
       .select()
       .single()
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
     const transaction = mapRow(inserted as TransactionRow)
     set((state) => {
       if (state.transactions.some((item) => item.id === transaction.id)) return state
@@ -107,24 +114,32 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => ({
   update: async (id, data) => {
     set({ error: null })
     const clean: Record<string, unknown> = { ...data }
-    if ("categoryId" in data && !data.categoryId) {
+    if ('categoryId' in data && !data.categoryId) {
       clean.categoryId = null
     }
     const { error } = await supabase
-      .from("transactions")
-      .update(mapKeysToSnake(clean) as Database["public"]["Tables"]["transactions"]["Update"])
-      .eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+      .from('transactions')
+      .update(mapKeysToSnake(clean) as Database['public']['Tables']['transactions']['Update'])
+      .eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
-      transactions: state.transactions.map((item) => (item.id === id ? { ...item, ...data } : item)) as any,
+      transactions: state.transactions.map((item) =>
+        item.id === id ? { ...item, ...data } : item,
+      ) as any,
     }))
   },
 
   remove: async (id) => {
     set({ error: null })
-    const { error } = await supabase.from("transactions").delete().eq("id", id)
-    if (error) { set({ error: error.message, loading: false }); throw error }
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) {
+      set({ error: error.message, loading: false })
+      throw error
+    }
 
     set((state) => ({
       transactions: state.transactions.filter((item) => item.id !== id),

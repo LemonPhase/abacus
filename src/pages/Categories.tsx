@@ -1,32 +1,48 @@
-import { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useEffect, useState } from 'react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { useCategoriesStore } from "@/stores/categoriesStore"
-import type { Category, CategoryKind } from "@/types"
-import { ICON_MAP, ICON_NAMES } from "@/lib/icons"
+} from '@/components/ui/select'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { useCategoriesStore } from '@/stores/categoriesStore'
+import type { Category, CategoryKind } from '@/types'
+import { ICON_MAP, ICON_NAMES } from '@/lib/icons'
 
 const COLORS = [
-  "#16a34a", "#22c55e", "#10b981", "#34d399", "#6ee7b7", // greens
-  "#dc2626", "#ef4444", "#f97316", "#f59e0b", "#eab308", // reds/oranges
-  "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", // blues/purples
-  "#ec4899", "#f43f5e", "#14b8a6", "#06b6d4", "#64748b", // misc
+  '#16a34a',
+  '#22c55e',
+  '#10b981',
+  '#34d399',
+  '#6ee7b7', // greens
+  '#dc2626',
+  '#ef4444',
+  '#f97316',
+  '#f59e0b',
+  '#eab308', // reds/oranges
+  '#3b82f6',
+  '#6366f1',
+  '#8b5cf6',
+  '#a855f7',
+  '#d946ef', // blues/purples
+  '#ec4899',
+  '#f43f5e',
+  '#14b8a6',
+  '#06b6d4',
+  '#64748b', // misc
 ]
 
 interface FormData {
@@ -38,11 +54,11 @@ interface FormData {
 }
 
 const emptyForm: FormData = {
-  name: "",
-  type: "expense",
+  name: '',
+  type: 'expense',
   color: COLORS[0],
-  parentId: "",
-  icon: "",
+  parentId: '',
+  icon: '',
 }
 
 export default function Categories() {
@@ -51,13 +67,13 @@ export default function Categories() {
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState<FormData>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
-  const [activeTab, setActiveTab] = useState("expense")
+  const [activeTab, setActiveTab] = useState('expense')
 
   useEffect(() => {
     load()
   }, [load])
 
-  function openAdd(type: CategoryKind, parentId = "") {
+  function openAdd(type: CategoryKind, parentId = '') {
     setEditing(null)
     setForm({ ...emptyForm, type, parentId, color: COLORS[0] })
     setDialogOpen(true)
@@ -69,8 +85,8 @@ export default function Categories() {
       name: cat.name,
       type: cat.type,
       color: cat.color,
-      parentId: cat.parentId ?? "",
-      icon: cat.icon ?? "",
+      parentId: cat.parentId ?? '',
+      icon: cat.icon ?? '',
     })
     setDialogOpen(true)
   }
@@ -109,15 +125,21 @@ export default function Categories() {
 
   function CategoryItem({ cat, level = 0 }: { cat: Category; level?: number }) {
     const children = getChildren(cat.id)
-    const CatIcon = ICON_MAP[cat.icon ?? ""]
+    const CatIcon = ICON_MAP[cat.icon ?? '']
     return (
       <div>
-        <div className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50" style={{ paddingLeft: `${12 + level * 20}px` }}>
+        <div
+          className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50"
+          style={{ paddingLeft: `${12 + level * 20}px` }}
+        >
           <div className="flex items-center gap-3">
             {CatIcon ? (
               <CatIcon className="size-4 shrink-0" style={{ color: cat.color }} />
             ) : (
-              <span className="size-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+              <span
+                className="size-3 rounded-full shrink-0"
+                style={{ backgroundColor: cat.color }}
+              />
             )}
             <span className="font-medium text-sm">{cat.name}</span>
             {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
@@ -190,10 +212,16 @@ export default function Categories() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditing(null) }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) setEditing(null)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Category" : "Add Category"}</DialogTitle>
+            <DialogTitle>{editing ? 'Edit Category' : 'Add Category'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
@@ -207,27 +235,49 @@ export default function Categories() {
             </div>
             <div className="grid gap-2">
               <Label>Type</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as CategoryKind, parentId: "" })} items={[{ value: "expense", label: "Expense" }, { value: "income", label: "Income" }]}>
+              <Select
+                value={form.type}
+                onValueChange={(v) => setForm({ ...form, type: v as CategoryKind, parentId: '' })}
+                items={[
+                  { value: 'expense', label: 'Expense' },
+                  { value: 'income', label: 'Income' },
+                ]}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="expense" label="Expense">Expense</SelectItem>
-                  <SelectItem value="income" label="Income">Income</SelectItem>
+                  <SelectItem value="expense" label="Expense">
+                    Expense
+                  </SelectItem>
+                  <SelectItem value="income" label="Income">
+                    Income
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {parentOptions.length > 0 && (
               <div className="grid gap-2">
                 <Label>Parent Category</Label>
-                <Select value={form.parentId} onValueChange={(v) => setForm({ ...form, parentId: v ?? "" })} items={[{ value: "", label: "None (root category)" }, ...parentOptions.map((c) => ({ value: c.id, label: c.name }))]}>
+                <Select
+                  value={form.parentId}
+                  onValueChange={(v) => setForm({ ...form, parentId: v ?? '' })}
+                  items={[
+                    { value: '', label: 'None (root category)' },
+                    ...parentOptions.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="None (root category)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="" label="None (root category)">None (root category)</SelectItem>
+                    <SelectItem value="" label="None (root category)">
+                      None (root category)
+                    </SelectItem>
                     {parentOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={c.id} label={c.name}>
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -240,7 +290,7 @@ export default function Categories() {
                   <button
                     key={color}
                     type="button"
-                    className={`size-7 rounded-full border-2 transition-all ${form.color === color ? "border-foreground scale-110" : "border-transparent"}`}
+                    className={`size-7 rounded-full border-2 transition-all ${form.color === color ? 'border-foreground scale-110' : 'border-transparent'}`}
                     style={{ backgroundColor: color }}
                     onClick={() => setForm({ ...form, color })}
                   />
@@ -259,10 +309,12 @@ export default function Categories() {
                       title={iconName}
                       className={`flex items-center justify-center size-9 rounded-lg transition-colors ${
                         form.icon === iconName
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                       }`}
-                      onClick={() => setForm({ ...form, icon: form.icon === iconName ? "" : iconName })}
+                      onClick={() =>
+                        setForm({ ...form, icon: form.icon === iconName ? '' : iconName })
+                      }
                     >
                       <Icon className="size-4" />
                     </button>
@@ -272,13 +324,22 @@ export default function Categories() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Save" : "Add Category"}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={!form.name.trim()}>
+              {editing ? 'Save' : 'Add Category'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Category</DialogTitle>
@@ -287,8 +348,12 @@ export default function Categories() {
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

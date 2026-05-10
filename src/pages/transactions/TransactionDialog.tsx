@@ -1,17 +1,23 @@
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import type { Account, Category, TransactionKind } from "@/types"
+} from '@/components/ui/select'
+import type { Account, Category, TransactionKind } from '@/types'
 
-const TRANSACTION_TYPES: TransactionKind[] = ["income", "expense", "transfer"]
+const TRANSACTION_TYPES: TransactionKind[] = ['income', 'expense', 'transfer']
 
 export interface TxFormData {
   accountId: string
@@ -48,7 +54,7 @@ export function TransactionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
+          <DialogTitle>{editing ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3 py-2">
           <div className="grid gap-2">
@@ -58,8 +64,8 @@ export function TransactionDialog({
               onValueChange={(v) =>
                 onFormChange({
                   ...form,
-                  type: (v ?? "expense") as TransactionKind,
-                  categoryId: "",
+                  type: (v ?? 'expense') as TransactionKind,
+                  categoryId: '',
                 })
               }
               items={TRANSACTION_TYPES.map((t) => ({
@@ -72,16 +78,18 @@ export function TransactionDialog({
               </SelectTrigger>
               <SelectContent>
                 {TRANSACTION_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+                  <SelectItem key={t} value={t}>
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Account {form.type === "transfer" ? "(From)" : ""}</Label>
+            <Label>Account {form.type === 'transfer' ? '(From)' : ''}</Label>
             <Select
               value={form.accountId}
-              onValueChange={(v) => onFormChange({ ...form, accountId: v ?? "" })}
+              onValueChange={(v) => onFormChange({ ...form, accountId: v ?? '' })}
               items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
             >
               <SelectTrigger>
@@ -89,17 +97,19 @@ export function TransactionDialog({
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name} ({a.currency})
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          {form.type === "transfer" && (
+          {form.type === 'transfer' && (
             <div className="grid gap-2">
               <Label>Account (To)</Label>
               <Select
                 value={form.toAccountId}
-                onValueChange={(v) => onFormChange({ ...form, toAccountId: v ?? "" })}
+                onValueChange={(v) => onFormChange({ ...form, toAccountId: v ?? '' })}
                 items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
               >
                 <SelectTrigger>
@@ -107,31 +117,36 @@ export function TransactionDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id} disabled={a.id === form.accountId}>{a.name} ({a.currency})</SelectItem>
+                    <SelectItem key={a.id} value={a.id} disabled={a.id === form.accountId}>
+                      {a.name} ({a.currency})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {form.accountId && form.toAccountId && (() => {
-                const fromAcc = accounts.find((a) => a.id === form.accountId)
-                const toAcc = accounts.find((a) => a.id === form.toAccountId)
-                if (fromAcc && toAcc && fromAcc.currency !== toAcc.currency) {
-                  return (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                      Converting from {fromAcc.currency} to {toAcc.currency}. The exchange rate will be applied automatically.
-                    </div>
-                  )
-                }
-                return null
-              })()}
+              {form.accountId &&
+                form.toAccountId &&
+                (() => {
+                  const fromAcc = accounts.find((a) => a.id === form.accountId)
+                  const toAcc = accounts.find((a) => a.id === form.toAccountId)
+                  if (fromAcc && toAcc && fromAcc.currency !== toAcc.currency) {
+                    return (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                        Converting from {fromAcc.currency} to {toAcc.currency}. The exchange rate
+                        will be applied automatically.
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
             </div>
           )}
           <div className="grid gap-2">
-            <Label>Category{form.type === "transfer" ? " (optional)" : ""}</Label>
+            <Label>Category{form.type === 'transfer' ? ' (optional)' : ''}</Label>
             <Select
               value={form.categoryId}
-              onValueChange={(v) => onFormChange({ ...form, categoryId: v ?? "" })}
+              onValueChange={(v) => onFormChange({ ...form, categoryId: v ?? '' })}
               items={categories
-                .filter((c) => (form.type === "transfer" ? true : c.type === form.type))
+                .filter((c) => (form.type === 'transfer' ? true : c.type === form.type))
                 .map((c) => ({ value: c.id, label: c.name }))}
             >
               <SelectTrigger>
@@ -139,9 +154,11 @@ export function TransactionDialog({
               </SelectTrigger>
               <SelectContent>
                 {categories
-                  .filter((c) => (form.type === "transfer" ? true : c.type === form.type))
+                  .filter((c) => (form.type === 'transfer' ? true : c.type === form.type))
                   .map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
                   ))}
               </SelectContent>
             </Select>
@@ -180,9 +197,19 @@ export function TransactionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={onSave} disabled={!form.accountId || (!form.categoryId && form.type !== "transfer") || !form.amount || (form.type === "transfer" && !form.toAccountId)}>
-            {editing ? "Save" : "Add Transaction"}
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={onSave}
+            disabled={
+              !form.accountId ||
+              (!form.categoryId && form.type !== 'transfer') ||
+              !form.amount ||
+              (form.type === 'transfer' && !form.toAccountId)
+            }
+          >
+            {editing ? 'Save' : 'Add Transaction'}
           </Button>
         </DialogFooter>
       </DialogContent>
