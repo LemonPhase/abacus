@@ -36,6 +36,8 @@ function formatDate(d: Date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+const PAGE_SIZE = 50
+
 const emptyTxForm: TxFormData = {
   accountId: '',
   categoryId: '',
@@ -64,7 +66,7 @@ export default function Transactions() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   // Filters
-  const [filters, setFilters] = useState<TransactionFiltersValue>({
+  const [filters, _setFilters] = useState<TransactionFiltersValue>({
     account: 'all',
     category: 'all',
     type: 'all',
@@ -87,6 +89,14 @@ export default function Transactions() {
   const [csvAccountId, setCsvAccountId] = useState('')
   const [csvCategoryId, setCsvCategoryId] = useState('')
 
+  const [page, setPage] = useState(1)
+
+  // Wrap setFilters to reset pagination on filter change
+  const setFilters = (f: TransactionFiltersValue) => {
+    setPage(1)
+    _setFilters(f)
+  }
+
   useEffect(() => {
     loadTx()
     loadAccounts()
@@ -103,6 +113,9 @@ export default function Transactions() {
       return true
     })
   }, [transactions, filters])
+
+  const totalPages = Math.max(1, Math.ceil(filteredTxn.length / PAGE_SIZE))
+  const pagedTxn = filteredTxn.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function openAdd() {
     setEditing(null)
@@ -441,73 +454,109 @@ export default function Transactions() {
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-28">Date</TableHead>
-                <TableHead>Account</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead className="max-w-48">Description</TableHead>
-                <TableHead className="text-right w-28">Amount</TableHead>
-                <TableHead className="w-16" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTxn.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell className="text-xs tabular-nums">
-                    {formatDate(new Date(tx.date))}
-                  </TableCell>
-                  <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5">
-                      {(() => {
-                        const iconName = getCategoryIcon(tx.categoryId)
-                        const IconComp = iconName ? ICON_MAP[iconName] : null
-                        return IconComp ? (
-                          <IconComp
-                            className="size-3.5 shrink-0"
-                            style={{ color: getCategoryColor(tx.categoryId) }}
-                          />
-                        ) : (
-                          <span
-                            className="size-2 rounded-full shrink-0"
-                            style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
-                          />
-                        )
-                      })()}
-                      <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground truncate max-w-48">
-                    {tx.description || '—'}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
-                  >
-                    {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
-                      ? '+'
-                      : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
-                        ? '−'
-                        : '↔'}{' '}
-                    {formatCurrency(Math.abs(tx.amount), tx.currency)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-0.5">
-                      <Button variant="ghost" size="icon-xs" onClick={() => openEdit(tx)}>
-                        <Pencil className="size-3" />
-                      </Button>
-                      <Button variant="ghost" size="icon-xs" onClick={() => setDeleteTarget(tx.id)}>
-                        <Trash2 className="size-3" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        <>
+          <div className="rounded-xl border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-28">Date</TableHead>
+                  <TableHead>Account</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead className="max-w-48">Description</TableHead>
+                  <TableHead className="text-right w-28">Amount</TableHead>
+                  <TableHead className="w-16" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {pagedTxn.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell className="text-xs tabular-nums">
+                      {formatDate(new Date(tx.date))}
+                    </TableCell>
+                    <TableCell className="text-xs">{getAccountName(tx.accountId)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        {(() => {
+                          const iconName = getCategoryIcon(tx.categoryId)
+                          const IconComp = iconName ? ICON_MAP[iconName] : null
+                          return IconComp ? (
+                            <IconComp
+                              className="size-3.5 shrink-0"
+                              style={{ color: getCategoryColor(tx.categoryId) }}
+                            />
+                          ) : (
+                            <span
+                              className="size-2 rounded-full shrink-0"
+                              style={{ backgroundColor: getCategoryColor(tx.categoryId) }}
+                            />
+                          )
+                        })()}
+                        <span className="text-xs">{getCategoryName(tx.categoryId)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground truncate max-w-48">
+                      {tx.description || '—'}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right text-xs tabular-nums font-medium ${tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0) ? 'text-emerald-600' : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0) ? 'text-rose-600' : ''}`}
+                    >
+                      {tx.type === 'income' || (tx.type === 'transfer' && tx.amount > 0)
+                        ? '+'
+                        : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
+                          ? '−'
+                          : '↔'}{' '}
+                      {formatCurrency(Math.abs(tx.amount), tx.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-0.5">
+                        <Button variant="ghost" size="icon-xs" onClick={() => openEdit(tx)}>
+                          <Pencil className="size-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={() => setDeleteTarget(tx.id)}
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-3 px-1">
+              <p className="text-xs text-muted-foreground">
+                Showing {(page - 1) * PAGE_SIZE + 1}–
+                {Math.min(page * PAGE_SIZE, filteredTxn.length)} of {filteredTxn.length}{' '}
+                transactions
+              </p>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <span className="text-xs text-muted-foreground px-2 tabular-nums">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Add/Edit Dialog */}
