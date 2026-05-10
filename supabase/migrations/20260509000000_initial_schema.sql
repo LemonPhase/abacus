@@ -20,7 +20,7 @@ end;
 $$ language plpgsql security definer;
 
 -- accounts
-create table accounts (
+create table if not exists accounts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -33,8 +33,15 @@ create table accounts (
 );
 
 alter table accounts enable row level security;
-create policy "Users can manage their own accounts" on accounts
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own accounts' and tablename = 'accounts') then
+    execute 'create policy "Users can manage their own accounts" on accounts for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on accounts;
 create trigger set_updated_at before update on accounts
   for each row execute function update_updated_at_column();
 
@@ -53,7 +60,7 @@ begin
     elsif old.type = 'expense' then
       update accounts set balance = balance + old.amount where id = old.account_id;
     end if;
-    
+
     if new.type = 'income' or new.type = 'transfer' then
       update accounts set balance = balance + new.amount where id = new.account_id;
     elsif new.type = 'expense' then
@@ -69,11 +76,13 @@ begin
   return null;
 end;
 $$ language plpgsql;
+
+drop trigger if exists set_user_id on accounts;
 create trigger set_user_id before insert on accounts
   for each row execute function set_user_id();
 
 -- categories
-create table categories (
+create table if not exists categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -86,15 +95,24 @@ create table categories (
 );
 
 alter table categories enable row level security;
-create policy "Users can manage their own categories" on categories
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own categories' and tablename = 'categories') then
+    execute 'create policy "Users can manage their own categories" on categories for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on categories;
 create trigger set_updated_at before update on categories
   for each row execute function update_updated_at_column();
+
+drop trigger if exists set_user_id on categories;
 create trigger set_user_id before insert on categories
   for each row execute function set_user_id();
 
 -- transactions
-create table transactions (
+create table if not exists transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -111,24 +129,35 @@ create table transactions (
   correlative_id uuid
 );
 
-create index idx_transactions_account_id on transactions(account_id);
-create index idx_transactions_category_id on transactions(category_id);
-create index idx_transactions_type on transactions(type);
-create index idx_transactions_date on transactions(date);
+create index if not exists idx_transactions_account_id on transactions(account_id);
+create index if not exists idx_transactions_category_id on transactions(category_id);
+create index if not exists idx_transactions_type on transactions(type);
+create index if not exists idx_transactions_date on transactions(date);
 
 alter table transactions enable row level security;
-create policy "Users can manage their own transactions" on transactions
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own transactions' and tablename = 'transactions') then
+    execute 'create policy "Users can manage their own transactions" on transactions for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on transactions;
 create trigger set_updated_at before update on transactions
   for each row execute function update_updated_at_column();
+
+drop trigger if exists maintain_account_balance on transactions;
 create trigger maintain_account_balance
   after insert or update or delete on transactions
   for each row execute function update_account_balance();
+
+drop trigger if exists set_user_id on transactions;
 create trigger set_user_id before insert on transactions
   for each row execute function set_user_id();
 
 -- budgets
-create table budgets (
+create table if not exists budgets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -140,18 +169,27 @@ create table budgets (
   start_date date not null default current_date
 );
 
-create index idx_budgets_period on budgets(period);
+create index if not exists idx_budgets_period on budgets(period);
 
 alter table budgets enable row level security;
-create policy "Users can manage their own budgets" on budgets
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own budgets' and tablename = 'budgets') then
+    execute 'create policy "Users can manage their own budgets" on budgets for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on budgets;
 create trigger set_updated_at before update on budgets
   for each row execute function update_updated_at_column();
+
+drop trigger if exists set_user_id on budgets;
 create trigger set_user_id before insert on budgets
   for each row execute function set_user_id();
 
 -- exchange_rates
-create table exchange_rates (
+create table if not exists exchange_rates (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -162,19 +200,28 @@ create table exchange_rates (
   date date not null
 );
 
-create unique index idx_exchange_rates_user_currency_date
+create unique index if not exists idx_exchange_rates_user_currency_date
   on exchange_rates(user_id, from_currency, to_currency, date);
 
 alter table exchange_rates enable row level security;
-create policy "Users can manage their own exchange_rates" on exchange_rates
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own exchange_rates' and tablename = 'exchange_rates') then
+    execute 'create policy "Users can manage their own exchange_rates" on exchange_rates for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on exchange_rates;
 create trigger set_updated_at before update on exchange_rates
   for each row execute function update_updated_at_column();
+
+drop trigger if exists set_user_id on exchange_rates;
 create trigger set_user_id before insert on exchange_rates
   for each row execute function set_user_id();
 
 -- investment_plans
-create table investment_plans (
+create table if not exists investment_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
@@ -188,12 +235,21 @@ create table investment_plans (
   notes text
 );
 
-create index idx_investment_plans_type on investment_plans(type);
+create index if not exists idx_investment_plans_type on investment_plans(type);
 
 alter table investment_plans enable row level security;
-create policy "Users can manage their own investment_plans" on investment_plans
-  for all using (auth.uid() = user_id);
+
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Users can manage their own investment_plans' and tablename = 'investment_plans') then
+    execute 'create policy "Users can manage their own investment_plans" on investment_plans for all using (auth.uid() = user_id)';
+  end if;
+end $$;
+
+drop trigger if exists set_updated_at on investment_plans;
 create trigger set_updated_at before update on investment_plans
   for each row execute function update_updated_at_column();
+
+drop trigger if exists set_user_id on investment_plans;
 create trigger set_user_id before insert on investment_plans
   for each row execute function set_user_id();

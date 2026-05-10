@@ -99,9 +99,14 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
 
     const internalAdd = async (data: Record<string, unknown>): Promise<T> => {
       set({ error: null })
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const insertData: Record<string, unknown> =
+        session?.user?.id && !('user_id' in data) ? { ...data, user_id: session.user.id } : data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: inserted, error } = await (supabase.from as any)(table)
-        .insert(data)
+        .insert(insertData)
         .select()
         .single()
       if (error) {
@@ -120,8 +125,16 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     const internalBulkAdd = async (data: Record<string, unknown>[]): Promise<T[]> => {
       if (data.length === 0) return []
       set({ error: null })
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const insertData = session?.user?.id
+        ? data.map((d) => ('user_id' in d ? d : { ...d, user_id: session.user.id }))
+        : data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: inserted, error } = await (supabase.from as any)(table).insert(data).select()
+      const { data: inserted, error } = await (supabase.from as any)(table)
+        .insert(insertData)
+        .select()
       if (error) {
         set({ error: error.message, loading: false })
         throw error
