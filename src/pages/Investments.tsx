@@ -88,26 +88,34 @@ export default function Investments() {
   }
 
   async function handleSave() {
-    const data = {
-      name: form.name.trim(),
-      type: form.type,
-      initialAmount: parseFloat(form.initialAmount) || 0,
-      monthlyContribution: parseFloat(form.monthlyContribution) || 0,
-      annualReturnRate: parseFloat(form.annualReturnRate) || 0,
-      currency: baseCurrency,
-      notes: form.notes.trim() || undefined,
+    try {
+      const data = {
+        name: form.name.trim(),
+        type: form.type,
+        initialAmount: parseFloat(form.initialAmount) || 0,
+        monthlyContribution: parseFloat(form.monthlyContribution) || 0,
+        annualReturnRate: parseFloat(form.annualReturnRate) || 0,
+        currency: baseCurrency,
+        notes: form.notes.trim() || undefined,
+      }
+      if (!data.name) return
+      if (editing) await update(editing.id, data)
+      else await add(data)
+      setDialogOpen(false)
+      setEditing(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-    if (!data.name) return
-    if (editing) await update(editing.id, data)
-    else await add(data)
-    setDialogOpen(false)
-    setEditing(null)
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return
-    await remove(deleteTarget.id)
-    setDeleteTarget(null)
+    try {
+      if (!deleteTarget) return
+      await remove(deleteTarget.id)
+      setDeleteTarget(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
+    }
   }
 
   const totalProjection = useMemo(

@@ -61,31 +61,39 @@ export default function Categories() {
   }
 
   async function handleSave() {
-    const data = {
-      name: form.name.trim(),
-      type: form.type,
-      color: form.color,
-      icon: form.icon || undefined,
-      ...(form.parentId ? { parentId: form.parentId } : {}),
+    try {
+      const data = {
+        name: form.name.trim(),
+        type: form.type,
+        color: form.color,
+        icon: form.icon || undefined,
+        ...(form.parentId ? { parentId: form.parentId } : {}),
+      }
+
+      if (!data.name) return
+
+      if (editing) {
+        await update(editing.id, data)
+      } else {
+        await add(data)
+      }
+
+      setActiveTab(data.type)
+      setDialogOpen(false)
+      setEditing(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-
-    if (!data.name) return
-
-    if (editing) {
-      await update(editing.id, data)
-    } else {
-      await add(data)
-    }
-
-    setActiveTab(data.type)
-    setDialogOpen(false)
-    setEditing(null)
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return
-    await remove(deleteTarget.id)
-    setDeleteTarget(null)
+    try {
+      if (!deleteTarget) return
+      await remove(deleteTarget.id)
+      setDeleteTarget(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
+    }
   }
 
   function CategoryItem({ cat, level = 0 }: { cat: Category; level?: number }) {

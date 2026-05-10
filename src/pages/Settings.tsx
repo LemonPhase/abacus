@@ -39,39 +39,75 @@ export default function Settings() {
   const [importDialog, setImportDialog] = useState(false)
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [importMsg, setImportMsg] = useState('')
+  const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [exportMsg, setExportMsg] = useState('')
 
   async function handleExport() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: Record<string, any> = {
-      version: 2,
-      exportedAt: new Date().toISOString(),
-    }
+    try {
+      setExportStatus('idle')
+      setExportMsg('')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: Record<string, any> = {
+        version: 2,
+        exportedAt: new Date().toISOString(),
+      }
 
-    for (const table of TABLES) {
-      const { data: rows, error } = await supabase.from(table).select('*')
-      if (error) throw error
-      data[table] = rows ?? []
-    }
+      for (const table of TABLES) {
+        const { data: rows, error } = await supabase.from(table).select('*')
+        if (error) throw error
+        data[table] = rows ?? []
+      }
 
-    const json = JSON.stringify(data, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `abacus-export-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+      const json = JSON.stringify(data, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `abacus-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      setExportStatus('success')
+      setExportMsg('Data exported successfully')
+    } catch (e) {
+      setExportStatus('error')
+      setExportMsg(e instanceof Error ? e.message : 'Export failed')
+    }
   }
 
   async function handleImport(file: File) {
     try {
       setImportStatus('idle')
+      setImportMsg('')
       const text = await file.text()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = JSON.parse(text) as Record<string, any>
 
       if (!data.accounts || !data.transactions) {
-        throw new Error('Invalid export format')
+        throw new Error('Invalid export format: missing required tables (accounts, transactions)')
+      }
+
+      // Count total rows before starting destructive operations
+      let totalRows = 0
+      for (const table of TABLES) {
+        const rows = data[table]
+        if (rows?.length) {
+          totalRows += rows.length
+        }
+      }
+      if (totalRows > 10000) {
+        setImportStatus('error')
+        setImportMsg(
+          `File contains ${totalRows} rows. Maximum is 10,000. Please reduce the data and try again.`,
+        )
+        return
+      }
+
+      // Validate structure: check each table has arrays
+      for (const table of TABLES) {
+        const rows = data[table]
+        if (rows !== undefined && !Array.isArray(rows)) {
+          throw new Error(`Invalid export format: "${table}" must be an array`)
+        }
       }
 
       // Delete all existing rows from each table
@@ -188,6 +224,8 @@ export default function Settings() {
               Import Data
             </Button>
           </div>
+          {exportStatus === 'success' && <p className="text-xs text-emerald-600">{exportMsg}</p>}
+          {exportStatus === 'error' && <p className="text-xs text-rose-600">{exportMsg}</p>}
         </div>
 
         {/* Account */}

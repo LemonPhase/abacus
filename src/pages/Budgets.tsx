@@ -127,31 +127,39 @@ export default function Budgets() {
   }
 
   async function handleSave() {
-    const amount = parseFloat(form.amount) || 0
-    if (!form.name.trim() || !amount || form.categoryIds.length === 0) return
+    try {
+      const amount = parseFloat(form.amount) || 0
+      if (!form.name.trim() || !amount || form.categoryIds.length === 0) return
 
-    const data = {
-      name: form.name.trim(),
-      categoryIds: form.categoryIds,
-      amount,
-      period: form.period,
-      startDate: new Date(form.startDate),
+      const data = {
+        name: form.name.trim(),
+        categoryIds: form.categoryIds,
+        amount,
+        period: form.period,
+        startDate: new Date(form.startDate),
+      }
+
+      if (editing) {
+        await update(editing.id, data)
+      } else {
+        await add(data)
+      }
+
+      setDialogOpen(false)
+      setEditing(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-
-    if (editing) {
-      await update(editing.id, data)
-    } else {
-      await add(data)
-    }
-
-    setDialogOpen(false)
-    setEditing(null)
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return
-    await remove(deleteTarget.id)
-    setDeleteTarget(null)
+    try {
+      if (!deleteTarget) return
+      await remove(deleteTarget.id)
+      setDeleteTarget(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
+    }
   }
 
   const expenseCategories = useMemo(

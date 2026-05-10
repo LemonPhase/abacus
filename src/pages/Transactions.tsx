@@ -164,60 +164,91 @@ export default function Transactions() {
   }
 
   async function handleSave() {
-    const amount = parseFloat(form.amount) || 0
-    if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
+    try {
+      const amount = parseFloat(form.amount) || 0
+      if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
 
-    const account = accounts.find((a) => a.id === form.accountId)
-    const currency = account?.currency ?? baseCurrency
+      const account = accounts.find((a) => a.id === form.accountId)
+      const currency = account?.currency ?? baseCurrency
 
-    if (form.type === 'transfer') {
-      if (!form.toAccountId) return
-      let convertedAmount: number
+      if (form.type === 'transfer') {
+        if (!form.toAccountId) return
+        let convertedAmount: number
 
-      if (editing) {
-        // Find if this transaction already has a correlative
-        const tx = transactions.find((t) => t.id === editing)
-        if (tx && tx.correlativeId) {
-          // Update both
-          const isOutgoing = tx.amount < 0
-          const outId = isOutgoing ? tx.id : tx.correlativeId
-          const inId = isOutgoing ? tx.correlativeId : tx.id
+        if (editing) {
+          // Find if this transaction already has a correlative
+          const tx = transactions.find((t) => t.id === editing)
+          if (tx && tx.correlativeId) {
+            // Update both
+            const isOutgoing = tx.amount < 0
+            const outId = isOutgoing ? tx.id : tx.correlativeId
+            const inId = isOutgoing ? tx.correlativeId : tx.id
 
-          const toAccount = accounts.find((a) => a.id === form.toAccountId)
-          const toCurrency = toAccount?.currency ?? currency
-          const rate = await getExchangeRate(currency, toCurrency)
-          convertedAmount = Math.round(amount * rate * 100) / 100
+            const toAccount = accounts.find((a) => a.id === form.toAccountId)
+            const toCurrency = toAccount?.currency ?? currency
+            const rate = await getExchangeRate(currency, toCurrency)
+            convertedAmount = Math.round(amount * rate * 100) / 100
 
-          await update(outId, {
-            accountId: form.accountId,
-            categoryId: form.categoryId,
-            type: 'transfer',
-            amount: -amount,
-            currency,
-            date: new Date(form.date),
-            description: form.description.trim() || undefined,
-          })
+            await update(outId, {
+              accountId: form.accountId,
+              categoryId: form.categoryId,
+              type: 'transfer',
+              amount: -amount,
+              currency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+            })
 
-          await update(inId, {
-            accountId: form.toAccountId,
-            categoryId: form.categoryId,
-            type: 'transfer',
-            amount: convertedAmount,
-            currency: toCurrency,
-            date: new Date(form.date),
-            description: form.description.trim() || undefined,
-          })
+            await update(inId, {
+              accountId: form.toAccountId,
+              categoryId: form.categoryId,
+              type: 'transfer',
+              amount: convertedAmount,
+              currency: toCurrency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+            })
+          } else {
+            // Changed from another type to transfer, need to create the missing correlative
+            const toAccount = accounts.find((a) => a.id === form.toAccountId)
+            const toCurrency = toAccount?.currency ?? currency
+            const rate = await getExchangeRate(currency, toCurrency)
+            convertedAmount = Math.round(amount * rate * 100) / 100
+
+            await update(editing, {
+              accountId: form.accountId,
+              categoryId: form.categoryId,
+              type: form.type,
+              amount: -amount,
+              currency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+            })
+
+            const inTx = await add({
+              accountId: form.toAccountId,
+              categoryId: form.categoryId,
+              type: 'transfer',
+              amount: convertedAmount,
+              currency: toCurrency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+              correlativeId: editing,
+            })
+
+            await update(editing, { correlativeId: inTx.id })
+          }
         } else {
-          // Changed from another type to transfer, need to create the missing correlative
+          // Add two transactions
           const toAccount = accounts.find((a) => a.id === form.toAccountId)
           const toCurrency = toAccount?.currency ?? currency
           const rate = await getExchangeRate(currency, toCurrency)
           convertedAmount = Math.round(amount * rate * 100) / 100
 
-          await update(editing, {
+          const outTx = await add({
             accountId: form.accountId,
             categoryId: form.categoryId,
-            type: form.type,
+            type: 'transfer',
             amount: -amount,
             currency,
             date: new Date(form.date),
@@ -232,59 +263,40 @@ export default function Transactions() {
             currency: toCurrency,
             date: new Date(form.date),
             description: form.description.trim() || undefined,
-            correlativeId: editing,
+            correlativeId: outTx.id,
           })
 
-          await update(editing, { correlativeId: inTx.id })
+          await update(outTx.id, { correlativeId: inTx.id })
         }
       } else {
-        // Add two transactions
-        const toAccount = accounts.find((a) => a.id === form.toAccountId)
-        const toCurrency = toAccount?.currency ?? currency
-        const rate = await getExchangeRate(currency, toCurrency)
-        convertedAmount = Math.round(amount * rate * 100) / 100
-
-        const outTx = await add({
-          accountId: form.accountId,
-          categoryId: form.categoryId,
-          type: 'transfer',
-          amount: -amount,
-          currency,
-          date: new Date(form.date),
-          description: form.description.trim() || undefined,
-        })
-
-        const inTx = await add({
-          accountId: form.toAccountId,
-          categoryId: form.categoryId,
-          type: 'transfer',
-          amount: convertedAmount,
-          currency: toCurrency,
-          date: new Date(form.date),
-          description: form.description.trim() || undefined,
-          correlativeId: outTx.id,
-        })
-
-        await update(outTx.id, { correlativeId: inTx.id })
-      }
-    } else {
-      if (editing) {
-        const tx = transactions.find((t) => t.id === editing)
-        if (tx && tx.type === 'transfer' && tx.correlativeId) {
-          // Changed from transfer to another type, remove the correlative
-          await remove(tx.correlativeId)
-          await update(editing, {
-            accountId: form.accountId,
-            categoryId: form.categoryId,
-            type: form.type,
-            amount,
-            currency,
-            date: new Date(form.date),
-            description: form.description.trim() || undefined,
-            correlativeId: null as unknown as string,
-          })
+        if (editing) {
+          const tx = transactions.find((t) => t.id === editing)
+          if (tx && tx.type === 'transfer' && tx.correlativeId) {
+            // Changed from transfer to another type, remove the correlative
+            await remove(tx.correlativeId)
+            await update(editing, {
+              accountId: form.accountId,
+              categoryId: form.categoryId,
+              type: form.type,
+              amount,
+              currency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+              correlativeId: null as unknown as string,
+            })
+          } else {
+            await update(editing, {
+              accountId: form.accountId,
+              categoryId: form.categoryId,
+              type: form.type,
+              amount,
+              currency,
+              date: new Date(form.date),
+              description: form.description.trim() || undefined,
+            })
+          }
         } else {
-          await update(editing, {
+          await add({
             accountId: form.accountId,
             categoryId: form.categoryId,
             type: form.type,
@@ -294,40 +306,36 @@ export default function Transactions() {
             description: form.description.trim() || undefined,
           })
         }
-      } else {
-        await add({
-          accountId: form.accountId,
-          categoryId: form.categoryId,
-          type: form.type,
-          amount,
-          currency,
-          date: new Date(form.date),
-          description: form.description.trim() || undefined,
-        })
       }
-    }
 
-    setDialogOpen(false)
-    setEditing(null)
-    if (!editing) {
-      setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
+      setDialogOpen(false)
+      setEditing(null)
+      if (!editing) {
+        setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
+      }
+      loadAccounts()
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-    loadAccounts()
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return
-    const tx = transactions.find((t) => t.id === deleteTarget)
+    try {
+      if (!deleteTarget) return
+      const tx = transactions.find((t) => t.id === deleteTarget)
 
-    if (tx?.type === 'transfer' && tx.correlativeId) {
-      const corr = transactions.find((t) => t.id === tx.correlativeId)
-      if (corr) {
-        await remove(tx.correlativeId)
+      if (tx?.type === 'transfer' && tx.correlativeId) {
+        const corr = transactions.find((t) => t.id === tx.correlativeId)
+        if (corr) {
+          await remove(tx.correlativeId)
+        }
       }
+      await remove(deleteTarget)
+      loadAccounts()
+      setDeleteTarget(null)
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-    await remove(deleteTarget)
-    loadAccounts()
-    setDeleteTarget(null)
   }
 
   async function handleCsvFile(file: File) {
@@ -340,41 +348,45 @@ export default function Transactions() {
   }
 
   async function handleCsvImport() {
-    const account = accounts.find((a) => a.id === csvAccountId)
-    const currency = account?.currency ?? baseCurrency
+    try {
+      const account = accounts.find((a) => a.id === csvAccountId)
+      const currency = account?.currency ?? baseCurrency
 
-    for (const row of csvMappedRows) {
-      const parsedAmount = parseAmount(row.amount)
-      if (!parsedAmount) continue
-      const date = parseDate(row.date)
-      if (!date) continue
+      for (const row of csvMappedRows) {
+        const parsedAmount = parseAmount(row.amount)
+        if (!parsedAmount) continue
+        const date = parseDate(row.date)
+        if (!date) continue
 
-      let type: TransactionKind = row.type ?? 'expense'
-      // Auto-detect: negative amount = expense, positive = income
-      if (!row.type) {
-        type = parsedAmount < 0 ? 'expense' : 'income'
+        let type: TransactionKind = row.type ?? 'expense'
+        // Auto-detect: negative amount = expense, positive = income
+        if (!row.type) {
+          type = parsedAmount < 0 ? 'expense' : 'income'
+        }
+
+        const dbAmount = Math.abs(parsedAmount)
+
+        await add({
+          accountId: csvAccountId,
+          categoryId: csvCategoryId,
+          type,
+          amount: dbAmount,
+          currency,
+          date,
+          description: row.description.trim() || undefined,
+        })
       }
 
-      const dbAmount = Math.abs(parsedAmount)
-
-      await add({
-        accountId: csvAccountId,
-        categoryId: csvCategoryId,
-        type,
-        amount: dbAmount,
-        currency,
-        date,
-        description: row.description.trim() || undefined,
-      })
+      setCsvDialogOpen(false)
+      setCsvStep('upload')
+      setCsvHeaders([])
+      setCsvRawRows([])
+      setCsvMappedRows([])
+      setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
+      loadAccounts()
+    } catch {
+      // Error is already in the store → GlobalErrorBanner will display it
     }
-
-    setCsvDialogOpen(false)
-    setCsvStep('upload')
-    setCsvHeaders([])
-    setCsvRawRows([])
-    setCsvMappedRows([])
-    setFilters({ account: 'all', category: 'all', type: 'all', dateFrom: '', dateTo: '' })
-    loadAccounts()
   }
 
   const getAccountName = (id: string) => accounts.find((a) => a.id === id)?.name ?? 'Unknown'
