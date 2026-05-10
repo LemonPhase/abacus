@@ -165,6 +165,10 @@
   box-shadow: 0 0 24px rgba(28, 25, 23, 0.06);
 }
 
+.dark .ink-shadow {
+  box-shadow: 0 0 32px rgba(239, 232, 229, 0.05);
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
