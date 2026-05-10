@@ -75,7 +75,7 @@ function applyUpdateBalanceEffect(
   applyInsertBalanceEffect(newRow)
 }
 
-type Filter = { col: string; val: unknown }
+type Filter = { col: string; val: unknown; op: 'eq' | 'neq' }
 
 function applyOrder(
   rows: Record<string, unknown>[],
@@ -105,7 +105,23 @@ function createBuilder(tableName: string): any {
   let _single = false
   let _maybeSingle = false
   let _limit = 0
+  let _rangeFrom = -1
+  let _rangeTo = -1
 
+  function applyFilters(
+    rows: Record<string, unknown>[],
+    filters: Filter[],
+  ): Record<string, unknown>[] {
+    let result = rows
+    for (const f of filters) {
+      if (f.op === 'neq') {
+        result = result.filter((r) => r[f.col] !== f.val)
+      } else {
+        result = result.filter((r) => r[f.col] === f.val)
+      }
+    }
+    return result
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: any = {}
 
@@ -142,18 +158,24 @@ function createBuilder(tableName: string): any {
   })
 
   builder.eq = vi.fn((col: string, val: unknown) => {
-    _filters.push({ col, val })
+    _filters.push({ col, val, op: 'eq' })
     return builder
   })
 
   builder.neq = vi.fn((col: string, val: unknown) => {
-    _filters.push({ col, val })
+    _filters.push({ col, val, op: 'neq' })
     return builder
   })
 
   builder.order = vi.fn((col: string, opts?: { ascending?: boolean }) => {
     _orderCol = col
     _orderAsc = opts?.ascending ?? true
+    return builder
+  })
+
+  builder.range = vi.fn((from: number, to: number) => {
+    _rangeFrom = from
+    _rangeTo = to
     return builder
   })
 
@@ -179,13 +201,13 @@ function createBuilder(tableName: string): any {
     try {
       if (_action === 'select') {
         let result = [...rows]
-        // neq filter: exclude rows matching the value
-        // eq filter: include rows matching the value
-        for (const f of _filters) {
-          result = result.filter((r) => r[f.col] === f.val)
-        }
+        result = applyFilters(result, _filters)
         result = applyOrder(result, _orderCol, _orderAsc)
-        if (_limit > 0) result = result.slice(0, _limit)
+        if (_rangeFrom >= 0 && _rangeTo >= _rangeFrom) {
+          result = result.slice(_rangeFrom, _rangeTo + 1)
+        } else if (_limit > 0) {
+          result = result.slice(0, _limit)
+        }
 
         if (_single || _maybeSingle) {
           resolve({ data: result[0] ?? null, error: null })
@@ -211,10 +233,7 @@ function createBuilder(tableName: string): any {
           resolve({ data: null, error: null })
         }
       } else if (_action === 'update') {
-        let targets = [...rows]
-        for (const f of _filters) {
-          targets = targets.filter((r) => r[f.col] === f.val)
-        }
+        const targets = applyFilters([...rows], _filters)
         for (const target of targets) {
           const oldRow = { ...target }
           Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
@@ -227,7 +246,7 @@ function createBuilder(tableName: string): any {
         }
       } else if (_action === 'delete') {
         if (_filters.length > 0) {
-          const matched = rows.filter((r) => _filters.every((f) => r[f.col] === f.val))
+          const matched = applyFilters(rows, _filters)
           for (const r of matched) {
             if (tableName === 'transactions') applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)
