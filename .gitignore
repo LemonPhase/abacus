@@ -26,5 +26,8 @@ coverage
 
 .env
 
+# Playwright
+test-results/
+
 # Supabase SQL snippets (personal scratchpad queries from the dashboard)
 supabase/snippets/

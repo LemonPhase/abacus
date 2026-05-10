@@ -9,6 +9,8 @@ coverage
 pnpm-lock.yaml
 package-lock.json
 supabase/snippets
+test-results
+playwright-report
 src/supabase/database.types.ts
 src-tauri/target
 src-tauri/gen
