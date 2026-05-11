@@ -1,5 +1,6 @@
 import { supabase } from '@/supabase/client'
 import { subscribeToTable } from '@/supabase/realtime'
+import { mapKeysToCamel } from '@/lib/case'
 import type { Database } from '@/supabase/database.types'
 
 type TableName = keyof Database['public']['Tables']
@@ -156,9 +157,10 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         set({ error: error.message, loading: false })
         throw error
       }
+      const camelData = mapKeysToCamel<Record<string, unknown>>(data)
       set((state: Record<string, unknown>) => ({
         [collectionKey]: getItems(() => state).map((item) =>
-          item.id === id ? { ...item, ...data } : item,
+          item.id === id ? { ...item, ...camelData } : item,
         ),
       }))
     }

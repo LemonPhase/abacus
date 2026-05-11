@@ -37,6 +37,7 @@ const defaultForm: BudgetFormData = {
   amount: '',
   period: 'monthly',
   startDate: '',
+  subtractFromId: '',
 }
 
 function renderDialog({
@@ -48,6 +49,8 @@ function renderDialog({
   onToggleCategory = vi.fn(),
   onSave = vi.fn(),
   expenseCategories = [makeCategory()],
+  existingBudgets = [] as Budget[],
+  formatAmount = (n: number) => String(n),
 }: {
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -57,6 +60,8 @@ function renderDialog({
   onToggleCategory?: (id: string) => void
   onSave?: () => void
   expenseCategories?: Category[]
+  existingBudgets?: Budget[]
+  formatAmount?: (n: number) => string
 } = {}) {
   return {
     onOpenChange,
@@ -73,6 +78,8 @@ function renderDialog({
         onToggleCategory={onToggleCategory}
         onSave={onSave}
         expenseCategories={expenseCategories}
+        existingBudgets={existingBudgets}
+        formatAmount={formatAmount}
       />,
     ),
   }

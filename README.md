@@ -94,20 +94,20 @@ Comment/uncomment the `VITE_SUPABASE_*` lines in `.env` and restart the dev serv
 
 ## Commands
 
-| Command                 | Description                                   |
-| ----------------------- | --------------------------------------------- |
-| `npm run dev`           | Start dev server                              |
-| `npm run build`         | Typecheck then production build to `dist/`    |
-| `npm run lint`          | ESLint                                        |
-| `npm run format`        | Prettier (write)                              |
-| `npm run format:check`  | Prettier (check only)                         |
-| `npm test`              | Vitest unit tests (jsdom + in-memory mock DB) |
-| `npm run test:e2e`      | Playwright E2E tests (requires dev server)    |
-| `npm run tauri dev`     | Tauri desktop dev mode                        |
-| `npm run tauri build`   | Build native desktop app                      |
-| `npx supabase start`    | Start local Supabase stack (Docker)           |
-| `npx supabase stop`     | Stop the local Supabase stack                 |
-| `npx supabase db reset` | Re-apply migrations to local DB               |
+| Command                 | Description                                |
+| ----------------------- | ------------------------------------------ |
+| `npm run dev`           | Start dev server                           |
+| `npm run build`         | Typecheck then production build to `dist/` |
+| `npm run lint`          | ESLint                                     |
+| `npm run format`        | Prettier (write)                           |
+| `npm run format:check`  | Prettier (check only)                      |
+| `npm test`              | Vitest unit tests                          |
+| `npm run test:e2e`      | Playwright E2E tests (requires dev server) |
+| `npm run tauri dev`     | Tauri desktop dev mode                     |
+| `npm run tauri build`   | Build native desktop app                   |
+| `npx supabase start`    | Start local Supabase stack (Docker)        |
+| `npx supabase stop`     | Stop the local Supabase stack              |
+| `npx supabase db reset` | Re-apply migrations to local DB            |
 
 ## Project structure
 

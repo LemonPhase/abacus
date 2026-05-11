@@ -13,6 +13,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Budget, BudgetPeriod } from '@/types'
+import { formatCurrency } from '@/lib/currency'
 import { BudgetDialog, type BudgetFormData } from '@/pages/budgets/BudgetDialog'
 import { BudgetList } from '@/pages/budgets/BudgetList'
 
@@ -51,6 +52,7 @@ const emptyForm: BudgetFormData = {
   amount: '',
   period: 'monthly',
   startDate: new Date().toISOString().slice(0, 7) + '-01',
+  subtractFromId: '',
 }
 
 export default function Budgets() {
@@ -114,6 +116,7 @@ export default function Budgets() {
       amount: String(budget.amount),
       period: budget.period,
       startDate: new Date(budget.startDate).toISOString().slice(0, 10),
+      subtractFromId: '',
     })
     setDialogOpen(true)
   }
@@ -143,6 +146,19 @@ export default function Budgets() {
       if (editing) {
         await update(editing.id, data)
       } else {
+        if (form.subtractFromId) {
+          const sourceBudget = budgets.find((b) => b.id === form.subtractFromId)
+          if (sourceBudget && amount <= sourceBudget.amount) {
+            const newSourceAmount = sourceBudget.amount - amount
+            await update(sourceBudget.id, {
+              name: sourceBudget.name,
+              categoryIds: sourceBudget.categoryIds,
+              amount: newSourceAmount,
+              period: sourceBudget.period,
+              startDate: sourceBudget.startDate,
+            })
+          }
+        }
         await add(data)
       }
 
@@ -215,6 +231,8 @@ export default function Budgets() {
         onToggleCategory={toggleCategory}
         onSave={handleSave}
         expenseCategories={expenseCategories}
+        existingBudgets={editing ? [] : budgets}
+        formatAmount={(n) => formatCurrency(n, baseCurrency)}
       />
 
       {/* Delete Dialog */}

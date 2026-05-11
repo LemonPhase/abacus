@@ -25,6 +25,7 @@ export interface BudgetFormData {
   amount: string
   period: BudgetPeriod
   startDate: string
+  subtractFromId: string
 }
 
 interface BudgetDialogProps {
@@ -36,6 +37,8 @@ interface BudgetDialogProps {
   onToggleCategory: (id: string) => void
   onSave: () => void
   expenseCategories: Category[]
+  existingBudgets: Budget[]
+  formatAmount: (n: number) => string
 }
 
 export function BudgetDialog({
@@ -47,7 +50,21 @@ export function BudgetDialog({
   onToggleCategory,
   onSave,
   expenseCategories,
+  existingBudgets,
+  formatAmount,
 }: BudgetDialogProps) {
+  const subtractEnabled = !!form.subtractFromId
+  const sourceBudget = subtractEnabled
+    ? existingBudgets.find((b) => b.id === form.subtractFromId)
+    : null
+  const newAmount = parseFloat(form.amount) || 0
+  const subtractInvalid: boolean = !!(
+    subtractEnabled &&
+    sourceBudget &&
+    newAmount > sourceBudget.amount
+  )
+  const sourceNewAmount =
+    sourceBudget && subtractEnabled ? Math.max(0, sourceBudget.amount - newAmount) : 0
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -146,6 +163,59 @@ export function BudgetDialog({
               <p className="text-xs text-muted-foreground">Select at least one category.</p>
             )}
           </div>
+          {!editing && existingBudgets.length > 0 && (
+            <div className="grid gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={subtractEnabled}
+                  onCheckedChange={(checked) =>
+                    onFormChange({
+                      ...form,
+                      subtractFromId: checked ? existingBudgets[0].id : '',
+                    })
+                  }
+                />
+                <span className="text-sm font-medium">Subtract from existing budget</span>
+              </label>
+              {subtractEnabled && (
+                <div className="space-y-2">
+                  <Select
+                    value={form.subtractFromId}
+                    onValueChange={(v: string | null) =>
+                      onFormChange({ ...form, subtractFromId: v ?? '' })
+                    }
+                    items={existingBudgets.map((b) => ({
+                      value: b.id,
+                      label: `${b.name} (${formatAmount(b.amount)})`,
+                    }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a budget..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {existingBudgets.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name} ({formatAmount(b.amount)})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {sourceBudget && !subtractInvalid && newAmount > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      &quot;{sourceBudget.name}&quot; will be reduced from{' '}
+                      {formatAmount(sourceBudget.amount)} to {formatAmount(sourceNewAmount)}.
+                    </p>
+                  )}
+                  {subtractInvalid && sourceBudget && (
+                    <p className="text-xs text-cinnabar">
+                      New budget amount ({formatAmount(newAmount)}) cannot exceed source budget
+                      amount ({formatAmount(sourceBudget.amount)}).
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -153,7 +223,9 @@ export function BudgetDialog({
           </Button>
           <Button
             onClick={onSave}
-            disabled={!form.name.trim() || !form.amount || form.categoryIds.length === 0}
+            disabled={
+              !form.name.trim() || !form.amount || form.categoryIds.length === 0 || subtractInvalid
+            }
           >
             {editing ? 'Save' : 'Add Budget'}
           </Button>

@@ -147,23 +147,28 @@ export default function Categories() {
 
   async function handleSave() {
     try {
-      const data = {
+      const base = {
         name: form.name.trim(),
         type: form.type,
         color: form.color,
         icon: form.icon || undefined,
-        ...(form.parentId ? { parentId: form.parentId } : {}),
       }
 
-      if (!data.name) return
+      if (!base.name) return
 
       if (editing) {
-        await update(editing.id, data)
+        await update(editing.id, {
+          ...base,
+          parentId: form.parentId || null,
+        } as Parameters<typeof update>[1])
       } else {
-        await add(data)
+        await add({
+          ...base,
+          ...(form.parentId ? { parentId: form.parentId } : {}),
+        })
       }
 
-      setActiveTab(data.type)
+      setActiveTab(base.type)
       setDialogOpen(false)
       setEditing(null)
     } catch {
