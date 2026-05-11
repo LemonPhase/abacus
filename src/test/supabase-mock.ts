@@ -37,11 +37,17 @@ function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
   }
 }
 
-function adjustBalance(accountId: string, delta: number) {
+function validateAccountOwnership(accountId: string, userId: string): boolean {
   const accounts = tables.get('accounts')
-  if (!accounts) return
+  if (!accounts) return false
   const account = accounts.find((r) => r.id === accountId)
-  if (!account) return
+  if (!account) return false
+  return account.user_id === userId
+}
+
+function adjustBalance(accountId: string, delta: number) {
+  const accounts = ensureTable('accounts')
+  const account = accounts.find((r) => r.id === accountId)!
   account.balance = ((account.balance as number) ?? 0) + delta
 }
 
@@ -216,6 +222,18 @@ function createBuilder(tableName: string): any {
         }
       } else if (_action === 'insert') {
         const toInsert = Array.isArray(_payload) ? _payload : [_payload ?? {}]
+
+        if (tableName === 'transactions') {
+          for (const d of toInsert) {
+            const accountId = d.account_id as string | undefined
+            const userId = d.user_id as string | undefined
+            if (accountId && userId && !validateAccountOwnership(accountId, userId)) {
+              resolve({ data: null, error: { message: 'Account does not belong to this user' } })
+              return
+            }
+          }
+        }
+
         const inserted = toInsert.map((d) => {
           const row = newRow(d as Record<string, unknown>)
           rows.push(row)
@@ -234,6 +252,19 @@ function createBuilder(tableName: string): any {
         }
       } else if (_action === 'update') {
         const targets = applyFilters([...rows], _filters)
+
+        if (tableName === 'transactions') {
+          for (const target of targets) {
+            const payload = _payload as Record<string, unknown>
+            const accountId = (payload?.account_id ?? target.account_id) as string | undefined
+            const userId = (payload?.user_id ?? target.user_id) as string | undefined
+            if (accountId && userId && !validateAccountOwnership(accountId, userId)) {
+              resolve({ data: null, error: { message: 'Account does not belong to this user' } })
+              return
+            }
+          }
+        }
+
         for (const target of targets) {
           const oldRow = { ...target }
           Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
@@ -247,6 +278,18 @@ function createBuilder(tableName: string): any {
       } else if (_action === 'delete') {
         if (_filters.length > 0) {
           const matched = applyFilters(rows, _filters)
+
+          if (tableName === 'transactions') {
+            for (const r of matched) {
+              const accountId = r.account_id as string | undefined
+              const userId = r.user_id as string | undefined
+              if (accountId && userId && !validateAccountOwnership(accountId, userId)) {
+                resolve({ data: null, error: { message: 'Account does not belong to this user' } })
+                return
+              }
+            }
+          }
+
           for (const r of matched) {
             if (tableName === 'transactions') applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)

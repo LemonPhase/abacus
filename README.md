@@ -82,6 +82,13 @@ VITE_SUPABASE_URL=https://<your-project-id>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=<your-publishable-key>
 ```
 
+Link your local project to the cloud project and apply migrations:
+
+```bash
+npx supabase link --project-ref <your-project-id>
+npm run db:push
+```
+
 ### 4. Start the dev server
 
 ```bash

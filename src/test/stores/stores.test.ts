@@ -292,6 +292,21 @@ describe('Categories Store', () => {
 describe('Transactions Store', () => {
   beforeEach(() => {
     useTransactionsStore.setState({ transactions: [], loading: false })
+    const accounts = getTable('accounts')
+    for (const id of ['acc-1', 'acc-2']) {
+      if (!accounts.some((r) => r.id === id)) {
+        accounts.push({
+          id,
+          user_id: 'mock-user',
+          name: `Test Account ${id}`,
+          type: 'checking',
+          currency: 'USD',
+          balance: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+      }
+    }
   })
 
   it('adds a transaction with base currency', async () => {
