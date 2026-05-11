@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 
 import { AuthProvider, AuthGuard } from '@/auth/auth'
 
@@ -19,6 +19,7 @@ import Accounts from '@/pages/Accounts'
 import Transactions from '@/pages/Transactions'
 import Budgets from '@/pages/Budgets'
 import Categories from '@/pages/Categories'
+import NotFound from '@/pages/NotFound'
 
 // Lazy-loaded routes — these pages use recharts (~400 KB) or are rarely visited.
 // Splitting them reduces the initial JS bundle significantly.
@@ -35,8 +36,6 @@ function PageFallback() {
 }
 
 function AppLayout() {
-  const location = useLocation()
-
   return (
     <div className="flex h-screen overflow-hidden">
       <GlobalErrorBanner />
@@ -47,16 +46,7 @@ function AppLayout() {
           <div className="container mx-auto p-4 md:p-6 max-w-[1400px]">
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
               <Suspense fallback={<PageFallback />}>
-                <Routes location={location}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/accounts" element={<Accounts />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/budgets" element={<Budgets />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/investments" element={<Investments />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Routes>
+                <Outlet />
               </Suspense>
             </div>
           </div>
@@ -76,15 +66,27 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route
-              path="*"
+              path="/app"
               element={
                 <AuthGuard>
                   <AppLayout />
                 </AuthGuard>
               }
-            />
+            >
+              <Route index element={<Navigate to="/app/dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="transactions" element={<Transactions />} />
+              <Route path="budgets" element={<Budgets />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="categories" element={<Categories />} />
+              <Route path="investments" element={<Investments />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>

@@ -14,7 +14,7 @@ function renderResetPasswordPage() {
   return {
     user: userEvent.setup(),
     ...render(
-      <MemoryRouter initialEntries={['/reset-password']}>
+      <MemoryRouter initialEntries={['/auth/reset-password']}>
         <AuthProvider>
           <ResetPassword />
         </AuthProvider>

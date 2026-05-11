@@ -95,7 +95,7 @@ describe('AuthProvider', () => {
     await capturedResetPassword!('test@example.com')
 
     expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@example.com', {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${window.location.origin}/auth/reset-password`,
     })
   })
 
@@ -222,7 +222,7 @@ describe('AuthGuard', () => {
       <AuthGuard>
         <div>Protected Content</div>
       </AuthGuard>,
-      { route: '/dashboard' },
+      { route: '/app/dashboard' },
     )
 
     await waitFor(() => {

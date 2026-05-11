@@ -43,7 +43,7 @@ export default function Landing() {
 
         <div className="mt-8 flex gap-3">
           {user ? (
-            <Link to="/dashboard" className={cn(buttonVariants(), 'gap-2')}>
+            <Link to="/app/dashboard" className={cn(buttonVariants(), 'gap-2')}>
               Dashboard
               <ArrowRight className="size-4" />
             </Link>

@@ -54,7 +54,7 @@ export default function ResetPassword() {
             {hashError ?? 'This reset link is invalid or has expired.'}
           </CardDescription>
           <CardFooter className="pt-2">
-            <Button className="w-full" onClick={() => navigate('/auth')}>
+            <Button className="w-full" onClick={() => navigate('/auth?mode=signin')}>
               Back to sign in
             </Button>
           </CardFooter>
@@ -90,7 +90,7 @@ export default function ResetPassword() {
             Your password has been reset successfully.
           </CardDescription>
           <CardFooter className="pt-2">
-            <Button className="w-full" onClick={() => navigate('/dashboard')}>
+            <Button className="w-full" onClick={() => navigate('/app/dashboard')}>
               Go to dashboard
             </Button>
           </CardFooter>

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 
 test('dashboard page renders stat cards', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/dashboard')
   await expect(page.locator('h1')).toContainText('Dashboard')
   await expect(page.locator("p.uppercase:text-is('Net Worth')")).toBeVisible()
   await expect(page.locator("p.uppercase:text-is('Income')")).toBeVisible()
@@ -10,7 +10,7 @@ test('dashboard page renders stat cards', async ({ page }) => {
 })
 
 test('sidebar navigation links work', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/app/dashboard')
 
   await page.getByText('Accounts').first().click()
   await expect(page.locator('h1')).toContainText('Accounts')
@@ -35,25 +35,25 @@ test('sidebar navigation links work', async ({ page }) => {
 })
 
 test('each page renders its empty state', async ({ page }) => {
-  await page.goto('/accounts')
+  await page.goto('/app/accounts')
   await expect(page.getByText('No accounts yet')).toBeVisible()
 
-  await page.goto('/transactions')
+  await page.goto('/app/transactions')
   await expect(page.getByText('No transactions yet')).toBeVisible()
 
-  await page.goto('/budgets')
+  await page.goto('/app/budgets')
   await expect(page.getByText('No budgets yet')).toBeVisible()
 
-  await page.goto('/reports')
+  await page.goto('/app/reports')
   await expect(page.locator('h1')).toContainText('Reports')
 
-  await page.goto('/settings')
+  await page.goto('/app/settings')
   await expect(page.getByText('Base Currency')).toBeVisible()
   await expect(page.getByText('Data Management')).toBeVisible()
 })
 
 test('accounts CRUD flow', async ({ page }) => {
-  await page.goto('/accounts')
+  await page.goto('/app/accounts')
   await page.locator('button:has(.lucide-plus)').first().click()
   await page.locator('input[id="name"]').fill('Main Checking')
   await page.locator('input[id="balance"]').fill('2500')
@@ -74,7 +74,7 @@ test('accounts CRUD flow', async ({ page }) => {
 })
 
 test('transactions page loads with controls', async ({ page }) => {
-  await page.goto('/transactions')
+  await page.goto('/app/transactions')
   await expect(page.locator('h1')).toContainText('Transactions')
   await expect(page.getByText('Add Transaction')).toBeVisible()
   await expect(page.getByText('Import CSV')).toBeVisible()

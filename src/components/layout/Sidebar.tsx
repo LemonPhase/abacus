@@ -25,7 +25,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
-            end={to === '/dashboard'}
+            end={to === '/app/dashboard'}
             className={({ isActive }) =>
               cn(
                 'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',

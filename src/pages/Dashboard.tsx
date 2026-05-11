@@ -255,7 +255,7 @@ export default function Dashboard() {
               {monthlyData.every((m) => m.income === 0 && m.expense === 0) ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
                   <p className="text-sm">No transaction data yet</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/transactions')}>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
                     Add Transaction
                   </Button>
                 </div>
@@ -287,7 +287,7 @@ export default function Dashboard() {
               {categorySpending.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-3">
                   <p className="text-sm">No spending data this month</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/transactions')}>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
                     Add Transaction
                   </Button>
                 </div>
@@ -347,7 +347,7 @@ export default function Dashboard() {
               {recentTransactions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
                   <p className="text-sm">No transactions yet</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/transactions')}>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/transactions')}>
                     Add Transaction
                   </Button>
                 </div>
@@ -395,7 +395,7 @@ export default function Dashboard() {
               {budgets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
                   <p className="text-sm">No budgets yet</p>
-                  <Button variant="outline" size="sm" onClick={() => navigate('/budgets')}>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/app/budgets')}>
                     Create Budget
                   </Button>
                 </div>
