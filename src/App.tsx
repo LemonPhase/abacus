@@ -68,10 +68,6 @@ export default function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route
-              path="/reset-password"
-              element={<Navigate to="/auth/reset-password" replace />}
-            />
-            <Route
               path="/app"
               element={
                 <AuthGuard>
@@ -83,14 +79,6 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="transactions" element={<Transactions />} />
-              <Route path="/dashboard" element={<Navigate to="/app/dashboard" replace />} />
-              <Route path="/accounts" element={<Navigate to="/app/accounts" replace />} />
-              <Route path="/transactions" element={<Navigate to="/app/transactions" replace />} />
-              <Route path="/budgets" element={<Navigate to="/app/budgets" replace />} />
-              <Route path="/reports" element={<Navigate to="/app/reports" replace />} />
-              <Route path="/categories" element={<Navigate to="/app/categories" replace />} />
-              <Route path="/investments" element={<Navigate to="/app/investments" replace />} />
-              <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />
               <Route path="categories" element={<Categories />} />
