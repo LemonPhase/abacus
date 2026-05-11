@@ -26,6 +26,7 @@ import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } f
 import type { TransactionKind, NewTransaction } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
+import { DEFAULT_CATEGORY_COLOR } from '@/lib/chartColors'
 import { TransactionDialog, type TxFormData } from '@/pages/transactions/TransactionDialog'
 import {
   TransactionFilters,
@@ -435,7 +436,7 @@ export default function Transactions() {
     id ? (categoryById.get(id)?.name ?? 'Unknown') : '—'
   const getCategoryIcon = (id: string | null) => (id ? (categoryById.get(id)?.icon ?? null) : null)
   const getCategoryColor = (id: string | null) =>
-    id ? (categoryById.get(id)?.color ?? '#888') : '#888'
+    id ? (categoryById.get(id)?.color ?? DEFAULT_CATEGORY_COLOR) : DEFAULT_CATEGORY_COLOR
 
   return (
     <div className="space-y-6">

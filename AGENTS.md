@@ -143,3 +143,47 @@ src/test/
 - `@fontsource-variable/geist` for typography.
 - `lucide-react` for icons.
 - `tw-animate-css` for animation utilities.
+
+## Design System
+
+The master design reference is `DESIGN.md` at the repo root. Read it before adding any new visual element. The design tokens are implemented in `src/index.css` via Tailwind v4 `@theme inline` and CSS custom properties on `:root` / `.dark`.
+
+### Color rules (critical)
+
+| Context                                                                    | How to apply color                                                                                                                                                                                       |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **UI chrome** (buttons, cards, borders, text, backgrounds)                 | Use Tailwind semantic classes ONLY: `bg-primary`, `text-muted-foreground`, `border-border/30`, `bg-card`, `text-destructive`, etc.                                                                       |
+| **Chart / data-vis color** (Recharts `fill`, `stroke`, pie/donut segments) | Import from `@/lib/chartColors.ts`. Use `INCOME_COLOR`, `EXPENSE_COLOR`, `CHART_COLORS`, `GROWTH_COLORS`, etc. These constants use `var(--token)` references so charts automatically adapt to dark mode. |
+| **Category default/fallback**                                              | Use `DEFAULT_CATEGORY_COLOR` from `@/lib/chartColors.ts` (hex — this is data, not styling).                                                                                                              |
+| **Category picker swatches**                                               | Use `CATEGORY_PICKER_COLORS` from `@/lib/chartColors.ts` (hex — user-selected values stored in DB).                                                                                                      |
+| **Investment type colors**                                                 | Use `INVESTMENT_TYPE_COLORS` from `@/lib/chartColors.ts` (CSS var refs — auto-adapt to theme).                                                                                                           |
+
+**Never hardcode a hex, rgb(), or hsl() value in a component, page, or hook file.** The only files allowed to contain raw hex values are:
+
+- `src/index.css` (design token definitions)
+- `src/lib/chartColors.ts` (JS constants mirroring the CSS tokens)
+
+### Semantic accent colors
+
+- **Jade** (`--jade`, `bg-jade`, `text-jade`): income, positive balances, growth, budget bars under 50%. Never use for structural UI.
+- **Cinnabar** (`--cinnabar`, `bg-cinnabar`, `text-cinnabar`): expenses, negative amounts, overspending, destructive indicators. Never use for structural UI.
+- **Structural palette** (`primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`): all UI chrome. These use warm earth/paper tones — never cool grays or blue tones.
+
+### Adding a new chart/data color
+
+1. **For chart colors** (used in Recharts `fill`/`stroke`/`Cell`): add a `var(--token)` entry to the relevant array in `@/lib/chartColors.ts`. Ensure the `--token` is defined in both `:root` and `.dark` blocks in `src/index.css`.
+2. **For picker/fallback colors** (user data stored in DB): add a hex value constant to `@/lib/chartColors.ts`.
+3. If the color should also be available as a Tailwind utility, add a `--color-<name>` mapping in the `@theme inline` block AND the `:root` / `.dark` CSS custom properties in `src/index.css`.
+4. Run `npm run build` to verify no type errors.
+
+### Typography
+
+- `tabular-nums` class on all monetary values, percentages, dates.
+- Headings use `tracking-tight` (tight tracking), labels use `tracking-wide` (wide tracking).
+- Use the `stat-number` style (Geist Variable, 1.5rem, semibold, tnum) for large stat values.
+
+### Radius
+
+- Interactive elements (buttons, inputs, badges): `rounded-lg` (4px).
+- Containers (cards, dialogs, popovers): `rounded-xl` (12px).
+- Pill shapes (FAB, progress bars): `rounded-full`.

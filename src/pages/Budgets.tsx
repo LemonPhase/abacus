@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { Loader2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,8 +14,10 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Budget, BudgetPeriod } from '@/types'
 import { formatCurrency } from '@/lib/currency'
+import { getBudgetStatus, type BudgetStatus } from '@/lib/budget'
 import { BudgetDialog, type BudgetFormData } from '@/pages/budgets/BudgetDialog'
 import { BudgetList } from '@/pages/budgets/BudgetList'
+import { BudgetGauge } from '@/components/budgets/BudgetGauge'
 
 function getPeriodLabel(date: Date, period: BudgetPeriod): string {
   if (period === 'monthly') {
@@ -43,7 +45,7 @@ function getPeriodBounds(date: Date, period: BudgetPeriod): { start: Date; end: 
 interface BudgetProgress {
   spent: number
   percentage: number
-  status: 'good' | 'warning' | 'danger' | 'over'
+  status: BudgetStatus
 }
 
 const emptyForm: BudgetFormData = {
@@ -80,23 +82,25 @@ export default function Budgets() {
     loadTransactions()
   }, [load, loadCategories, loadTransactions])
 
-  function computeProgress(budget: Budget): BudgetProgress {
-    const { start, end } = getPeriodBounds(currentPeriod, budget.period)
-    const spent = transactions
-      .filter((t) => {
-        if (t.type !== 'expense') return false
-        if (!t.categoryId || !budget.categoryIds.includes(t.categoryId)) return false
-        const d = new Date(t.date)
-        return d >= start && d <= end
-      })
-      .reduce((sum, t) => sum + t.baseAmount, 0)
+  const computeProgress = useCallback(
+    (budget: Budget): BudgetProgress => {
+      const { start, end } = getPeriodBounds(currentPeriod, budget.period)
+      const spent = transactions
+        .filter((t) => {
+          if (t.type !== 'expense') return false
+          if (!t.categoryId || !budget.categoryIds.includes(t.categoryId)) return false
+          const d = new Date(t.date)
+          return d >= start && d <= end
+        })
+        .reduce((sum, t) => sum + t.baseAmount, 0)
 
-    const pct = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
-    const status: BudgetProgress['status'] =
-      pct < 50 ? 'good' : pct < 80 ? 'warning' : pct < 100 ? 'danger' : 'over'
+      const pct = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
+      const status = getBudgetStatus(pct)
 
-    return { spent, percentage: pct, status }
-  }
+      return { spent, percentage: pct, status }
+    },
+    [transactions, currentPeriod],
+  )
 
   function getCategoryName(id: string) {
     return categories.find((c) => c.id === id)?.name ?? 'Unknown'
@@ -184,6 +188,19 @@ export default function Budgets() {
     [categories],
   )
 
+  const totalBudgetProgress = useMemo(() => {
+    if (budgets.length === 0) return null
+    let totalSpent = 0
+    let totalBudget = 0
+    for (const b of budgets) {
+      const p = computeProgress(b)
+      totalSpent += p.spent
+      totalBudget += b.amount
+    }
+    const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
+    return { spent: totalSpent, total: totalBudget, percentage: pct }
+  }, [budgets, computeProgress])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -196,6 +213,29 @@ export default function Budgets() {
           Add Budget
         </Button>
       </div>
+
+      {totalBudgetProgress && (
+        <div className="rounded-xl border bg-card p-6">
+          <div className="flex items-center gap-6">
+            <BudgetGauge
+              percentage={totalBudgetProgress.percentage}
+              spent={formatCurrency(totalBudgetProgress.spent, baseCurrency)}
+              total={formatCurrency(totalBudgetProgress.total, baseCurrency)}
+            />
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold">Total Budget Usage</h2>
+              <p className="text-sm text-muted-foreground">
+                {totalBudgetProgress.percentage >= 100
+                  ? `Over budget by ${formatCurrency(totalBudgetProgress.spent - totalBudgetProgress.total, baseCurrency)}`
+                  : `${formatCurrency(totalBudgetProgress.total - totalBudgetProgress.spent, baseCurrency)} remaining across all budgets`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {budgets.length} budget{budgets.length !== 1 ? 's' : ''} tracked this period
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12">

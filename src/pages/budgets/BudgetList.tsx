@@ -1,19 +1,13 @@
 import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/currency'
+import { getBudgetColors, type BudgetStatus } from '@/lib/budget'
 import type { Budget, BudgetPeriod } from '@/types'
 import { Pencil, Trash2 } from 'lucide-react'
 
 interface BudgetProgress {
   spent: number
   percentage: number
-  status: 'good' | 'warning' | 'danger' | 'over'
-}
-
-const STATUS_COLORS: Record<BudgetProgress['status'], { bar: string; text: string }> = {
-  good: { bar: 'bg-jade', text: 'text-jade' },
-  warning: { bar: 'bg-amber-500', text: 'text-amber-600' },
-  danger: { bar: 'bg-orange-500', text: 'text-orange-600' },
-  over: { bar: 'bg-cinnabar', text: 'text-cinnabar' },
+  status: BudgetStatus
 }
 
 interface BudgetListProps {
@@ -39,7 +33,7 @@ export function BudgetList({
     <div className="grid gap-4 md:grid-cols-2">
       {budgets.map((budget) => {
         const progress = computeProgress(budget)
-        const colors = STATUS_COLORS[progress.status]
+        const colors = getBudgetColors(progress.status)
         return (
           <div key={budget.id} className="rounded-xl border bg-card p-5 space-y-4">
             <div className="flex items-start justify-between">

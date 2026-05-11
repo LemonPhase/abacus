@@ -16,30 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ICON_MAP, ICON_NAMES } from '@/lib/icons'
+import { CATEGORY_PICKER_COLORS as COLORS } from '@/lib/chartColors'
 import type { Category, CategoryKind } from '@/types'
-
-const COLORS = [
-  '#16a34a',
-  '#22c55e',
-  '#10b981',
-  '#34d399',
-  '#6ee7b7',
-  '#dc2626',
-  '#ef4444',
-  '#f97316',
-  '#f59e0b',
-  '#eab308',
-  '#3b82f6',
-  '#6366f1',
-  '#8b5cf6',
-  '#a855f7',
-  '#d946ef',
-  '#ec4899',
-  '#f43f5e',
-  '#14b8a6',
-  '#06b6d4',
-  '#64748b',
-]
 
 export interface CategoryFormData {
   name: string

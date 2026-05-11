@@ -27,6 +27,12 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
+import {
+  CHART_COLORS,
+  INCOME_COLOR,
+  EXPENSE_COLOR,
+  DEFAULT_CATEGORY_COLOR,
+} from '@/lib/chartColors'
 
 export default function Reports() {
   const loadAccounts = useAccountsStore((s) => s.load)
@@ -82,7 +88,7 @@ export default function Reports() {
       if (!map.has(key)) {
         map.set(key, {
           name: cat?.name ?? 'Unknown',
-          color: cat?.color ?? '#888',
+          color: cat?.color ?? DEFAULT_CATEGORY_COLOR,
           icon: cat?.icon ?? null,
           income: 0,
           expense: 0,
@@ -234,8 +240,18 @@ export default function Reports() {
                       <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} />
                       <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
-                      <Bar dataKey="income" fill="#22c55e" radius={[4, 4, 0, 0]} name="Income" />
-                      <Bar dataKey="expense" fill="#ef4444" radius={[4, 4, 0, 0]} name="Expense" />
+                      <Bar
+                        dataKey="income"
+                        fill={INCOME_COLOR}
+                        radius={[4, 4, 0, 0]}
+                        name="Income"
+                      />
+                      <Bar
+                        dataKey="expense"
+                        fill={EXPENSE_COLOR}
+                        radius={[4, 4, 0, 0]}
+                        name="Expense"
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -251,7 +267,7 @@ export default function Reports() {
                       <Line
                         type="monotone"
                         dataKey="netWorth"
-                        stroke="#3b82f6"
+                        stroke={CHART_COLORS[2]}
                         strokeWidth={2}
                         dot={false}
                         name="Net Worth"

@@ -12,12 +12,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import type { Category, CategoryKind } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
+import { NEW_CATEGORY_DEFAULT_COLOR } from '@/lib/chartColors'
 import { CategoryDialog, type CategoryFormData } from '@/pages/categories/CategoryDialog'
 
 const emptyForm: CategoryFormData = {
   name: '',
   type: 'expense',
-  color: '#16a34a',
+  color: NEW_CATEGORY_DEFAULT_COLOR,
   parentId: '',
   icon: '',
 }

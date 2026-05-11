@@ -1,3 +1,5 @@
+import { INVESTMENT_TYPE_COLORS as COLORS } from '@/lib/chartColors'
+
 export const INVESTMENT_TYPE_LABELS: Record<string, string> = {
   fixed_income: 'Fixed Income',
   index_fund: 'Index Fund',
@@ -8,12 +10,4 @@ export const INVESTMENT_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-export const INVESTMENT_TYPE_COLORS: Record<string, string> = {
-  fixed_income: '#3b82f6',
-  index_fund: '#22c55e',
-  stock: '#ef4444',
-  real_estate: '#f59e0b',
-  cash: '#8b5cf6',
-  crypto: '#ec4899',
-  other: '#64748b',
-}
+export const INVESTMENT_TYPE_COLORS: Record<string, string> = COLORS

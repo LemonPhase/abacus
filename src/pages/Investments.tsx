@@ -32,6 +32,7 @@ import {
   formatInvestmentValue,
 } from '@/lib/investments'
 import { INVESTMENT_TYPE_COLORS } from '@/pages/investments/constants'
+import { GROWTH_COLORS } from '@/lib/chartColors'
 import { InvestmentDialog, type InvestmentFormData } from '@/pages/investments/InvestmentDialog'
 import { InvestmentList } from '@/pages/investments/InvestmentList'
 import {
@@ -163,17 +164,6 @@ export default function Investments() {
       }
     })
   }, [plans, horizonYears, finalYear])
-
-  const GROWTH_COLORS = [
-    '#3b82f6',
-    '#22c55e',
-    '#f59e0b',
-    '#ef4444',
-    '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#f97316',
-  ]
 
   return (
     <div className="space-y-6">

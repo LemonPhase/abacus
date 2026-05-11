@@ -12,7 +12,9 @@ import {
   Cell,
 } from 'recharts'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
+import { BudgetGauge } from '@/components/budgets/BudgetGauge'
 import { Loader2, TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
+import { getBudgetColors, getBudgetStatus } from '@/lib/budget'
 import { Button } from '@/components/ui/button'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
@@ -21,6 +23,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
+import { CHART_COLORS, INCOME_COLOR, EXPENSE_COLOR } from '@/lib/chartColors'
 
 function StatCard({
   title,
@@ -79,19 +82,6 @@ function StatCard({
     </div>
   )
 }
-
-const CHART_COLORS = [
-  '#006b4d',
-  '#e23636',
-  '#5d5f5e',
-  '#c6c0ba',
-  '#8a807d',
-  '#4d4540',
-  '#ab8f70',
-  '#1c1917',
-  '#7e7570',
-  '#a09088',
-]
 
 export default function Dashboard() {
   const accounts = useAccountsStore((s) => s.accounts)
@@ -192,6 +182,31 @@ export default function Dashboard() {
     return total
   }, [budgets, transactions])
 
+  const aggregateBudgetProgress = useMemo(() => {
+    if (budgets.length === 0) return null
+    const now = new Date()
+    let totalSpent = 0
+    let totalBudget = 0
+    for (const b of budgets) {
+      totalBudget += b.amount
+      for (const t of transactions) {
+        if (t.type !== 'expense') continue
+        if (!t.categoryId) continue
+        if (!b.categoryIds.includes(t.categoryId)) continue
+        const d = new Date(t.date)
+        if (
+          b.period === 'monthly'
+            ? d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+            : d.getFullYear() === now.getFullYear()
+        ) {
+          totalSpent += t.baseAmount
+        }
+      }
+    }
+    const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
+    return { spent: totalSpent, total: totalBudget, percentage: pct }
+  }, [budgets, transactions])
+
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
   const isLoading = loadingAccounts || loadingTxn || loadingBudgets || loadingCategories
 
@@ -255,8 +270,13 @@ export default function Dashboard() {
                     />
                     <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" />
                     <ChartTooltip formatter={(v: number) => formatCurrency(v, baseCurrency)} />
-                    <Bar dataKey="income" fill="#006b4d" radius={[4, 4, 0, 0]} name="Income" />
-                    <Bar dataKey="expense" fill="#e23636" radius={[4, 4, 0, 0]} name="Expense" />
+                    <Bar dataKey="income" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} name="Income" />
+                    <Bar
+                      dataKey="expense"
+                      fill={EXPENSE_COLOR}
+                      radius={[4, 4, 0, 0]}
+                      name="Expense"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -371,7 +391,7 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-xl bg-card p-5 border border-border/30">
-              <h2 className="text-sm font-semibold tracking-tight mb-3">Active Budgets</h2>
+              <h2 className="text-sm font-semibold tracking-tight mb-4">Active Budgets</h2>
               {budgets.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
                   <p className="text-sm">No budgets yet</p>
@@ -380,50 +400,56 @@ export default function Dashboard() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {budgets.slice(0, 4).map((b) => {
-                    const now = new Date()
-                    let spent = 0
-                    for (const t of transactions) {
-                      if (t.type !== 'expense') continue
-                      if (!t.categoryId) continue
-                      if (!b.categoryIds.includes(t.categoryId)) continue
-                      const d = new Date(t.date)
-                      if (
-                        b.period === 'monthly'
-                          ? d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-                          : d.getFullYear() === now.getFullYear()
-                      ) {
-                        spent += t.baseAmount
+                <>
+                  {aggregateBudgetProgress && (
+                    <div className="flex items-center justify-center mb-4">
+                      <BudgetGauge
+                        percentage={aggregateBudgetProgress.percentage}
+                        spent={formatCurrency(aggregateBudgetProgress.spent, baseCurrency)}
+                        total={formatCurrency(aggregateBudgetProgress.total, baseCurrency)}
+                        size={140}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {budgets.slice(0, 4).map((b) => {
+                      const now = new Date()
+                      let spent = 0
+                      for (const t of transactions) {
+                        if (t.type !== 'expense') continue
+                        if (!t.categoryId) continue
+                        if (!b.categoryIds.includes(t.categoryId)) continue
+                        const d = new Date(t.date)
+                        if (
+                          b.period === 'monthly'
+                            ? d.getMonth() === now.getMonth() &&
+                              d.getFullYear() === now.getFullYear()
+                            : d.getFullYear() === now.getFullYear()
+                        ) {
+                          spent += t.baseAmount
+                        }
                       }
-                    }
-                    const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
-                    const color =
-                      pct >= 100
-                        ? 'bg-cinnabar'
-                        : pct >= 80
-                          ? 'bg-orange-500'
-                          : pct >= 50
-                            ? 'bg-amber-500'
-                            : 'bg-jade'
-                    return (
-                      <div key={b.id}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium">{b.name}</span>
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            {pct.toFixed(0)}%
-                          </span>
+                      const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
+                      const colors = getBudgetColors(getBudgetStatus(pct))
+                      return (
+                        <div key={b.id}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium">{b.name}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {pct.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${colors.bar}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${color}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                      )
+                    })}
+                  </div>
+                </>
               )}
             </div>
           </div>
