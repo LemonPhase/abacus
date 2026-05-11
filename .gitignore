@@ -28,6 +28,7 @@ coverage
 
 # Playwright
 test-results/
+.last-run.json
 
 # Supabase SQL snippets (personal scratchpad queries from the dashboard)
 supabase/snippets/

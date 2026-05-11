@@ -88,4 +88,10 @@ export default defineConfig([
       'design-system/no-hardcoded-colors': 'error',
     },
   },
+  {
+    files: ['e2e/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
 ])
