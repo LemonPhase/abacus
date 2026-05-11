@@ -20,6 +20,7 @@ function ensureTable(name: string): Record<string, unknown>[] {
 export function resetAllTables(): void {
   tables.clear()
   _counter = 0
+  _onAuthStateChangeCallback = null
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
@@ -315,6 +316,14 @@ function createMockChannel() {
   return channel
 }
 
+let _onAuthStateChangeCallback:
+  | ((event: string, session: Record<string, unknown> | null) => void)
+  | null = null
+
+export function simulateAuthEvent(event: string, session: Record<string, unknown> | null = null) {
+  _onAuthStateChangeCallback?.(event, session)
+}
+
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
   channel: vi.fn(() => createMockChannel()),
@@ -327,9 +336,20 @@ export const mockSupabase = {
     signInWithPassword: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
-    onAuthStateChange: vi.fn(() => ({
-      data: { subscription: { unsubscribe: vi.fn() } },
-    })),
+    onAuthStateChange: vi.fn(
+      (callback: (event: string, session: Record<string, unknown> | null) => void) => {
+        _onAuthStateChangeCallback = callback
+        return {
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(() => {
+                _onAuthStateChangeCallback = null
+              }),
+            },
+          },
+        }
+      },
+    ),
     getUser: vi.fn(),
     setSession: vi.fn(),
     refreshSession: vi.fn(),

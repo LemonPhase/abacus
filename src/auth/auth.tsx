@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/supabase/client'
 import { unsubscribeAll } from '@/supabase/realtime'
 import { useAccountsStore } from '@/stores/accountsStore'
@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -61,12 +62,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
         })
       }
+      if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth/reset-password') {
+        navigate('/auth/reset-password', { replace: true })
+      }
       setSession(session)
       setUser(session?.user ?? null)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [navigate])
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })

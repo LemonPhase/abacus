@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth, AuthGuard } from '@/auth/auth'
-import { mockSupabase } from '@/test/supabase-mock'
+import { mockSupabase, simulateAuthEvent } from '@/test/supabase-mock'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -171,6 +171,68 @@ describe('AuthProvider', () => {
     })
 
     await expect(capturedUpdatePassword!('short')).rejects.toThrow('Password too short')
+  })
+
+  it('navigates to /auth/reset-password on PASSWORD_RECOVERY event when not already there', async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+
+    function PathDisplay() {
+      const location = useLocation()
+      return <div data-testid="pathname">{location.pathname}</div>
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <AuthProvider>
+          <PathDisplay />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname')).toHaveTextContent('/')
+    })
+
+    await act(async () => {
+      simulateAuthEvent('PASSWORD_RECOVERY', {
+        user: { id: 'u1', email: 'test@example.com' },
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname')).toHaveTextContent('/auth/reset-password')
+    })
+  })
+
+  it('does not navigate on PASSWORD_RECOVERY when already on reset-password page', async () => {
+    mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null })
+
+    function PathDisplay() {
+      const location = useLocation()
+      return <div data-testid="pathname">{location.pathname}</div>
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/auth/reset-password']}>
+        <AuthProvider>
+          <PathDisplay />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname')).toHaveTextContent('/auth/reset-password')
+    })
+
+    await act(async () => {
+      simulateAuthEvent('PASSWORD_RECOVERY', {
+        user: { id: 'u1', email: 'test@example.com' },
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pathname')).toHaveTextContent('/auth/reset-password')
+    })
   })
 })
 
