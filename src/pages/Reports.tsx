@@ -67,6 +67,8 @@ export default function Reports() {
     })
   }, [transactions, dateFrom, dateTo])
 
+  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+
   const summary = useMemo(() => {
     let income = 0
     let expense = 0
@@ -83,7 +85,7 @@ export default function Reports() {
       { name: string; color: string; icon: string | null; income: number; expense: number }
     >()
     for (const t of filteredTxn) {
-      const cat = categories.find((c) => c.id === t.categoryId)
+      const cat = t.categoryId ? categoryMap.get(t.categoryId) : undefined
       const key = cat?.id ?? t.categoryId ?? '__uncategorized__'
       if (!map.has(key)) {
         map.set(key, {
@@ -99,7 +101,7 @@ export default function Reports() {
       if (t.type === 'expense') entry.expense += t.baseAmount
     }
     return Array.from(map.values()).sort((a, b) => b.expense + b.income - (a.expense + a.income))
-  }, [filteredTxn, categories])
+  }, [filteredTxn, categoryMap])
 
   const netWorthTimeline = useMemo(() => {
     const from = new Date(dateFrom)

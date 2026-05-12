@@ -1,5 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '@/supabase/client'
 import { unsubscribeAll } from '@/supabase/realtime'
@@ -23,6 +31,8 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined)
+
+const appUrl = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/+$/, '')
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -72,33 +82,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [navigate])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
-  }
+  }, [])
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
     if (error) throw new Error(error.message)
-  }
+  }, [])
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
-  }
+  }, [])
 
-  const appUrl = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/+$/, '')
-
-  const resetPasswordForEmail = async (email: string) => {
+  const resetPasswordForEmail = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${appUrl ?? window.location.origin}/auth/reset-password`,
     })
     if (error) throw new Error(error.message)
-  }
+  }, [])
 
-  const updatePassword = async (password: string) => {
+  const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) throw new Error(error.message)
-  }
+  }, [])
 
   const value = useMemo(
     () => ({

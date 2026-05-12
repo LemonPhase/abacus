@@ -108,6 +108,10 @@ export default function Dashboard() {
 
   const netWorth = useMemo(() => accounts.reduce((sum, a) => sum + a.balance, 0), [accounts])
 
+  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
+
+  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
+
   const monthlyData = useMemo(() => {
     const now = new Date()
     const months: { label: string; income: number; expense: number }[] = []
@@ -142,13 +146,13 @@ export default function Dashboard() {
       if (t.type !== 'expense') continue
       const d = new Date(t.date)
       if (d < start || d > end) continue
-      const name = categories.find((c) => c.id === t.categoryId)?.name ?? 'Other'
+      const name = (t.categoryId && categoryMap.get(t.categoryId)?.name) || 'Other'
       map.set(name, (map.get(name) ?? 0) + t.baseAmount)
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [transactions, categories])
+  }, [transactions, categoryMap])
 
   const currentMonthIncome = useMemo(() => {
     if (monthlyData.length === 0) return 0
@@ -363,7 +367,7 @@ export default function Dashboard() {
                           {tx.description ||
                             (tx.type === 'transfer'
                               ? 'Transfer'
-                              : categories.find((c) => c.id === tx.categoryId)?.name ||
+                              : (tx.categoryId && categoryMap.get(tx.categoryId)?.name) ||
                                 'Transaction')}
                         </p>
                         <p className="text-xs text-muted-foreground">
@@ -371,7 +375,7 @@ export default function Dashboard() {
                             month: 'short',
                             day: 'numeric',
                           })}{' '}
-                          · {accounts.find((a) => a.id === tx.accountId)?.name}
+                          · {accountMap.get(tx.accountId)?.name}
                         </p>
                       </div>
                       <span

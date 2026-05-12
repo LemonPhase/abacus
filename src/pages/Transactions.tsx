@@ -116,7 +116,7 @@ export default function Transactions() {
       next.delete('add')
       setSearchParams(next, { replace: true })
     }
-  }, [searchParams, loading])
+  }, [searchParams, setSearchParams, loading])
 
   const filteredTxn = useMemo(() => {
     return transactions.filter((t) => {
