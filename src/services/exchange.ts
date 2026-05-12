@@ -7,6 +7,7 @@ const API_BASE = 'https://open.er-api.com/v6/latest'
 export async function fetchExchangeRate(from: string, to: string): Promise<number | null> {
   try {
     const resp = await fetch(`${API_BASE}/${from}`)
+    if (!resp.ok) return null
     const data = await resp.json()
     if (data.result === 'success' && data.rates[to]) {
       return data.rates[to] as number
@@ -36,7 +37,7 @@ export async function getOrFetchRate(from: string, to: string, date: Date): Prom
 
   const rate = await fetchExchangeRate(from, to)
   if (rate) {
-    const { error: insertError } = await supabase.from('exchange_rates').insert(
+    void supabase.from('exchange_rates').insert(
       mapKeysToSnake({
         fromCurrency: from,
         toCurrency: to,
@@ -44,7 +45,6 @@ export async function getOrFetchRate(from: string, to: string, date: Date): Prom
         date: dateStr,
       }) as Database['public']['Tables']['exchange_rates']['Insert'],
     )
-    if (insertError) return null
     return rate
   }
 

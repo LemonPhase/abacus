@@ -52,10 +52,11 @@ export default function Settings() {
         exportedAt: new Date().toISOString(),
       }
 
-      for (const table of TABLES) {
-        const { data: rows, error } = await supabase.from(table).select('*')
+      const results = await Promise.all(TABLES.map((table) => supabase.from(table).select('*')))
+      for (let i = 0; i < TABLES.length; i++) {
+        const { data: rows, error } = results[i]
         if (error) throw error
-        data[table] = rows ?? []
+        data[TABLES[i]] = rows ?? []
       }
 
       const json = JSON.stringify(data, null, 2)
@@ -110,21 +111,24 @@ export default function Settings() {
         }
       }
 
-      // Delete all existing rows from each table
-      for (const table of TABLES) {
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .neq('id', '00000000-0000-0000-0000-000000000000')
-        if (error) throw error
+      // Delete all existing rows from each table (parallel)
+      const deleteResults = await Promise.all(
+        TABLES.map((table) =>
+          supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        ),
+      )
+      for (const result of deleteResults) {
+        if (result.error) throw result.error
       }
 
-      // Import data from each table
-      for (const table of TABLES) {
-        const rows = data[table]
-        if (rows?.length) {
-          const { error } = await supabase.from(table).insert(rows)
-          if (error) throw error
+      // Import data from each table (parallel)
+      const inserts = TABLES.filter((table) => data[table]?.length).map((table) =>
+        supabase.from(table).insert(data[table]),
+      )
+      if (inserts.length > 0) {
+        const insertResults = await Promise.all(inserts)
+        for (const result of insertResults) {
+          if (result.error) throw result.error
         }
       }
 

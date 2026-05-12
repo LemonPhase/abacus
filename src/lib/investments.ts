@@ -27,21 +27,22 @@ export function calculateTotalProjection(
   horizonYears: number,
 ): ProjectionYear[] {
   if (plans.length === 0) return []
-  const combined: ProjectionYear[] = []
 
-  for (let y = 1; y <= horizonYears; y++) {
+  // Pre-compute each plan's full projection once (O(P × H))
+  const planProjections = plans.map((p) => calculateProjection(p, horizonYears))
+
+  const combined: ProjectionYear[] = []
+  for (let y = 0; y < horizonYears; y++) {
     let totalValue = 0
     let totalInvested = 0
 
-    for (const plan of plans) {
-      const projection = calculateProjection(plan, y)
-      const yearData = projection[projection.length - 1]
-      totalValue += yearData.totalValue
-      totalInvested += yearData.principal
+    for (const projection of planProjections) {
+      totalValue += projection[y].totalValue
+      totalInvested += projection[y].principal
     }
 
     combined.push({
-      year: y,
+      year: y + 1,
       principal: totalInvested,
       returns: totalValue - totalInvested,
       totalValue: Math.round(totalValue * 100) / 100,

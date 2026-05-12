@@ -16,6 +16,7 @@ afterEach(() => {
 describe('fetchExchangeRate', () => {
   it('returns rate on successful API response', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ result: 'success', rates: { EUR: 0.92 } }),
     })
 
@@ -23,8 +24,16 @@ describe('fetchExchangeRate', () => {
     expect(rate).toBe(0.92)
   })
 
+  it('returns null on non-ok HTTP response', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 404 })
+
+    const rate = await fetchExchangeRate('USD', 'EUR')
+    expect(rate).toBeNull()
+  })
+
   it('returns null when API result is not success', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ result: 'error', rates: {} }),
     })
 
@@ -34,6 +43,7 @@ describe('fetchExchangeRate', () => {
 
   it('returns null when target currency not in rates', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ result: 'success', rates: { GBP: 0.78 } }),
     })
 
@@ -57,6 +67,7 @@ describe('getOrFetchRate', () => {
 
   it('fetches from API when not cached and stores result', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ result: 'success', rates: { EUR: 0.92 } }),
     })
 
@@ -80,6 +91,7 @@ describe('convertCurrency', () => {
 
   it('converts amount using fetched rate', async () => {
     mockFetch.mockResolvedValueOnce({
+      ok: true,
       json: () => Promise.resolve({ result: 'success', rates: { JPY: 150 } }),
     })
 
