@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/table'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
 
@@ -31,15 +32,16 @@ const TYPE_COLORS: Record<AccountType, string> = {
   cash: 'outline',
 }
 
-const emptyForm: AccountFormData = {
-  name: '',
-  type: 'checking',
-  currency: 'USD',
-  balance: '',
-  notes: '',
-}
-
 export default function Accounts() {
+  const baseCurrency = useSettingsStore((s) => s.baseCurrency)
+  const getEmptyForm = (): AccountFormData => ({
+    name: '',
+    type: 'checking',
+    currency: baseCurrency,
+    balance: '',
+    notes: '',
+  })
+
   const accounts = useAccountsStore((s) => s.accounts)
   const loading = useAccountsStore((s) => s.loading)
   const load = useAccountsStore((s) => s.load)
@@ -49,7 +51,7 @@ export default function Accounts() {
   const transactions = useTransactionsStore((s) => s.transactions)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
-  const [form, setForm] = useState<AccountFormData>(emptyForm)
+  const [form, setForm] = useState<AccountFormData>(getEmptyForm())
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null)
 
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function Accounts() {
 
   function openAdd() {
     setEditing(null)
-    setForm(emptyForm)
+    setForm(getEmptyForm())
     setDialogOpen(true)
   }
 
