@@ -79,7 +79,7 @@ describe('Auth Page', () => {
 
     const { user } = renderAuthPage()
     await waitFor(() => {
-      expect(screen.getByLabelText('Email')).toBeInTheDocument()
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
     })
 
     await user.type(screen.getByLabelText('Email'), 'bad@b.com')
@@ -89,6 +89,8 @@ describe('Auth Page', () => {
     await waitFor(() => {
       expect(screen.getByText('Invalid login credentials')).toBeInTheDocument()
     })
+
+    expect(document.querySelector('.lucide-circle-alert')).toBeInTheDocument()
   })
 
   it('calls signUp on sign up mode submit', async () => {
@@ -105,6 +107,7 @@ describe('Auth Page', () => {
     await user.click(screen.getByRole('button', { name: 'Sign up' }))
     await user.type(screen.getByLabelText('Email'), 'new@b.com')
     await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.type(screen.getByLabelText('Confirm Password'), 'pass123')
     await user.click(screen.getByRole('button', { name: 'Sign Up' }))
 
     await waitFor(() => {
@@ -209,5 +212,156 @@ describe('Auth Page', () => {
 
     await user.click(screen.getByRole('button', { name: 'Back to sign in' }))
     expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+  })
+
+  it('validates email format and blocks submission', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Email'), 'notanemail')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument()
+    })
+    expect(mockSupabase.auth.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('clears email field error when user edits email', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Email'), 'bad')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Email'), '@test.com')
+
+    await waitFor(() => {
+      expect(screen.queryByText('Please enter a valid email address')).not.toBeInTheDocument()
+    })
+  })
+
+  it('requires confirm password on signup', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await user.type(screen.getByLabelText('Email'), 'new@test.com')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Please confirm your password')).toBeInTheDocument()
+    })
+    expect(mockSupabase.auth.signUp).not.toHaveBeenCalled()
+  })
+
+  it('validates confirm password matches on signup', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await user.type(screen.getByLabelText('Email'), 'new@test.com')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.type(screen.getByLabelText('Confirm Password'), 'different')
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+    })
+    expect(mockSupabase.auth.signUp).not.toHaveBeenCalled()
+  })
+
+  it('clears confirm password error when user edits', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await user.type(screen.getByLabelText('Email'), 'new@test.com')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.type(screen.getByLabelText('Confirm Password'), 'different')
+    await user.click(screen.getByRole('button', { name: 'Sign Up' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Passwords do not match')).toBeInTheDocument()
+    })
+
+    await user.clear(screen.getByLabelText('Confirm Password'))
+    await user.type(screen.getByLabelText('Confirm Password'), 'pass123')
+
+    await waitFor(() => {
+      expect(screen.queryByText('Passwords do not match')).not.toBeInTheDocument()
+    })
+  })
+
+  it('toggles password visibility', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    const passwordInput = screen.getByLabelText('Password')
+    expect(passwordInput).toHaveAttribute('type', 'password')
+
+    await user.click(screen.getByRole('button', { name: 'Show password' }))
+    expect(passwordInput).toHaveAttribute('type', 'text')
+
+    await user.click(screen.getByRole('button', { name: 'Hide password' }))
+    expect(passwordInput).toHaveAttribute('type', 'password')
+  })
+
+  it('validates password is not empty on signin', async () => {
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Email'), 'a@b.com')
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Please enter your password')).toBeInTheDocument()
+    })
+    expect(mockSupabase.auth.signInWithPassword).not.toHaveBeenCalled()
+  })
+
+  it('shows spinner and disables button during submission', async () => {
+    let resolvePromise: (value?: unknown) => void
+    const promise = new Promise<unknown>((resolve) => {
+      resolvePromise = resolve
+    })
+    mockSupabase.auth.signInWithPassword.mockReturnValue(promise)
+
+    const { user } = renderAuthPage()
+    await waitFor(() => {
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument()
+    })
+
+    await user.type(screen.getByLabelText('Email'), 'a@b.com')
+    await user.type(screen.getByLabelText('Password'), 'pass123')
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    await waitFor(() => {
+      const submitButton = document.querySelector('button[type="submit"]')
+      expect(submitButton).toBeDisabled()
+    })
+
+    resolvePromise!({ data: { user: null, session: null }, error: null })
   })
 })
