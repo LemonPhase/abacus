@@ -42,7 +42,14 @@ jobs:
       - run: npm ci
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
+      - name: Start local Supabase
+        run: npx supabase start
+      - name: Export Supabase env for dev server
+        run: |
+          eval "$(npx supabase status -o env)"
+          echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> "$GITHUB_ENV"
       - run: npm run test:e2e
-        env:
-          VITE_SUPABASE_URL: http://127.0.0.1:54321
-          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_e2e_test_key
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop
