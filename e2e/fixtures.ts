@@ -1,5 +1,5 @@
 import { test as base, expect } from '@playwright/test'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * E2E fixtures backed by a real local Supabase stack.
@@ -57,6 +57,16 @@ export async function deleteTestUser(id: string): Promise<void> {
   await adminClient.auth.admin.deleteUser(id).catch(() => undefined)
 }
 
+/**
+ * Look up a user by email and delete them. Used by sign-up flow tests where
+ * the user is created via the UI and we never see the id directly.
+ */
+export async function deleteUserByEmail(email: string): Promise<void> {
+  const { data } = await adminClient.auth.admin.listUsers({ perPage: 200 })
+  const match = data?.users.find((u) => u.email === email)
+  if (match) await deleteTestUser(match.id)
+}
+
 async function fetchSession(email: string, password: string) {
   const client = createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -66,12 +76,41 @@ async function fetchSession(email: string, password: string) {
   return data.session
 }
 
+// The app runs at this origin; supabase-js writes its session to localStorage
+// scoped here, not to the Supabase API origin.
+const APP_ORIGIN = 'http://localhost:5173'
+
+/**
+ * Sign in a fresh PostgREST client as the given user. Use this to seed DB
+ * state directly from a test instead of going through the UI — much faster
+ * and the `set_user_id` trigger relies on `auth.uid()` so the admin/service
+ * role can't write on the user's behalf.
+ */
+export async function signedInClient(user: TestUser): Promise<SupabaseClient> {
+  const client = createClient(SUPABASE_URL, PUBLISHABLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  const { error } = await client.auth.signInWithPassword({
+    email: user.email,
+    password: user.password,
+  })
+  if (error) throw error
+  return client
+}
+
 /**
  * Authenticated fixture — seeds a real session in localStorage so AuthGuard
  * allows access to `/app/*` routes. The user is created before the test and
  * deleted after; FK cascade removes any rows the test inserted.
+ *
+ * Uses Playwright's `storageState` fixture (not `addInitScript`) so that the
+ * session is written once at context creation. `addInitScript` would re-run
+ * on every navigation and undo any sign-out the test performs.
+ *
+ * `userSupabase` is a Supabase client signed in as `testUser`, available for
+ * tests that need to seed DB state directly.
  */
-export const test = base.extend<{ testUser: TestUser }>({
+export const test = base.extend<{ testUser: TestUser; userSupabase: SupabaseClient }>({
   // eslint-disable-next-line no-empty-pattern -- Playwright requires destructuring the worker arg even when no fixtures are consumed
   testUser: async ({}, use) => {
     const user = await createTestUser()
@@ -81,15 +120,21 @@ export const test = base.extend<{ testUser: TestUser }>({
       await deleteTestUser(user.id)
     }
   },
-  page: async ({ page, testUser }, use) => {
+  storageState: async ({ testUser }, use) => {
     const session = await fetchSession(testUser.email, testUser.password)
-    await page.addInitScript(
-      ({ key, value }: { key: string; value: string }) => {
-        localStorage.setItem(key, value)
-      },
-      { key: STORAGE_KEY, value: JSON.stringify(session) },
-    )
-    await use(page)
+    await use({
+      cookies: [],
+      origins: [
+        {
+          origin: APP_ORIGIN,
+          localStorage: [{ name: STORAGE_KEY, value: JSON.stringify(session) }],
+        },
+      ],
+    })
+  },
+  userSupabase: async ({ testUser }, use) => {
+    const client = await signedInClient(testUser)
+    await use(client)
   },
 })
 
