@@ -16,6 +16,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Accounts')).toBeInTheDocument()
     expect(screen.getByText('Transactions')).toBeInTheDocument()
+    expect(screen.getByText('Recurring')).toBeInTheDocument()
     expect(screen.getByText('Budgets')).toBeInTheDocument()
     expect(screen.getByText('Reports')).toBeInTheDocument()
     expect(screen.getByText('Settings')).toBeInTheDocument()
@@ -29,6 +30,7 @@ describe('MobileNav', () => {
       'Dashboard',
       'Accounts',
       'Transactions',
+      'Recurring',
       'Budgets',
       'Reports',
       'Categories',
@@ -38,7 +40,7 @@ describe('MobileNav', () => {
     for (const label of labels) {
       expect(screen.getByTitle(label)).toBeInTheDocument()
     }
-    // Verify all 8 nav links are present
-    expect(screen.getAllByRole('link')).toHaveLength(8)
+    // Verify all 9 nav links are present
+    expect(screen.getAllByRole('link')).toHaveLength(9)
   })
 })

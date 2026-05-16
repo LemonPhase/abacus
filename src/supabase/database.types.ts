@@ -225,6 +225,81 @@ export type Database = {
         }
         Relationships: []
       }
+      recurring_transactions: {
+        Row: {
+          id: string
+          user_id: string
+          created_at: string
+          updated_at: string
+          account_id: string
+          category_id: string | null
+          type: string
+          amount: number
+          currency: string
+          description: string | null
+          frequency: string
+          interval_value: number
+          day_of_month: number | null
+          start_date: string
+          end_date: string | null
+          next_date: string
+          is_active: boolean
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          created_at?: string
+          updated_at?: string
+          account_id: string
+          category_id?: string | null
+          type: string
+          amount: number
+          currency?: string
+          description?: string | null
+          frequency: string
+          interval_value?: number
+          day_of_month?: number | null
+          start_date?: string
+          end_date?: string | null
+          next_date?: string
+          is_active?: boolean
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          created_at?: string
+          updated_at?: string
+          account_id?: string
+          category_id?: string | null
+          type?: string
+          amount?: number
+          currency?: string
+          description?: string | null
+          frequency?: string
+          interval_value?: number
+          day_of_month?: number | null
+          start_date?: string
+          end_date?: string | null
+          next_date?: string
+          is_active?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           account_id: string

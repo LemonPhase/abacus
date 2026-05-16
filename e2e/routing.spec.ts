@@ -68,6 +68,7 @@ test.describe('App pages (authenticated)', () => {
     const navLinks = [
       { label: 'Accounts', heading: 'Accounts' },
       { label: 'Transactions', heading: 'Transactions' },
+      { label: 'Recurring', heading: 'Recurring' },
       { label: 'Budgets', heading: 'Budgets' },
       { label: 'Reports', heading: 'Reports' },
       { label: 'Categories', heading: 'Categories' },
@@ -96,6 +97,13 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByRole('button', { name: 'Import CSV' })).toBeVisible()
     // Header "Add Transaction" button (not FAB) — use first match
     await expect(page.getByRole('button', { name: 'Add Transaction' }).first()).toBeVisible()
+  })
+
+  test('recurring page shows empty state', async ({ page }) => {
+    await page.goto('/app/recurring')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Recurring')
+    await expect(page.getByText('No recurring transactions')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add Recurring' })).toBeVisible()
   })
 
   test('budgets page shows empty state', async ({ page }) => {

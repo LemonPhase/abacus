@@ -108,4 +108,29 @@ export type NewTransaction = Omit<
   Transaction,
   'id' | 'baseAmount' | 'baseCurrency' | 'createdAt' | 'updatedAt'
 >
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
+
+export type RecurringTransactionKind = 'income' | 'expense'
+
+export interface RecurringTransaction {
+  id: string
+  accountId: string
+  categoryId: string | null
+  type: RecurringTransactionKind
+  amount: number
+  currency: string
+  description?: string
+  frequency: RecurringFrequency
+  intervalValue: number
+  dayOfMonth?: number | null
+  startDate: Date
+  endDate?: Date | null
+  nextDate: Date
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export type NewRecurringTransaction = Omit<RecurringTransaction, 'id' | 'createdAt' | 'updatedAt'>
+
 export type NewBudget = Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>

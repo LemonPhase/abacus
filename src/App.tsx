@@ -17,6 +17,7 @@ import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
 import Accounts from '@/pages/Accounts'
 import Transactions from '@/pages/Transactions'
+import RecurringTransactions from '@/pages/RecurringTransactions'
 import Budgets from '@/pages/Budgets'
 import Categories from '@/pages/Categories'
 import NotFound from '@/pages/NotFound'
@@ -79,6 +80,7 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="transactions" element={<Transactions />} />
+              <Route path="recurring" element={<RecurringTransactions />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />
               <Route path="categories" element={<Categories />} />
