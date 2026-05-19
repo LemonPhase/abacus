@@ -20,12 +20,12 @@
 
 ## Architecture
 
-- **React 19 + React Router v7** SPA. 10 page routes in `src/pages/`.
+- **React 19 + React Router v7** SPA. 13 page components in `src/pages/` (9 app pages: Accounts, Budgets, Categories, Dashboard, Investments, RecurringTransactions, Reports, Settings, Transactions; 2 auth pages: Auth, ResetPassword; plus Landing, NotFound).
 - **Supabase** backend (`@supabase/supabase-js`). Auth is mandatory — all routes except `/auth` and `/reset-password` are behind `AuthGuard` (`src/auth/auth.tsx`). Client configured in `src/supabase/client.ts`.
-- **Database schema** source of truth: `supabase/migrations/`. Use `npm run db:push` to apply migrations to the remote database. 6 tables: `accounts`, `categories`, `transactions`, `budgets`, `exchange_rates`, `investment_plans`. All tables have RLS via `auth.uid() = user_id`. A `maintain_account_balance` trigger on `transactions` keeps account balances in sync. Generated types in `src/supabase/database.types.ts`.
+- **Database schema** source of truth: `supabase/migrations/`. Use `npm run db:push` to apply migrations to the remote database. 7 tables: `accounts`, `categories`, `transactions`, `budgets`, `exchange_rates`, `investment_plans`, `recurring_transactions`. All tables have RLS via `auth.uid() = user_id`. A `maintain_account_balance` trigger on `transactions` keeps account balances in sync. Generated types in `src/supabase/database.types.ts`.
 - **Realtime**: Supabase Realtime subscriptions via `src/supabase/realtime.ts` — `subscribeToTable(table, handler)` wraps Postgres changes channels.
 - **Tauri v2 desktop wrapper** (`src-tauri/`). Frontend build output is `dist/`. Tauri commands via `npm run tauri`.
-- **Zustand stores** in `src/stores/` — one per domain: `accountsStore`, `budgetsStore`, `categoriesStore`, `investmentPlansStore`, `transactionsStore`, `settingsStore`.
+- **Zustand stores** in `src/stores/` — one per domain: `accountsStore`, `budgetsStore`, `categoriesStore`, `investmentPlansStore`, `recurringTransactionsStore`, `transactionsStore`, `settingsStore`.
 - **shadcn/ui** components in `src/components/ui/` (base-nova style, icon library: lucide-react).
 - **PWA** via `vite-plugin-pwa` with auto-registering service worker.
 - **Charts**: `recharts` for visualization. **CSV**: `papaparse` for import/export.
@@ -97,6 +97,7 @@ src/test/
 ├── components/           # Shared component tests
 ├── auth/                 # Auth tests
 └── pages/                # Page-level tests
+    └── recurring/        # Recurring transactions tests
 ```
 
 - Tests mirror the source directory structure.
@@ -126,11 +127,12 @@ src/test/
 ### Adding a new feature (checklist)
 
 1. Types: add domain interface + `New*` type to `src/types/index.ts`
-2. Store: create store using `createCrudSlice`, add custom selectors
-3. Page: create route component in `src/pages/`, extract dialogs to subfolder
-4. Test: add tests in `src/test/pages/` and/or `src/test/stores/`
-5. Route: add to `src/App.tsx` inside `AuthGuard`
-6. Verify: run `npm test && npm run build` — both must pass
+2. Migration: if the feature needs a new table, add a migration in `supabase/migrations/` and regenerate types (`npx supabase gen types typescript --local > src/supabase/database.types.ts`)
+3. Store: create store using `createCrudSlice`, add custom selectors
+4. Page: create route component in `src/pages/`, extract dialogs to subfolder
+5. Test: add tests in `src/test/pages/` and/or `src/test/stores/`
+6. Route: add to `src/App.tsx` inside `AuthGuard`
+7. Verify: run `npm test && npm run build` — both must pass
 
 ## Tailwind CSS v4
 
