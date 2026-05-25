@@ -287,6 +287,75 @@ describe('Categories Store', () => {
     expect(children).toHaveLength(2)
     expect(children.map((c) => c.name).sort()).toEqual(['Dining Out', 'Groceries'])
   })
+  it('reorder swaps sort_order with adjacent sibling (down)', async () => {
+    const store = useCategoriesStore.getState()
+    const a = await store.add({ name: 'A', type: 'expense', color: '#ff0000' })
+    const b = await store.add({ name: 'B', type: 'expense', color: '#00ff00' })
+
+    // a.sortOrder = 0, b.sortOrder = 1 (added sequentially)
+    await store.reorder(a.id, 'down')
+
+    const state = useCategoriesStore.getState()
+    const aAfter = state.categories.find((c) => c.id === a.id)!
+    const bAfter = state.categories.find((c) => c.id === b.id)!
+    expect(aAfter.sortOrder).toBe(1)
+    expect(bAfter.sortOrder).toBe(0)
+  })
+
+  it('reorder swaps sort_order with adjacent sibling (up)', async () => {
+    const store = useCategoriesStore.getState()
+    const a = await store.add({ name: 'A', type: 'expense', color: '#ff0000' })
+    const b = await store.add({ name: 'B', type: 'expense', color: '#00ff00' })
+
+    await store.reorder(b.id, 'up')
+
+    const state = useCategoriesStore.getState()
+    const aAfter = state.categories.find((c) => c.id === a.id)!
+    const bAfter = state.categories.find((c) => c.id === b.id)!
+    expect(aAfter.sortOrder).toBe(1)
+    expect(bAfter.sortOrder).toBe(0)
+  })
+
+  it('reorder at boundaries is a no-op', async () => {
+    const store = useCategoriesStore.getState()
+    const a = await store.add({ name: 'A', type: 'expense', color: '#ff0000' })
+
+    // Moving first item up does nothing
+    await store.reorder(a.id, 'up')
+    const aAfter = useCategoriesStore.getState().categories.find((c) => c.id === a.id)!
+    expect(aAfter.sortOrder).toBe(0)
+
+    // Moving last item down does nothing
+    await store.reorder(a.id, 'down')
+    const aAfter2 = useCategoriesStore.getState().categories.find((c) => c.id === a.id)!
+    expect(aAfter2.sortOrder).toBe(0)
+  })
+
+  it('reorder only swaps within same type and parent', async () => {
+    const store = useCategoriesStore.getState()
+    const expense1 = await store.add({ name: 'Food', type: 'expense', color: '#ff0000' })
+    await store.add({ name: 'Salary', type: 'income', color: '#00ff00' })
+
+    // Moving expense down when the next sibling is a different type should be a no-op
+    await store.reorder(expense1.id, 'down')
+    const state = useCategoriesStore.getState()
+    const e1 = state.categories.find((c) => c.id === expense1.id)!
+    expect(e1.sortOrder).toBe(0)
+  })
+
+  it('new category gets next sortOrder after max sibling', async () => {
+    const store = useCategoriesStore.getState()
+    const a = await store.add({ name: 'A', type: 'expense', color: '#ff0000' })
+    const b = await store.add({ name: 'B', type: 'expense', color: '#00ff00' })
+
+    // They should have sequential sort orders
+    expect(a.sortOrder).toBe(0)
+    expect(b.sortOrder).toBe(1)
+
+    // A new income category starts at 0 (no income siblings yet)
+    const income = await store.add({ name: 'Salary', type: 'income', color: '#0000ff' })
+    expect(income.sortOrder).toBe(0)
+  })
 })
 
 describe('Transactions Store', () => {

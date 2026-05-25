@@ -20,6 +20,7 @@ export interface Category {
   parentId?: string
   color: string
   icon?: string
+  sortOrder: number
   createdAt: Date
   updatedAt: Date
 }
@@ -103,7 +104,7 @@ export interface UserSettings {
 }
 
 export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
-export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'sortOrder'>
 export type NewTransaction = Omit<
   Transaction,
   'id' | 'baseAmount' | 'baseCurrency' | 'createdAt' | 'updatedAt'

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,9 +32,19 @@ interface CategoryItemProps {
   categories: Category[]
   onEdit: (cat: Category) => void
   onDelete: (cat: Category) => void
+  onMoveUp: (cat: Category) => void
+  onMoveDown: (cat: Category) => void
 }
 
-function CategoryItem({ cat, level, categories, onEdit, onDelete }: CategoryItemProps) {
+function CategoryItem({
+  cat,
+  level,
+  categories,
+  onEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: CategoryItemProps) {
   const children = categories.filter((c) => c.parentId === cat.id)
   const CatIcon = ICON_MAP[cat.icon ?? '']
   return (
@@ -53,6 +63,12 @@ function CategoryItem({ cat, level, categories, onEdit, onDelete }: CategoryItem
           {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
         </div>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon-xs" onClick={() => onMoveUp(cat)}>
+            <ChevronUp className="size-3" />
+          </Button>
+          <Button variant="ghost" size="icon-xs" onClick={() => onMoveDown(cat)}>
+            <ChevronDown className="size-3" />
+          </Button>
           <Button variant="ghost" size="icon-xs" onClick={() => onEdit(cat)}>
             <Pencil className="size-3" />
           </Button>
@@ -69,6 +85,8 @@ function CategoryItem({ cat, level, categories, onEdit, onDelete }: CategoryItem
           categories={categories}
           onEdit={onEdit}
           onDelete={onDelete}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
         />
       ))}
     </div>
@@ -80,9 +98,18 @@ interface CategoryListProps {
   categories: Category[]
   onEdit: (cat: Category) => void
   onDelete: (cat: Category) => void
+  onMoveUp: (cat: Category) => void
+  onMoveDown: (cat: Category) => void
 }
 
-function CategoryList({ type, categories, onEdit, onDelete }: CategoryListProps) {
+function CategoryList({
+  type,
+  categories,
+  onEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+}: CategoryListProps) {
   const roots = categories.filter((c) => c.type === type && !c.parentId)
   if (roots.length === 0) {
     return (
@@ -101,6 +128,8 @@ function CategoryList({ type, categories, onEdit, onDelete }: CategoryListProps)
           categories={categories}
           onEdit={onEdit}
           onDelete={onDelete}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
         />
       ))}
     </div>
@@ -114,6 +143,7 @@ export default function Categories() {
   const add = useCategoriesStore((s) => s.add)
   const update = useCategoriesStore((s) => s.update)
   const remove = useCategoriesStore((s) => s.remove)
+  const reorder = useCategoriesStore((s) => s.reorder)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Category | null>(null)
   const [form, setForm] = useState<CategoryFormData>(emptyForm)
@@ -187,6 +217,22 @@ export default function Categories() {
     }
   }
 
+  async function handleMoveUp(cat: Category) {
+    try {
+      await reorder(cat.id, 'up')
+    } catch {
+      // Error is already in the store
+    }
+  }
+
+  async function handleMoveDown(cat: Category) {
+    try {
+      await reorder(cat.id, 'down')
+    } catch {
+      // Error is already in the store
+    }
+  }
+
   const parentOptions = editing
     ? categories.filter((c) => c.type === form.type && !c.parentId && c.id !== editing.id)
     : categories.filter((c) => c.type === form.type && !c.parentId)
@@ -221,6 +267,8 @@ export default function Categories() {
                 categories={categories}
                 onEdit={openEdit}
                 onDelete={confirmDelete}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
               />
             </div>
           </TabsContent>
@@ -231,6 +279,8 @@ export default function Categories() {
                 categories={categories}
                 onEdit={openEdit}
                 onDelete={confirmDelete}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
               />
             </div>
           </TabsContent>
