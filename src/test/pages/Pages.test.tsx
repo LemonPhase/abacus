@@ -205,6 +205,48 @@ describe('Categories Page', () => {
       expect(screen.getByText('Salary')).toBeInTheDocument()
     })
   })
+
+  it('renders up/down reorder buttons for each category', async () => {
+    getTable('categories').push(
+      {
+        id: 'cat-a',
+        user_id: 'user-1',
+        name: 'Food',
+        type: 'expense',
+        color: '#ff0000',
+        sort_order: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'cat-b',
+        user_id: 'user-1',
+        name: 'Rent',
+        type: 'expense',
+        color: '#00ff00',
+        sort_order: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    )
+
+    renderWithRouter(<Categories />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Food')).toBeInTheDocument()
+      expect(screen.getByText('Rent')).toBeInTheDocument()
+    })
+
+    // All four arrow buttons should be present (up+down for each category)
+    const upButtons = screen
+      .getAllByRole('button')
+      .filter((el) => el.querySelector('.lucide-chevron-up'))
+    const downButtons = screen
+      .getAllByRole('button')
+      .filter((el) => el.querySelector('.lucide-chevron-down'))
+    expect(upButtons).toHaveLength(2)
+    expect(downButtons).toHaveLength(2)
+  })
 })
 
 describe('Transactions Page', () => {

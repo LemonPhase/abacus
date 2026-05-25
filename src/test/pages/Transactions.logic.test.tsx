@@ -41,6 +41,7 @@ const categoryFixture: Category = {
   name: 'Transfers',
   type: 'expense',
   color: '#ff0000',
+  sortOrder: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
 }

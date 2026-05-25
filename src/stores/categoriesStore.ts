@@ -17,6 +17,7 @@ function mapRow(row: CategoryRow): Category {
 const crud = createCrudSlice<Category>({
   table: 'categories',
   collectionKey: 'categories',
+  order: { column: 'sort_order', ascending: true },
   mapRow: (row) => mapRow(row as CategoryRow),
 })
 
@@ -34,7 +35,16 @@ interface CategoriesState {
   getById: (id: string) => Category | undefined
   getChildren: (parentId: string) => Category[]
   getRootCategories: (type: CategoryKind) => Category[]
+  /** Swap the category's sort_order with its adjacent sibling. */
+  reorder: (id: string, direction: 'up' | 'down') => Promise<void>
   unsubscribe: () => void
+}
+
+function getSiblings(state: CategoriesState, cat: Category): Category[] {
+  const parentKey = cat.parentId ?? '__root__'
+  return state.categories
+    .filter((c) => c.type === cat.type && (c.parentId ?? '__root__') === parentKey)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 export const useCategoriesStore = create<CategoriesState>()((set, get) => {
@@ -42,12 +52,51 @@ export const useCategoriesStore = create<CategoriesState>()((set, get) => {
   return {
     categories: [],
     ...base,
-    add: (data) =>
-      _add(mapKeysToSnake(data) as Database['public']['Tables']['categories']['Insert']),
+    add: (data) => {
+      // Compute next sortOrder: the max among same-type, same-parent siblings + 1
+      const existing = get().categories.filter(
+        (c) => c.type === data.type && (c.parentId ?? '') === (data.parentId ?? ''),
+      )
+      const nextOrder = existing.length > 0 ? Math.max(...existing.map((c) => c.sortOrder)) + 1 : 0
+      const insertData = {
+        ...mapKeysToSnake(data),
+        sort_order: nextOrder,
+      } as Database['public']['Tables']['categories']['Insert']
+      return _add(insertData)
+    },
     update: (id, data) =>
       _update(id, mapKeysToSnake(data) as Database['public']['Tables']['categories']['Update']),
     getByType: (type) => get().categories.filter((c) => c.type === type),
     getChildren: (parentId) => get().categories.filter((c) => c.parentId === parentId),
     getRootCategories: (type) => get().categories.filter((c) => c.type === type && !c.parentId),
+    reorder: async (id, direction) => {
+      const state = get()
+      const cat = state.categories.find((c) => c.id === id)
+      if (!cat) return
+
+      const siblings = getSiblings(state, cat)
+      const idx = siblings.findIndex((c) => c.id === id)
+      if (idx === -1) return
+
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+      if (swapIdx < 0 || swapIdx >= siblings.length) return
+
+      const other = siblings[swapIdx]
+      const catOrder = cat.sortOrder
+      const otherOrder = other.sortOrder
+
+      // Persist both updates
+      await _update(cat.id, { sort_order: otherOrder } as Record<string, unknown>)
+      await _update(other.id, { sort_order: catOrder } as Record<string, unknown>)
+
+      // Optimistic local update (swap sortOrder in state)
+      set((s: CategoriesState) => ({
+        categories: s.categories.map((c) => {
+          if (c.id === cat.id) return { ...c, sortOrder: otherOrder }
+          if (c.id === other.id) return { ...c, sortOrder: catOrder }
+          return c
+        }),
+      }))
+    },
   }
 })
