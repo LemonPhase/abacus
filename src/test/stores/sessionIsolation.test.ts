@@ -148,14 +148,12 @@ describe('CRUD session isolation', () => {
 
   it('stays usable after reset: a fresh load repopulates for the next user', async () => {
     supabase.from = vi.fn().mockReturnValue({
-      select: vi
-        .fn()
-        .mockReturnValue(
-          Promise.resolve({
-            data: [{ ...accountRow, id: 'account-b', user_id: 'user-b' }],
-            error: null,
-          }),
-        ),
+      select: vi.fn().mockReturnValue(
+        Promise.resolve({
+          data: [{ ...accountRow, id: 'account-b', user_id: 'user-b' }],
+          error: null,
+        }),
+      ),
     })
 
     useAccountsStore.getState().reset()

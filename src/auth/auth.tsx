@@ -75,10 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // financial collection and tear down realtime so nothing from the previous
       // session leaks into the next one.
       const uid = session?.user?.id ?? null
-      if (event === 'SIGNED_OUT' || uid !== currentUserId) {
+      // Reset only on a real identity transition: explicit sign-out, or one
+      // signed-in user being replaced by another. Boot-time events
+      // (INITIAL_SESSION / SIGNED_IN) merely establish currentUserId — wiping
+      // there discards the app's first in-flight data load on every
+      // authenticated page load (stores start empty on a fresh page anyway).
+      if (event === 'SIGNED_OUT' || (currentUserId !== null && uid !== currentUserId)) {
         resetFinancialStores()
-        currentUserId = uid
       }
+      currentUserId = uid
       if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth/reset-password') {
         navigate('/auth/reset-password', { replace: true })
       }
