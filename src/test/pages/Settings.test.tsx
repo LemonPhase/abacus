@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import Settings from '@/pages/Settings'
 import { useSettingsStore } from '@/stores/settingsStore'
 
-const mockSignOut = vi.fn()
+const mockSignOut = vi.fn<(email?: string) => Promise<void>>().mockResolvedValue(undefined)
 
 vi.mock('@/auth/auth', async (importOriginal) => {
   const actual = (await importOriginal()) as typeof import('@/auth/auth')

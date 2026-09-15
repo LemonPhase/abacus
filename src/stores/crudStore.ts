@@ -42,6 +42,11 @@ type GetFn = () => Record<string, unknown>
 export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>) {
   const { table, collectionKey, mapRow, order, prependInsert } = config
 
+  // Bumped by reset(). Async operations capture the value at start and discard
+  // their results when it changed, so responses from a previous signed-in user
+  // never repopulate the store after logout / account switch.
+  let generation = 0
+
   function getItems(getter: GetFn): T[] {
     return (getter() as Record<string, T[]>)[collectionKey] ?? []
   }
@@ -70,7 +75,10 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   // set/get come from Zustand, which has store-specific types.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function build(set: any, get: any) {
+    const isStale = (token: number) => token !== generation
+
     const load = async (options?: { limit?: number; offset?: number }) => {
+      const token = generation
       set({ loading: true, error: null })
       const { limit, offset } = options ?? {}
       let query = supabase.from(table).select('*')
@@ -83,6 +91,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         query = query.limit(limit)
       }
       const { data, error } = await query
+      if (isStale(token)) return
       if (error) {
         set({ error: error.message, loading: false })
         throw error
@@ -92,6 +101,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
 
       if (!get()._unsub) {
         const unsub = subscribeToTable(table as string, (payload) => {
+          if (isStale(token)) return
           handleRealtime(set, payload)
         })
         set({ _unsub: unsub })
@@ -99,10 +109,12 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     }
 
     const internalAdd = async (data: Record<string, unknown>): Promise<T> => {
+      const token = generation
       set({ error: null })
       const {
         data: { session },
       } = await supabase.auth.getSession()
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       const insertData: Record<string, unknown> =
         session?.user?.id && !('user_id' in data) ? { ...data, user_id: session.user.id } : data
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,6 +122,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         .insert(insertData)
         .select()
         .single()
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       if (error) {
         set({ error: error.message, loading: false })
         throw error
@@ -125,10 +138,12 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
 
     const internalBulkAdd = async (data: Record<string, unknown>[]): Promise<T[]> => {
       if (data.length === 0) return []
+      const token = generation
       set({ error: null })
       const {
         data: { session },
       } = await supabase.auth.getSession()
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       const insertData = session?.user?.id
         ? data.map((d) => ('user_id' in d ? d : { ...d, user_id: session.user.id }))
         : data
@@ -136,6 +151,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       const { data: inserted, error } = await (supabase.from as any)(table)
         .insert(insertData)
         .select()
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       if (error) {
         set({ error: error.message, loading: false })
         throw error
@@ -150,9 +166,11 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     }
 
     const internalUpdate = async (id: string, data: Record<string, unknown>): Promise<void> => {
+      const token = generation
       set({ error: null })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase.from as any)(table).update(data).eq('id', id)
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       if (error) {
         set({ error: error.message, loading: false })
         throw error
@@ -166,9 +184,11 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     }
 
     const remove = async (id: string): Promise<void> => {
+      const token = generation
       set({ error: null })
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase.from as any)(table).delete().eq('id', id)
+      if (isStale(token)) throw new Error('Session changed; stale response discarded')
       if (error) {
         set({ error: error.message, loading: false })
         throw error
@@ -188,6 +208,16 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       set({ _unsub: null })
     }
 
+    /**
+     * Wipe all user data and teardown realtime. Called on auth identity change.
+     * Also invalidates any in-flight load/mutation from the previous session.
+     */
+    const reset = () => {
+      generation++
+      unsubscribe()
+      set({ [collectionKey]: [], loading: false, error: null })
+    }
+
     return {
       loading: false,
       error: null,
@@ -200,6 +230,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       remove,
       getById,
       unsubscribe,
+      reset,
     }
   }
 }

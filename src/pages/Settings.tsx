@@ -236,7 +236,13 @@ export default function Settings() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Account</h2>
           <p className="text-sm text-muted-foreground">{user?.email}</p>
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void signOut().catch((e: Error) => console.error('Sign-out failed:', e.message))
+            }
+          >
             Sign Out
           </Button>
         </div>

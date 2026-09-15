@@ -32,6 +32,7 @@ interface InvestmentPlansState {
   remove: (id: string) => Promise<void>
   getById: (id: string) => InvestmentPlan | undefined
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get) => {

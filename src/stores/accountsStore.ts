@@ -33,6 +33,7 @@ interface AccountsState {
   getByType: (type: AccountType) => Account[]
   getById: (id: string) => Account | undefined
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useAccountsStore = create<AccountsState>()((set, get) => {

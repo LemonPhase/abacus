@@ -16,6 +16,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
+import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import type { User, Session } from '@supabase/supabase-js'
 import { Loader2 } from 'lucide-react'
 
@@ -34,6 +35,23 @@ const AuthContext = createContext<AuthState | undefined>(undefined)
 
 const appUrl = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/+$/, '')
 
+/** Every per-user financial collection. Wiped whenever the signed-in identity changes. */
+const FINANCIAL_STORES = [
+  useAccountsStore,
+  useCategoriesStore,
+  useTransactionsStore,
+  useBudgetsStore,
+  useInvestmentPlansStore,
+  useRecurringTransactionsStore,
+] as const
+
+function resetFinancialStores() {
+  unsubscribeAll()
+  for (const store of FINANCIAL_STORES) {
+    store.getState().reset()
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -47,30 +65,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
+    // Tracks the signed-in identity across auth events; `null` until an event
+    // establishes it. Reset fires when it changes or on explicit SIGNED_OUT.
+    let currentUserId: string | null = null
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        unsubscribeAll()
-        // Reset all data stores to prevent stale data appearing on next sign-in.
-        // setState is typed per-store, so we cast to the shared shape.
-        ;(
-          [
-            useAccountsStore,
-            useCategoriesStore,
-            useTransactionsStore,
-            useBudgetsStore,
-            useInvestmentPlansStore,
-          ] as const
-        ).forEach((store) => {
-          store.getState().unsubscribe?.()
-          ;(store.setState as (s: Record<string, unknown>) => void)({
-            items: [],
-            loading: false,
-            error: null,
-            _unsub: null,
-          })
-        })
+      // On identity change (sign-out or a different signed-in user), wipe every
+      // financial collection and tear down realtime so nothing from the previous
+      // session leaks into the next one.
+      const uid = session?.user?.id ?? null
+      if (event === 'SIGNED_OUT' || uid !== currentUserId) {
+        resetFinancialStores()
+        currentUserId = uid
       }
       if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth/reset-password') {
         navigate('/auth/reset-password', { replace: true })
@@ -86,14 +93,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw new Error(error.message)
   }, [])
-
   const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
     if (error) throw new Error(error.message)
   }, [])
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    const { error } = await supabase.auth.signOut()
+    if (error) throw new Error(error.message)
   }, [])
 
   const resetPasswordForEmail = useCallback(async (email: string) => {
