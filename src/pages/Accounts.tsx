@@ -38,7 +38,7 @@ export default function Accounts() {
     name: '',
     type: 'checking',
     currency: baseCurrency,
-    balance: '',
+    openingBalance: '',
     notes: '',
   })
 
@@ -70,7 +70,7 @@ export default function Accounts() {
       name: account.name,
       type: account.type,
       currency: account.currency,
-      balance: String(account.balance),
+      openingBalance: String(account.openingBalance),
       notes: account.notes ?? '',
     })
     setDialogOpen(true)
@@ -86,7 +86,9 @@ export default function Accounts() {
         name: form.name.trim(),
         type: form.type,
         currency: form.currency,
-        balance: parseFloat(form.balance) || 0,
+        // balance is derived by the database (opening_balance + ledger effects);
+        // opening_balance is the explicit correction path. Never send `balance`.
+        openingBalance: parseFloat(form.openingBalance) || 0,
         notes: form.notes.trim() || undefined,
       }
 
@@ -174,10 +176,20 @@ export default function Accounts() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon-xs" onClick={() => openEdit(account)}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Edit ${account.name}`}
+                        onClick={() => openEdit(account)}
+                      >
                         <Pencil className="size-3" />
                       </Button>
-                      <Button variant="ghost" size="icon-xs" onClick={() => confirmDelete(account)}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label={`Delete ${account.name}`}
+                        onClick={() => confirmDelete(account)}
+                      >
                         <Trash2 className="size-3" />
                       </Button>
                     </div>

@@ -46,40 +46,39 @@ function validateAccountOwnership(accountId: string, userId: string): boolean {
   return account.user_id === userId
 }
 
-function adjustBalance(accountId: string, delta: number) {
-  const accounts = ensureTable('accounts')
-  const account = accounts.find((r) => r.id === accountId)!
-  account.balance = ((account.balance as number) ?? 0) + delta
+// Mirrors the real DB (20260916000000_opening_balance_ledger.sql):
+// balance = opening_balance + signed transaction effects, enforced.
+function accountEffectsSum(accountId: string): number {
+  const txns = (tables.get('transactions') ?? []).filter((t) => t.account_id === accountId)
+  return txns.reduce((sum, t) => {
+    const amount = (t.amount as number) ?? 0
+    return t.type === 'expense' ? sum - amount : sum + amount
+  }, 0)
 }
 
+function recomputeBalance(accountId: string) {
+  const account = ensureTable('accounts').find((r) => r.id === accountId)
+  if (!account) return
+  account.balance = ((account.opening_balance as number) ?? 0) + accountEffectsSum(accountId)
+}
+
+const DERIVED_BALANCE_ERROR =
+  'account balance is derived (opening_balance + transaction effects); update opening_balance instead'
+
 function applyInsertBalanceEffect(row: Record<string, unknown>) {
-  const type = row.type as string
-  const amount = (row.amount as number) ?? 0
-  const accountId = row.account_id as string
-  if (type === 'income' || type === 'transfer') {
-    adjustBalance(accountId, amount)
-  } else if (type === 'expense') {
-    adjustBalance(accountId, -amount)
-  }
+  recomputeBalance(row.account_id as string)
 }
 
 function applyDeleteBalanceEffect(row: Record<string, unknown>) {
-  const type = row.type as string
-  const amount = (row.amount as number) ?? 0
-  const accountId = row.account_id as string
-  if (type === 'income' || type === 'transfer') {
-    adjustBalance(accountId, -amount)
-  } else if (type === 'expense') {
-    adjustBalance(accountId, amount)
-  }
+  recomputeBalance(row.account_id as string)
 }
 
 function applyUpdateBalanceEffect(
   oldRow: Record<string, unknown>,
   newRow: Record<string, unknown>,
 ) {
-  applyDeleteBalanceEffect(oldRow)
-  applyInsertBalanceEffect(newRow)
+  recomputeBalance(newRow.account_id as string)
+  recomputeBalance(oldRow.account_id as string)
 }
 
 type Filter = { col: string; val: unknown; op: 'eq' | 'neq' }
@@ -237,6 +236,10 @@ function createBuilder(tableName: string): any {
 
         const inserted = toInsert.map((d) => {
           const row = newRow(d as Record<string, unknown>)
+          if (tableName === 'accounts') {
+            // New account: balance is derived, no transactions can exist yet.
+            row.balance = (row.opening_balance as number) ?? 0
+          }
           rows.push(row)
           if (tableName === 'transactions') applyInsertBalanceEffect(row)
           return row
@@ -254,6 +257,14 @@ function createBuilder(tableName: string): any {
       } else if (_action === 'update') {
         const targets = applyFilters([...rows], _filters)
 
+        if (tableName === 'accounts') {
+          // balance is derived: reject direct writes, mirror enforce_account_balance.
+          if (_payload && 'balance' in _payload) {
+            resolve({ data: null, error: { message: DERIVED_BALANCE_ERROR } })
+            return
+          }
+        }
+
         if (tableName === 'transactions') {
           for (const target of targets) {
             const payload = _payload as Record<string, unknown>
@@ -269,6 +280,10 @@ function createBuilder(tableName: string): any {
         for (const target of targets) {
           const oldRow = { ...target }
           Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
+          if (tableName === 'accounts') {
+            // Opening-balance edits re-derive the balance.
+            recomputeBalance(target.id as string)
+          }
           if (tableName === 'transactions') applyUpdateBalanceEffect(oldRow, target)
         }
         if (_returning) {
@@ -292,9 +307,10 @@ function createBuilder(tableName: string): any {
           }
 
           for (const r of matched) {
-            if (tableName === 'transactions') applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)
             if (idx >= 0) rows.splice(idx, 1)
+            // recompute after removal — matches AFTER DELETE trigger semantics
+            if (tableName === 'transactions') applyDeleteBalanceEffect(r)
           }
         }
         resolve({ data: null, error: null })

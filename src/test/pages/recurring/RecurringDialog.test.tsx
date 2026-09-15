@@ -11,6 +11,8 @@ function makeAccount(overrides: Partial<Account> = {}): Account {
     name: 'Checking',
     type: 'checking',
     currency: 'USD',
+
+    openingBalance: 1000,
     balance: 1000,
     createdAt: new Date(),
     updatedAt: new Date(),

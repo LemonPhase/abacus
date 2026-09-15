@@ -44,7 +44,7 @@ describe('Store Error Handling', () => {
 
     const store = useAccountsStore.getState()
     await expect(
-      store.add({ name: 'A', type: 'checking', currency: 'USD', balance: 0 }),
+      store.add({ name: 'A', type: 'checking', currency: 'USD', openingBalance: 0 }),
     ).rejects.toThrow()
 
     expect(useAccountsStore.getState().error).toBe('Add failed')

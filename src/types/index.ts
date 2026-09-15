@@ -5,6 +5,9 @@ export interface Account {
   name: string
   type: AccountType
   currency: string
+  /** Authoritative user-owned input; balance = openingBalance + signed transaction effects. */
+  openingBalance: number
+  /** Derived by the database: openingBalance + signed ledger effects. */
   balance: number
   notes?: string
   createdAt: Date
@@ -102,7 +105,9 @@ export interface UserSettings {
   onboarded: boolean
 }
 
-export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
+// balance is derived by the database (opening_balance + ledger effects) —
+// clients create/correct accounts via openingBalance only.
+export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'balance'>
 export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
 export type NewTransaction = Omit<
   Transaction,

@@ -69,6 +69,7 @@ describe('CrudStore Edge Cases', () => {
           name: 'Test',
           type: 'checking',
           currency: 'USD',
+          openingBalance: 0,
           balance: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -77,7 +78,7 @@ describe('CrudStore Edge Cases', () => {
     })
 
     const store = useAccountsStore.getState()
-    await expect(store.update('acc-1', { name: 'New', balance: 100 })).rejects.toThrow()
+    await expect(store.update('acc-1', { name: 'New' })).rejects.toThrow()
 
     expect(useAccountsStore.getState().error).toBe('Update denied')
   })

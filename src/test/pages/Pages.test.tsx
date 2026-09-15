@@ -25,6 +25,8 @@ function seedAccount() {
     name: 'Test Account',
     type: 'checking',
     currency: 'USD',
+
+    opening_balance: 0,
     balance: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -127,6 +129,7 @@ describe('Accounts Page', () => {
       name: 'Savings',
       type: 'savings',
       currency: 'USD',
+      opening_balance: 5000,
       balance: 5000,
       notes: null,
       created_at: new Date().toISOString(),
@@ -136,8 +139,8 @@ describe('Accounts Page', () => {
     renderWithRouter(<Accounts />)
 
     await waitFor(() => {
-      const editButtons = screen.getAllByRole('button', { name: '' })
-      expect(editButtons.length).toBeGreaterThanOrEqual(2)
+      expect(screen.getByRole('button', { name: 'Edit Savings' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete Savings' })).toBeInTheDocument()
     })
   })
 })

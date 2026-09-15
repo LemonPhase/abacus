@@ -24,6 +24,8 @@ const accountFixture: Account = {
   name: 'Checking',
   type: 'checking',
   currency: 'USD',
+
+  openingBalance: 0,
   balance: 0,
   createdAt: new Date(),
   updatedAt: new Date(),
