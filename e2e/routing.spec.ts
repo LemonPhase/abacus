@@ -13,7 +13,8 @@ publicTest.describe('Public pages', () => {
   })
 
   publicTest('auth page renders sign in form', async ({ page }) => {
-    await page.goto('/auth')
+    const response = await page.goto('/auth')
+    expect(response?.status()).toBe(200)
     await expect(page.getByText('Sign in to your account')).toBeVisible()
     await expect(page.locator('input[id="email"]')).toBeVisible()
     await expect(page.locator('input[id="password"]')).toBeVisible()
@@ -35,8 +36,13 @@ publicTest.describe('Public pages', () => {
     await expect(page.getByRole('button', { name: 'Send reset link' })).toBeVisible()
   })
 
-  publicTest('reset password page renders', async ({ page }) => {
-    await page.goto('/auth/reset-password')
+  publicTest('reset password page survives direct navigation and refresh', async ({ page }) => {
+    const response = await page.goto('/auth/reset-password')
+    expect(response?.status()).toBe(200)
+    await expect(page.getByText('Back to sign in')).toBeVisible()
+
+    const refreshResponse = await page.reload()
+    expect(refreshResponse?.status()).toBe(200)
     await expect(page.getByText('Back to sign in')).toBeVisible()
   })
 
@@ -48,8 +54,9 @@ publicTest.describe('Public pages', () => {
 })
 
 test.describe('App pages (authenticated)', () => {
-  test('dashboard page renders stat cards', async ({ page }) => {
-    await page.goto('/app/dashboard')
+  test('dashboard page survives direct navigation and refresh', async ({ page }) => {
+    const response = await page.goto('/app/dashboard')
+    expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
     await expect(page.getByText('Net Worth')).toBeVisible()
     await expect(page.getByText('Income', { exact: true })).toBeVisible()
@@ -60,6 +67,10 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByText('No spending data this month')).toBeVisible()
     await expect(page.getByText('No transactions yet')).toBeVisible()
     await expect(page.getByText('No budgets yet')).toBeVisible()
+
+    const refreshResponse = await page.reload()
+    expect(refreshResponse?.status()).toBe(200)
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
   })
 
   test('sidebar navigation links work for all pages', async ({ page }) => {
