@@ -20,3 +20,69 @@ describe('formatCurrency', () => {
     expect(formatCurrency(100, 'USD')).toBe('$100')
   })
 })
+
+import { roundCurrency, reliableBaseAmount } from '@/lib/currency'
+import type { Transaction } from '@/types'
+
+function txn(overrides: Partial<Transaction>): Transaction {
+  return {
+    id: 't1',
+    accountId: 'a1',
+    categoryId: null,
+    type: 'expense',
+    amount: 100,
+    currency: 'USD',
+    baseAmount: 100,
+    baseCurrency: 'USD',
+    fxRate: null,
+    fxDate: null,
+    baseAmountStale: false,
+    date: new Date('2026-05-01'),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+}
+
+describe('roundCurrency', () => {
+  it('rounds to the currency minor units', () => {
+    expect(roundCurrency(10.12345, 'USD')).toBe(10.12)
+    expect(roundCurrency(1000.56, 'JPY')).toBe(1001)
+  })
+})
+
+describe('reliableBaseAmount', () => {
+  it('trusts identity rows (currency === reporting) regardless of stale flag', () => {
+    expect(reliableBaseAmount(txn({ currency: 'USD', baseCurrency: 'USD' }), 'USD')).toBe(100)
+    expect(
+      reliableBaseAmount(
+        txn({ currency: 'USD', baseCurrency: 'USD', baseAmountStale: true }),
+        'USD',
+      ),
+    ).toBe(100)
+  })
+
+  it('trusts fresh conversions for the current reporting currency', () => {
+    expect(
+      reliableBaseAmount(
+        txn({ currency: 'EUR', baseAmount: 108, baseCurrency: 'USD', fxRate: 1.08 }),
+        'USD',
+      ),
+    ).toBe(108)
+  })
+
+  it('excludes rows converted for a different reporting currency', () => {
+    expect(
+      reliableBaseAmount(txn({ currency: 'EUR', baseAmount: 108, baseCurrency: 'USD' }), 'GBP'),
+    ).toBeNull()
+  })
+
+  it('excludes stale rows to avoid silent 1:1 misrepresentation', () => {
+    expect(
+      reliableBaseAmount(
+        txn({ currency: 'EUR', baseAmount: 100, baseCurrency: 'EUR', baseAmountStale: true }),
+        'USD',
+      ),
+    ).toBeNull()
+  })
+})

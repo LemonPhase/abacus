@@ -281,10 +281,14 @@ describe('Budgets Page', () => {
       name: 'Food Budget',
       amount: 500,
       period: 'monthly',
-      category_ids: ['cat-food'],
       start_date: new Date('2026-01-01').toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    })
+    getTable('budget_categories').push({
+      budget_id: 'budget-test-1',
+      category_id: 'cat-food',
+      user_id: 'user-1',
     })
 
     renderWithRouter(<Budgets />)

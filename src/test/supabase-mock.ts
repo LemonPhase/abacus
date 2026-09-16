@@ -21,8 +21,10 @@ export function resetAllTables(): void {
   tables.clear()
   _counter = 0
   _onAuthStateChangeCallback = null
-  mockSupabase.rpc.mockReset()
-  mockSupabase.rpc.mockImplementation(() => Promise.resolve({ data: null, error: null }))
+  _failNextRpc = null
+  // Restore the default RPC dispatch — restore-service tests override it via
+  // mockImplementation/mockResolvedValue, which would otherwise leak here.
+  mockSupabase.rpc.mockImplementation(defaultRpc)
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
@@ -338,17 +340,52 @@ let _onAuthStateChangeCallback:
   | ((event: string, session: Record<string, unknown> | null) => void)
   | null = null
 
+// When set, the next rpc() call resolves with this error message without
+// mutating any table — lets store tests exercise RPC failure paths.
+let _failNextRpc: string | null = null
+
+export function failNextRpc(message = 'rpc failed'): void {
+  _failNextRpc = message
+}
+
+// Mirrors public.replace_budget_categories (20260917000005): replaces all
+// association rows for one budget in a single atomic step.
+function mockReplaceBudgetCategories(args: Record<string, unknown>) {
+  const budgetId = args.p_budget_id as string
+  const categoryIds = (args.p_category_ids as string[]) ?? []
+  const assoc = ensureTable('budget_categories')
+  for (let i = assoc.length - 1; i >= 0; i--) {
+    if (assoc[i].budget_id === budgetId) assoc.splice(i, 1)
+  }
+  for (const category_id of categoryIds) {
+    if (!assoc.some((r) => r.budget_id === budgetId && r.category_id === category_id)) {
+      assoc.push({ budget_id: budgetId, category_id, user_id: 'user-1' })
+    }
+  }
+}
+
 export function simulateAuthEvent(event: string, session: Record<string, unknown> | null = null) {
   _onAuthStateChangeCallback?.(event, session)
 }
 
+// Default RPC dispatch: failNextRpc injects one failure; known RPCs are
+// simulated; anything else is a loud test bug.
+function defaultRpc(fn: string, args: Record<string, unknown> = {}) {
+  if (_failNextRpc) {
+    const message = _failNextRpc
+    _failNextRpc = null
+    return Promise.resolve({ data: null, error: { message } })
+  }
+  if (fn === 'replace_budget_categories') {
+    mockReplaceBudgetCategories(args)
+    return Promise.resolve({ data: null, error: null })
+  }
+  return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
+}
+
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
-  // RPCs are not table queries; tests stub per-call via
-  // mockSupabase.rpc.mockImplementation(...). Default: success with no data.
-  rpc: vi.fn<() => Promise<{ data: unknown; error: { message: string } | null }>>(() =>
-    Promise.resolve({ data: null, error: null }),
-  ),
+  rpc: vi.fn(defaultRpc),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

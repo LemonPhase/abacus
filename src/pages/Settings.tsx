@@ -123,7 +123,8 @@ export default function Settings() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Base Currency</h2>
           <p className="text-sm text-muted-foreground">
-            All reports and summaries will use this currency.
+            All reports and summaries will use this currency. Transactions keep the exchange rate
+            they were saved with; totals include only amounts already converted to this currency.
           </p>
           <Select
             value={baseCurrency}
