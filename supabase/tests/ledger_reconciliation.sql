@@ -91,7 +91,11 @@ begin
   raise exception 'ASSERT FAILED: cross-user transaction should have been rejected';
 exception
   when others then
-    if sqlerrm not like 'Account does not belong to this user%' then
+    -- Since 20260917000004 the composite FK rejects cross-user references
+    -- before the balance trigger's ownership check can speak; either
+    -- rejection preserves the invariant being tested here.
+    if sqlerrm not like 'Account does not belong to this user%'
+       and sqlerrm not like 'insert or update on table "transactions" violates foreign key constraint "transactions_account_same_user_fkey"%' then
       raise exception 'ASSERT FAILED: unexpected error: %', sqlerrm;
     end if;
 end $$;

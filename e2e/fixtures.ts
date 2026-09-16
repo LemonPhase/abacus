@@ -77,8 +77,9 @@ async function fetchSession(email: string, password: string) {
 }
 
 // The app runs at this origin; supabase-js writes its session to localStorage
-// scoped here, not to the Supabase API origin.
-const APP_ORIGIN = 'http://localhost:5173'
+// scoped here, not to the Supabase API origin. Honors E2E_PORT so parallel
+// worktrees can run e2e against their own dev server (see playwright.config.ts).
+const APP_ORIGIN = `http://localhost:${process.env.E2E_PORT ?? '5173'}`
 
 /**
  * Sign in a fresh PostgREST client as the given user. Use this to seed DB

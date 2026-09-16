@@ -15,9 +15,10 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
+import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useAuth } from '@/auth/auth'
 import { supabase } from '@/supabase/client'
-import { normalizeLegacyAccounts } from '@/pages/settings/legacyAccounts'
+import { restoreUserData, currentUserId } from '@/services/restore'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
@@ -29,16 +30,8 @@ const TABLES = [
   'budgets',
   'exchange_rates',
   'investment_plans',
+  'recurring_transactions',
 ] as const
-
-// Re-read the signed-in identity from the client session. Export/import
-// capture it at start and re-verify after every await and before every
-// destructive side effect, aborting if the identity changed — so A's data is
-// never downloaded or written during B's session.
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession()
-  return data.session?.user?.id ?? null
-}
 
 export default function Settings() {
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
@@ -59,7 +52,7 @@ export default function Settings() {
       const uid = await currentUserId()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: Record<string, any> = {
-        version: 2,
+        version: 3,
         exportedAt: new Date().toISOString(),
       }
 
@@ -71,6 +64,27 @@ export default function Settings() {
         const { data: rows, error } = results[i]
         if (error) throw error
         data[TABLES[i]] = rows ?? []
+      }
+
+      // The v3 payload keeps the budgets[].category_ids array shape so exports
+      // stay stable across the Audit 08 schema change: the DB now stores the
+      // links in the budget_categories association table, so derive the arrays
+      // on export (the restore RPC regenerates the association rows from them).
+      const { data: assoc, error: assocError } = await supabase
+        .from('budget_categories')
+        .select('budget_id, category_id')
+      if ((await currentUserId()) !== uid) {
+        throw new Error('Signed-in user changed; export aborted')
+      }
+      if (assocError) throw assocError
+      const byBudget = new Map<string, string[]>()
+      for (const row of assoc ?? []) {
+        const list = byBudget.get(row.budget_id) ?? []
+        list.push(row.category_id)
+        byBudget.set(row.budget_id, list)
+      }
+      for (const budget of data.budgets) {
+        budget.category_ids = byBudget.get(budget.id) ?? []
       }
 
       const json = JSON.stringify(data, null, 2)
@@ -94,75 +108,12 @@ export default function Settings() {
     try {
       setImportStatus('idle')
       setImportMsg('')
-      const uid = await currentUserId()
-      const text = await file.text()
-      if ((await currentUserId()) !== uid) throw abort()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = JSON.parse(text) as Record<string, any>
 
-      if (!data.accounts || !data.transactions) {
-        throw new Error('Invalid export format: missing required tables (accounts, transactions)')
-      }
-
-      // Count total rows before starting destructive operations
-      let totalRows = 0
-      for (const table of TABLES) {
-        const rows = data[table]
-        if (rows?.length) {
-          totalRows += rows.length
-        }
-      }
-      if (totalRows > 10000) {
-        setImportStatus('error')
-        setImportMsg(
-          `File contains ${totalRows} rows. Maximum is 10,000. Please reduce the data and try again.`,
-        )
-        return
-      }
-
-      // Validate structure: check each table has arrays
-      for (const table of TABLES) {
-        const rows = data[table]
-        if (rows !== undefined && !Array.isArray(rows)) {
-          throw new Error(`Invalid export format: "${table}" must be an array`)
-        }
-      }
-
-      // Identity is re-verified after every await and before every destructive
-      // step, so the delete/insert phases can never run against a different
-      // user's tables than the one the import started for.
-      if ((await currentUserId()) !== uid) throw abort()
-
-      // Delete all existing rows from each table (parallel)
-      const deleteResults = await Promise.all(
-        TABLES.map((table) =>
-          supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        ),
-      )
-      if ((await currentUserId()) !== uid) throw abort()
-      for (const result of deleteResults) {
-        if (result.error) throw result.error
-      }
-
-      // Legacy exports (version 2) have no opening_balance; derive it from the
-      // exported balance minus the signed effects of the exported transactions,
-      // so the DB's INSERT trigger (balance := opening_balance) doesn't zero the
-      // restored balances. Exports that already carry opening_balance pass through.
-      const accounts = normalizeLegacyAccounts(data.accounts, data.transactions)
-
-      // Import data from each table (parallel)
-      const rowsFor = (table: (typeof TABLES)[number]) =>
-        table === 'accounts' ? accounts : data[table]
-      const inserts = TABLES.filter((table) => rowsFor(table)?.length).map((table) =>
-        supabase.from(table).insert(rowsFor(table)),
-      )
-      if (inserts.length > 0) {
-        const insertResults = await Promise.all(inserts)
-        if ((await currentUserId()) !== uid) throw abort()
-        for (const result of insertResults) {
-          if (result.error) throw result.error
-        }
-      }
+      // One service call: validates the whole payload, then restores it in a
+      // single database transaction (restore_user_data RPC) that rolls back
+      // entirely on any error. Identity is captured once at the start and
+      // re-verified inside the service after every await and before the RPC.
+      const result = await restoreUserData(file)
 
       await Promise.all([
         useAccountsStore.getState().load(),
@@ -170,12 +121,11 @@ export default function Settings() {
         useTransactionsStore.getState().load(),
         useBudgetsStore.getState().load(),
         useInvestmentPlansStore.getState().load(),
+        useRecurringTransactionsStore.getState().load(),
       ])
-      if ((await currentUserId()) !== uid) throw abort()
+      if ((await currentUserId()) !== result.restoredFor) throw abort()
       setImportStatus('success')
-      setImportMsg(
-        `Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`,
-      )
+      setImportMsg(`Imported ${result.accounts} accounts, ${result.transactions} transactions.`)
     } catch (e) {
       setImportStatus('error')
       setImportMsg(e instanceof Error ? e.message : 'Failed to import')

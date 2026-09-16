@@ -190,7 +190,7 @@ publicTest.describe('Forgot password', () => {
           },
         )
         const { error } = await client.auth.resetPasswordForEmail(user.email, {
-          redirectTo: 'http://localhost:5173/auth/reset-password',
+          redirectTo: `http://localhost:${process.env.E2E_PORT ?? '5173'}/auth/reset-password`,
         })
         expect(error).toBeNull()
 

@@ -22,6 +22,9 @@ export function resetAllTables(): void {
   _counter = 0
   _onAuthStateChangeCallback = null
   _failNextRpc = null
+  // Restore the default RPC dispatch — restore-service tests override it via
+  // mockImplementation/mockResolvedValue, which would otherwise leak here.
+  mockSupabase.rpc.mockImplementation(defaultRpc)
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
@@ -365,26 +368,27 @@ export function simulateAuthEvent(event: string, session: Record<string, unknown
   _onAuthStateChangeCallback?.(event, session)
 }
 
+// Default RPC dispatch: failNextRpc injects one failure; known RPCs are
+// simulated; anything else is a loud test bug.
+function defaultRpc(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<{ data: unknown; error: { message: string } | null }> {
+  if (_failNextRpc) {
+    const message = _failNextRpc
+    _failNextRpc = null
+    return Promise.resolve({ data: null, error: { message } })
+  }
+  if (fn === 'replace_budget_categories') {
+    mockReplaceBudgetCategories(args)
+    return Promise.resolve({ data: null, error: null })
+  }
+  return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
+}
+
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
-  rpc: vi.fn(
-    (
-      fn: string,
-      args: Record<string, unknown> = {},
-    ): Promise<{ data: unknown; error: { message: string } | null }> => {
-      if (_failNextRpc) {
-        const message = _failNextRpc
-        _failNextRpc = null
-        return Promise.resolve({ data: null, error: { message } })
-      }
-      if (fn === 'replace_budget_categories') {
-        mockReplaceBudgetCategories(args)
-        return Promise.resolve({ data: null, error: null })
-      }
-      return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
-    },
-  ),
-
+  rpc: vi.fn(defaultRpc),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

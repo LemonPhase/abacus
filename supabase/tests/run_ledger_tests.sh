@@ -66,6 +66,10 @@ MIGRATIONS=(
   20260511182423_fix_balance_trigger_ownership.sql
   20260516000000_recurring_transactions.sql
   20260916000000_opening_balance_ledger.sql
+  20260917000001_atomic_restore.sql
+  20260917000003_currency_provenance.sql
+  20260917000004_ownership_enforcement.sql
+  20260917000005_replace_budget_categories_rpc.sql
 )
 
 run_sql() { # $1=db, rest = files or -c commands
@@ -80,7 +84,20 @@ new_db() { # $1=name
     create table if not exists auth.users(id uuid primary key);
     create or replace function auth.uid() returns uuid language sql stable as $fn$
       select nullif(current_setting('"'"'app.test_user_id'"'"', true), '"'"''"'"')::uuid
-    $fn$;' >/dev/null
+    $fn$;
+    do $$ begin
+      -- Supabase standard role set; grants/revokes in migrations (e.g.
+      -- 20260917000001, 20260917000005) expect these roles to exist.
+      if not exists (select 1 from pg_roles where rolname = '"'"'authenticated'"'"') then
+        create role authenticated nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'anon'"'"') then
+        create role anon nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'service_role'"'"') then
+        create role service_role nologin;
+      end if;
+    end $$;' >/dev/null
 }
 
 apply_migrations() { # $1=db, $2=count prefix
@@ -97,7 +114,7 @@ T2="abacus_ledger_backfill_$$"
 
 echo "== 1. semantics ($T1) =="
 new_db "$T1"
-apply_migrations "$T1" 4
+apply_migrations "$T1" ${#MIGRATIONS[@]}
 run_sql "$T1" -f supabase/tests/ledger_reconciliation.sql >/dev/null
 echo "   semantics: OK"
 

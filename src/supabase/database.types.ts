@@ -416,6 +416,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      restore_user_data: {
+        Args: { payload: Json }
+        Returns: Json
+      }
       replace_budget_categories: {
         Args: { p_budget_id: string; p_category_ids: string[] }
         Returns: undefined
