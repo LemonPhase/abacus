@@ -35,6 +35,7 @@ describe('Tauri CSP', () => {
     expect(directives['img-src']).toEqual(["'self'", 'data:'])
     expect(directives['font-src']).toEqual(["'self'"])
     expect(directives['frame-ancestors']).toEqual(["'none'"])
+    expect(directives['form-action']).toEqual(["'self'"])
     expect(directives['object-src']).toEqual(["'none'"])
     expect(directives['base-uri']).toEqual(["'self'"])
     // Tauri adds hashes/nonces for its own injected init scripts at compile

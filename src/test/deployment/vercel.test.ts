@@ -199,7 +199,8 @@ describe('Vercel security headers', () => {
     expect(cspDirectives['worker-src']).toEqual(["'self'"])
     expect(cspDirectives['manifest-src']).toEqual(["'self'"])
 
-    // Containment: no framing, no plugins, no base hijacking.
+    // Containment: no framing, no form hijacking, no plugins, no base hijack.
+    expect(cspDirectives['form-action']).toEqual(["'self'"])
     expect(cspDirectives['frame-ancestors']).toEqual(["'none'"])
     expect(cspDirectives['object-src']).toEqual(["'none'"])
     expect(cspDirectives['base-uri']).toEqual(["'self'"])
