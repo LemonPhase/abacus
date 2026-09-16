@@ -52,28 +52,15 @@ export const useBudgetsStore = create<BudgetsState>()((set, get) => {
     })
   }
 
-  // Replace one budget's association rows (delete + insert; small row counts).
+  // Replace one budget's association rows atomically: a single RPC call is a
+  // single transaction, so a failure can no longer wipe the prior associations
+  // (P2 from the PR #27 review — the old delete-then-insert spanned two
+  // requests).
   const writeAssociations = async (budgetId: string, categoryIds: string[]) => {
-    const { error: delErr } = await supabase
-      .from('budget_categories')
-      .delete()
-      .eq('budget_id', budgetId)
-    if (delErr) throw new Error(delErr.message)
-    if (categoryIds.length === 0) return
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    const userId = session?.user?.id
-    const { error } = await supabase.from('budget_categories').insert(
-      // user_id is stamped by the set_user_id trigger when omitted (same
-      // convention as createCrudSlice); the Insert cast is the sanctioned
-      // store-wrapper one.
-      categoryIds.map((category_id) => ({
-        budget_id: budgetId,
-        category_id,
-        ...(userId ? { user_id: userId } : {}),
-      })) as Database['public']['Tables']['budget_categories']['Insert'][],
-    )
+    const { error } = await supabase.rpc('replace_budget_categories', {
+      p_budget_id: budgetId,
+      p_category_ids: categoryIds,
+    })
     if (error) throw new Error(error.message)
   }
 

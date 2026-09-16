@@ -21,6 +21,7 @@ export function resetAllTables(): void {
   tables.clear()
   _counter = 0
   _onAuthStateChangeCallback = null
+  _failNextRpc = null
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
@@ -336,12 +337,48 @@ let _onAuthStateChangeCallback:
   | ((event: string, session: Record<string, unknown> | null) => void)
   | null = null
 
+// When set, the next rpc() call resolves with this error message without
+// mutating any table — lets store tests exercise RPC failure paths.
+let _failNextRpc: string | null = null
+
+export function failNextRpc(message = 'rpc failed'): void {
+  _failNextRpc = message
+}
+
+// Mirrors public.replace_budget_categories (20260917000005): replaces all
+// association rows for one budget in a single atomic step.
+function mockReplaceBudgetCategories(args: Record<string, unknown>) {
+  const budgetId = args.p_budget_id as string
+  const categoryIds = (args.p_category_ids as string[]) ?? []
+  const assoc = ensureTable('budget_categories')
+  for (let i = assoc.length - 1; i >= 0; i--) {
+    if (assoc[i].budget_id === budgetId) assoc.splice(i, 1)
+  }
+  for (const category_id of categoryIds) {
+    if (!assoc.some((r) => r.budget_id === budgetId && r.category_id === category_id)) {
+      assoc.push({ budget_id: budgetId, category_id, user_id: 'user-1' })
+    }
+  }
+}
+
 export function simulateAuthEvent(event: string, session: Record<string, unknown> | null = null) {
   _onAuthStateChangeCallback?.(event, session)
 }
 
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
+  rpc: vi.fn((fn: string, args: Record<string, unknown> = {}) => {
+    if (_failNextRpc) {
+      const message = _failNextRpc
+      _failNextRpc = null
+      return Promise.resolve({ data: null, error: { message } })
+    }
+    if (fn === 'replace_budget_categories') {
+      mockReplaceBudgetCategories(args)
+      return Promise.resolve({ data: null, error: null })
+    }
+    return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
+  }),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

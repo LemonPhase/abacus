@@ -5,7 +5,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getTable } from '@/test/supabase-mock'
+import { getTable, failNextRpc } from '@/test/supabase-mock'
 
 describe('Accounts Store', () => {
   beforeEach(() => {
@@ -618,6 +618,28 @@ describe('Budgets Store', () => {
     const updated = dbRows.find((r) => r.id === budget.id)
     expect(updated?.amount).toBe(1000)
     expect(updated?.name).toBe('Updated Budget')
+  })
+
+  it('leaves prior associations intact when the replace fails', async () => {
+    const store = useBudgetsStore.getState()
+    const budget = await store.add({
+      categoryIds: ['cat-1'],
+      name: 'Steady Budget',
+      amount: 100,
+      period: 'monthly',
+      startDate: new Date('2026-01-01'),
+    })
+
+    failNextRpc('replace_budget_categories failed')
+    await expect(store.update(budget.id, { categoryIds: ['cat-2'] })).rejects.toThrow(
+      'replace_budget_categories failed',
+    )
+
+    // The old delete-then-insert flow would have wiped cat-1 on failure.
+    const assoc = getTable('budget_categories')
+      .filter((r) => r.budget_id === budget.id)
+      .map((r) => r.category_id)
+    expect(assoc).toEqual(['cat-1'])
   })
 
   it('removes a budget from the database', async () => {

@@ -65,12 +65,14 @@ if ! $PSQL "${PSQL_ARGS[@]}" -d "$ADMIN_DB" -tAc 'select 1' >/dev/null 2>&1; the
 fi
 
 OWN_MIGRATION=20260917000004_ownership_enforcement.sql
+RPC_MIGRATION=20260917000005_replace_budget_categories_rpc.sql
 MIGRATIONS=(
   20260509000000_initial_schema.sql
   20260511182423_fix_balance_trigger_ownership.sql
   20260516000000_recurring_transactions.sql
   20260916000000_opening_balance_ledger.sql
   "$OWN_MIGRATION"
+  "$RPC_MIGRATION"
 )
 
 run_sql() { # $1=db, rest = files or -c commands
@@ -87,8 +89,16 @@ new_db() { # $1=name
       select nullif(current_setting('"'"'app.test_user_id'"'"', true), '"'"''"'"')::uuid
     $fn$;
     do $$ begin
+      -- Supabase standard role set; grants/revokes in migrations (e.g.
+      -- 20260917000005) expect these roles to exist.
       if not exists (select 1 from pg_roles where rolname = '"'"'authenticated'"'"') then
         create role authenticated nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'anon'"'"') then
+        create role anon nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'service_role'"'"') then
+        create role service_role nologin;
       end if;
     end $$;' >/dev/null
 }
@@ -104,23 +114,65 @@ apply_migrations() { # $1=db, $2=count prefix
 
 install_grants() { # $1=db — Supabase projects configure equivalent default
   # privileges for the authenticated role; the stub cluster grants explicitly.
+  # Function execute is restated because 20260917000005 revokes PUBLIC.
   run_sql "$1" -c 'grant usage on schema public to authenticated;
     grant usage on schema auth to authenticated;
     grant execute on all functions in schema auth to authenticated;
+    grant execute on all functions in schema public to authenticated;
     grant all on all tables in schema public to authenticated;' >/dev/null
 }
 
 T1="abacus_ownership_enforce_$$"
 T2="abacus_ownership_remed_$$"
+U1='11111111-1111-1111-1111-111111111111'
+RPC_BUDGET='bbbbbbbb-0000-0000-0000-000000000011'
+RPC_CAT_A='cccccccc-0000-0000-0000-000000000011'
+RPC_CAT_B='cccccccc-0000-0000-0000-000000000012'
 
 echo "== 1. enforcement ($T1) =="
 new_db "$T1"
-apply_migrations "$T1" 5
+apply_migrations "$T1" 6
 install_grants "$T1"
 run_sql "$T1" -f supabase/tests/ownership_cross_user.sql >/dev/null
 echo "   enforcement: OK (cross-user INSERT/UPDATE rejected, RLS holds, same-user flows work)"
 
-echo "== 2. remediation ($T2) =="
+echo "== 2. rpc atomicity ($T1) =="
+run_sql "$T1" -f supabase/tests/ownership_rpc_tests.sql >/dev/null
+echo "   atomicity: OK (failed replace leaves prior associations intact, foreign budget/category rejected)"
+
+echo "== 3. rpc concurrency ($T1) =="
+# Session A holds the budget row lock (FOR UPDATE in the RPC guard) while its
+# replace is open; session B must serialize behind it — no mixed state.
+$PSQL "${PSQL_ARGS[@]}" -q -d "$T1" -c "
+  set role authenticated;
+  set app.test_user_id = '$U1';
+  begin;
+  select public.replace_budget_categories('$RPC_BUDGET', array['$RPC_CAT_A']::uuid[]);
+  select pg_sleep(1.5);
+  commit;" >/dev/null &
+A_PID=$!
+sleep 0.4
+
+START=$(date +%s%N)
+run_sql "$T1" -c "set role authenticated;
+  set app.test_user_id = '$U1';
+  select public.replace_budget_categories('$RPC_BUDGET', array['$RPC_CAT_B']::uuid[]);" >/dev/null
+END=$(date +%s%N)
+ELAPSED_MS=$(( (END - START) / 1000000 ))
+wait $A_PID
+
+if [ "$ELAPSED_MS" -lt 1000 ]; then
+  echo "ASSERT FAILED: concurrent replace finished in ${ELAPSED_MS}ms — it did not serialize behind session A" >&2
+  exit 1
+fi
+ASSOC=$(run_sql "$T1" -c "select category_id from budget_categories where budget_id = '$RPC_BUDGET'" --csv | tail -1 | cut -d, -f1)
+if [ "$ASSOC" != "$RPC_CAT_B" ]; then
+  echo "ASSERT FAILED: concurrent replaces left mixed state: $ASSOC, expected exactly $RPC_CAT_B" >&2
+  exit 1
+fi
+echo "   concurrency: OK (B waited ${ELAPSED_MS}ms behind A; final state exactly B's replace, no mix)"
+
+echo "== 4. remediation ($T2) =="
 new_db "$T2"
 apply_migrations "$T2" 4
 run_sql "$T2" -f supabase/tests/ownership_remediation_seed.sql >/dev/null
@@ -129,7 +181,7 @@ install_grants "$T2"
 run_sql "$T2" -f supabase/tests/ownership_remediation_assert.sql >/dev/null
 echo "   remediation: OK (cross-user rows reassigned, foreign refs nulled, arrays converted)"
 
-echo "== 3. idempotency ($T2) =="
+echo "== 5. idempotency ($T2) =="
 run_sql "$T2" -f "supabase/migrations/$OWN_MIGRATION" >/dev/null
 run_sql "$T2" -f supabase/tests/ownership_remediation_assert.sql >/dev/null
 echo "   idempotency: OK (migration re-applied cleanly, data unchanged)"
