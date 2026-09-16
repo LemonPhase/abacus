@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Settings from '@/pages/Settings'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { mockSupabase, getTable, resetAllTables } from '@/test/supabase-mock'
+import { mockSupabase, getTable, resetAllTables, chainableSelect } from '@/test/supabase-mock'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
@@ -83,7 +83,7 @@ describe('Settings identity-safe export/import', () => {
       resolveSelect = resolve
     })
     const originalFrom = mockSupabase.from.getMockImplementation()
-    mockSupabase.from.mockImplementation(() => ({ select: vi.fn(() => pending) }))
+    mockSupabase.from.mockImplementation(() => ({ select: vi.fn(() => chainableSelect(pending)) }))
 
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const user = userEvent.setup()

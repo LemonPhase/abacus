@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { supabase } from '@/supabase/client'
+import { chainableSelect } from '@/test/supabase-mock'
 
 const accountRow = {
   id: 'account-a',
@@ -33,7 +34,7 @@ describe('CRUD session isolation', () => {
       resolveLoad = resolve
     })
     supabase.from = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue(delayedLoad),
+      select: vi.fn().mockReturnValue(chainableSelect(delayedLoad)),
     })
 
     const load = useAccountsStore.getState().load()
@@ -94,7 +95,7 @@ describe('CRUD session isolation', () => {
       subscribe: vi.fn(() => channel),
     }
     supabase.from = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue(Promise.resolve({ data: [], error: null })),
+      select: vi.fn().mockReturnValue(chainableSelect(Promise.resolve({ data: [], error: null }))),
     })
     supabase.channel = vi.fn().mockReturnValue(channel)
 
@@ -109,9 +110,11 @@ describe('CRUD session isolation', () => {
     let resolveLoad: ((value: { data: null; error: { message: string } }) => void) | undefined
     supabase.from = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue(
-        new Promise<{ data: null; error: { message: string } }>((resolve) => {
-          resolveLoad = resolve
-        }),
+        chainableSelect(
+          new Promise<{ data: null; error: { message: string } }>((resolve) => {
+            resolveLoad = resolve
+          }),
+        ),
       ),
     })
 
@@ -149,10 +152,12 @@ describe('CRUD session isolation', () => {
   it('stays usable after reset: a fresh load repopulates for the next user', async () => {
     supabase.from = vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue(
-        Promise.resolve({
-          data: [{ ...accountRow, id: 'account-b', user_id: 'user-b' }],
-          error: null,
-        }),
+        chainableSelect(
+          Promise.resolve({
+            data: [{ ...accountRow, id: 'account-b', user_id: 'user-b' }],
+            error: null,
+          }),
+        ),
       ),
     })
 
@@ -177,7 +182,7 @@ describe('CRUD session isolation', () => {
     ]
     let call = 0
     supabase.from = vi.fn().mockImplementation(() => ({
-      select: vi.fn(() => pending[call++]),
+      select: vi.fn(() => chainableSelect(pending[call++])),
     }))
 
     const older = useAccountsStore.getState().load()
@@ -215,13 +220,8 @@ describe('CRUD session isolation', () => {
     const delayed = new Promise<{ data: (typeof recurringRow)[]; error: null }>((resolve) => {
       resolveLoad = resolve
     })
-    const chainable = {
-      order: vi.fn(() => chainable),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      then: (onFulfilled: (v: any) => any) => delayed.then(onFulfilled),
-    }
     supabase.from = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue(chainable),
+      select: vi.fn().mockReturnValue(chainableSelect(delayed)),
     })
 
     const load = useRecurringTransactionsStore.getState().load()

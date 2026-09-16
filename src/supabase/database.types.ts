@@ -258,48 +258,6 @@ export type Database = {
         }
         Relationships: []
       }
-      recurring_occurrences: {
-        Row: {
-          applied_at: string
-          due_date: string
-          id: string
-          recurring_id: string
-          transaction_id: string | null
-          user_id: string
-        }
-        Insert: {
-          applied_at?: string
-          due_date: string
-          id?: string
-          recurring_id: string
-          transaction_id?: string | null
-          user_id: string
-        }
-        Update: {
-          applied_at?: string
-          due_date?: string
-          id?: string
-          recurring_id?: string
-          transaction_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "recurring_occurrences_recurring_id_fkey"
-            columns: ["recurring_id"]
-            isOneToOne: false
-            referencedRelation: "recurring_transactions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "recurring_occurrences_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       recurring_transactions: {
         Row: {
           account_id: string
@@ -359,13 +317,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "recurring_transactions_account_currency_fkey"
-            columns: ["account_id", "currency"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id", "currency"]
-          },
           {
             foreignKeyName: "recurring_transactions_account_same_user_fkey"
             columns: ["account_id", "user_id"]
@@ -445,13 +396,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_account_currency_fkey"
-            columns: ["account_id", "currency"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id", "currency"]
-          },
-          {
             foreignKeyName: "transactions_account_same_user_fkey"
             columns: ["account_id", "user_id"]
             isOneToOne: false
@@ -476,17 +420,6 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: number
       }
-      apply_recurring_occurrence: {
-        Args: {
-          p_base_amount: number
-          p_base_currency: string
-          p_base_stale: boolean
-          p_fx_date?: string
-          p_fx_rate?: number
-          p_recurring_id: string
-        }
-        Returns: number
-      }
       assert_owned_account: {
         Args: { p_account_id: string; p_user_id: string }
         Returns: {
@@ -507,6 +440,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      budget_spending: {
+        Args: { p_currency: string; p_today: string }
+        Returns: {
+          budget_amount: number
+          budget_id: string
+          budget_name: string
+          budget_period: string
+          spent: number
+        }[]
       }
       convert_transfer_to_plain: {
         Args: {
@@ -648,18 +591,38 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      recurring_next_date: {
-        Args: {
-          p_day_of_month?: number
-          p_frequency: string
-          p_interval_value: number
-          p_next: string
-        }
-        Returns: string
-      }
       replace_budget_categories: {
         Args: { p_budget_id: string; p_category_ids: string[] }
         Returns: undefined
+      }
+      report_by_category: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          category_color: string
+          category_icon: string
+          category_id: string
+          category_name: string
+          expense: number
+          income: number
+        }[]
+      }
+      report_monthly: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          expense: number
+          income: number
+          month_start: string
+          unconverted: number
+        }[]
+      }
+      report_summary: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          expense: number
+          income: number
+          total: number
+          unconverted: number
+        }[]
       }
       restore_user_data: { Args: { p_payload: Json }; Returns: Json }
     }

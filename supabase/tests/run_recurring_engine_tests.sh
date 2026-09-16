@@ -73,6 +73,7 @@ MIGRATIONS=(
   20260917000004_ownership_enforcement.sql
   20260917000005_replace_budget_categories_rpc.sql
   20260918000001_input_invariants.sql
+  20260918000002_report_aggregates.sql
   "$MIGRATION"
 )
 
