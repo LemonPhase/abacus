@@ -73,10 +73,42 @@ export type Database = {
         }
         Relationships: []
       }
+      budget_categories: {
+        Row: {
+          budget_id: string
+          category_id: string
+          user_id: string
+        }
+        Insert: {
+          budget_id: string
+          category_id: string
+          user_id: string
+        }
+        Update: {
+          budget_id?: string
+          category_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_budget_id_user_id_fkey"
+            columns: ["budget_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "budgets"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "budget_categories_category_id_user_id_fkey"
+            columns: ["category_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
       budgets: {
         Row: {
           amount: number
-          category_ids: string[]
           created_at: string
           id: string
           name: string
@@ -87,7 +119,6 @@ export type Database = {
         }
         Insert: {
           amount: number
-          category_ids?: string[]
           created_at?: string
           id?: string
           name: string
@@ -98,7 +129,6 @@ export type Database = {
         }
         Update: {
           amount?: number
-          category_ids?: string[]
           created_at?: string
           id?: string
           name?: string
@@ -145,11 +175,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "categories_parent_id_fkey"
-            columns: ["parent_id"]
+            foreignKeyName: "categories_parent_same_user_fkey"
+            columns: ["parent_id", "user_id"]
             isOneToOne: false
             referencedRelation: "categories"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -288,18 +318,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "recurring_transactions_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: "recurring_transactions_account_same_user_fkey"
+            columns: ["account_id", "user_id"]
             isOneToOne: false
             referencedRelation: "accounts"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
-            foreignKeyName: "recurring_transactions_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "recurring_transactions_category_same_user_fkey"
+            columns: ["category_id", "user_id"]
             isOneToOne: false
             referencedRelation: "categories"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -354,18 +384,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_account_id_fkey"
-            columns: ["account_id"]
+            foreignKeyName: "transactions_account_same_user_fkey"
+            columns: ["account_id", "user_id"]
             isOneToOne: false
             referencedRelation: "accounts"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
-            foreignKeyName: "transactions_category_id_fkey"
-            columns: ["category_id"]
+            foreignKeyName: "transactions_category_same_user_fkey"
+            columns: ["category_id", "user_id"]
             isOneToOne: false
             referencedRelation: "categories"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
