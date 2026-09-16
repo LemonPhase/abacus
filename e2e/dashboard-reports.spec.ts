@@ -88,14 +88,24 @@ async function seedDashboardData(client: SupabaseClient) {
   const { error: txErr } = await client.from('transactions').insert(transactions)
   if (txErr) throw txErr
 
-  const { error: budgetErr } = await client.from('budgets').insert({
-    name: 'Monthly Essentials',
-    amount: 2000,
-    period: 'monthly',
-    start_date: `${y}-${pad(m)}-01`,
-    category_ids: [rent.id, groceries.id],
-  })
+  const { data: budget, error: budgetErr } = await client
+    .from('budgets')
+    .insert({
+      name: 'Monthly Essentials',
+      amount: 2000,
+      period: 'monthly',
+      start_date: `${y}-${pad(m)}-01`,
+    })
+    .select()
+    .single()
   if (budgetErr) throw budgetErr
+
+  // user_id is filled by the set_user_id trigger.
+  const { error: budgetCatErr } = await client.from('budget_categories').insert([
+    { budget_id: budget.id, category_id: rent.id },
+    { budget_id: budget.id, category_id: groceries.id },
+  ])
+  if (budgetCatErr) throw budgetCatErr
 
   return { account, salary, groceries, rent }
 }
