@@ -80,10 +80,14 @@ function makeComparator<T extends { id: string }>(order?: {
   const col = order ? snakeToCamel(order.column) : null
   return (a, b) => {
     if (col) {
+      // Date keys compare by value so the id tiebreak stays reachable for
+      // equal keys (two distinct Date instances are never `===`).
       const av = (a as Record<string, unknown>)[col] as string | number | Date
       const bv = (b as Record<string, unknown>)[col] as string | number | Date
-      if (av !== bv) {
-        const aFirst = av < bv
+      const aVal = av instanceof Date ? +av : av
+      const bVal = bv instanceof Date ? +bv : bv
+      if (aVal !== bVal) {
+        const aFirst = aVal < bVal
         return order!.ascending ? (aFirst ? -1 : 1) : aFirst ? 1 : -1
       }
     }
@@ -116,9 +120,10 @@ function insertSorted<T>(list: T[], item: T, cmp: (a: T, b: T) => number): T[] {
  *   refetch of the current query
  * - Per-event reconcile: insert-if-absent dedupe by id, last-write-wins
  *   updates, evict on delete, ordered per the load query
- * - Paged-window rule: while unfetched pages remain, realtime rows sorting
+ * - Paged-window rule: while unfetched pages remain, rows sorting
  *   beyond the loaded window are left for `loadMore` (they only bump `total`),
- *   so offset paging state is never corrupted
+ *   so offset paging state is never corrupted — enforced for realtime events
+ *   AND optimistic inserts/updates
  * - Optimistic local state updates with duplicate guards
  * - Session-generation protection: `reset()` invalidates every in-flight
  *   operation and tears down realtime
@@ -155,6 +160,8 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   // Session generation the current realtime subscription was created under.
   let subscriptionToken: number | null = null
   let sawDisconnect = false
+  // Wall clock of the last reconnect reconcile — debounces flapping links.
+  let lastReconcileAt = 0
 
   function getItems(getter: GetFn): T[] {
     return (getter() as Record<string, T[]>)[collectionKey] ?? []
@@ -212,7 +219,14 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
           ...(payload.eventType === 'INSERT' ? totalBump(state, 1) : {}),
         }
       }
-      // Last write wins: replace in place.
+      // Last write wins: replace in place. If the update moves the row
+      // beyond the loaded window while more pages remain, evict instead —
+      // it now lives on an unloaded page, and keeping it would break the
+      // contiguous-prefix invariant loadMore()'s offset relies on.
+      const last = list[list.length - 1]
+      if ((state.hasMore as boolean) && compareItems(item, last) > 0) {
+        return { [collectionKey]: list.filter((i) => i.id !== item.id) }
+      }
       return { [collectionKey]: list.map((i) => (i.id === item.id ? item : i)) }
     })
   }
@@ -237,6 +251,9 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     error: { message: string } | null
     count: number | null
   }
+
+  /** Minimum interval between reconnect-triggered reconcile refetches. */
+  const RECONCILE_DEBOUNCE_MS = 5000
 
   // set/get come from Zustand, which has store-specific types.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,9 +285,13 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         return
       }
       // Rejoined after a drop: events during the outage are lost, so silently
-      // re-run the current query to reconcile.
+      // re-run the current query to reconcile. Debounced: on a flapping link
+      // rejoins arrive in quick succession — skip ones inside the window;
+      // sawDisconnect stays set so the next rejoin after it retries.
       if (sawDisconnect && lastQueryOptions) {
+        if (Date.now() - lastReconcileAt < RECONCILE_DEBOUNCE_MS) return
         sawDisconnect = false
+        lastReconcileAt = Date.now()
         void load(
           { ...lastQueryOptions, offset: undefined, append: undefined },
           { silent: true },
@@ -418,6 +439,13 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         const list = getItems(() => state)
         // Realtime echo may have landed first — never duplicate.
         if (list.some((i) => i.id === item.id)) return state
+        const last = list[list.length - 1]
+        // Paged window rule (same as realtime inserts): with unfetched pages
+        // remaining, a row sorting beyond the loaded window is left for
+        // loadMore() — applying it here would corrupt the offset paging.
+        if ((state.hasMore as boolean) && last && compareItems(item, last) > 0) {
+          return totalBump(state, 1)
+        }
         return {
           [collectionKey]: insertSorted(list, item, compareItems),
           ...totalBump(state, 1),
@@ -459,16 +487,22 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         const list = getItems(() => state)
         const existing = new Set(list.map((i) => i.id))
         let newList = list
+        let newCount = 0
         for (const item of items) {
           // Dedupe by id: the realtime echo of these inserts may have landed
           // before the response.
           if (existing.has(item.id)) continue
           existing.add(item.id)
+          newCount++
+          // Paged window rule (same as realtime inserts): beyond-window rows
+          // are left for loadMore(), they only count toward total.
+          const last = newList[newList.length - 1]
+          if ((state.hasMore as boolean) && last && compareItems(item, last) > 0) continue
           newList = insertSorted(newList, item, compareItems)
         }
         return {
           [collectionKey]: newList,
-          ...totalBump(state, newList.length - list.length),
+          ...totalBump(state, newCount),
         }
       })
       return items
@@ -485,11 +519,24 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         throw error
       }
       const camelData = mapKeysToCamel<Record<string, unknown>>(data)
-      set((state: Record<string, unknown>) => ({
-        [collectionKey]: getItems(() => state).map((item) =>
-          item.id === id ? { ...item, ...camelData } : item,
-        ),
-      }))
+      set((state: Record<string, unknown>) => {
+        const list = getItems(() => state)
+        const updated = list.map((item) => (item.id === id ? { ...item, ...camelData } : item))
+        // Paged window rule (same as realtime updates): if the update moved
+        // the row beyond the loaded window while more pages remain, evict it
+        // — it now belongs to an unloaded page.
+        const updatedItem = updated.find((item) => item.id === id)
+        const last = list[list.length - 1]
+        if (
+          updatedItem &&
+          (state.hasMore as boolean) &&
+          last &&
+          compareItems(updatedItem, last) > 0
+        ) {
+          return { [collectionKey]: list.filter((item) => item.id !== id) }
+        }
+        return { [collectionKey]: updated }
+      })
     }
 
     const remove = async (id: string): Promise<void> => {
@@ -528,6 +575,8 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       lastPageOptions = null
       lastQueryOptions = null
       pendingEvents = null
+      sawDisconnect = false
+      lastReconcileAt = 0
       set({
         [collectionKey]: [],
         loading: false,

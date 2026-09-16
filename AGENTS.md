@@ -56,7 +56,6 @@ const crud = createCrudSlice<DomainType>({
   table: 'table_name', // from Database['public']['Tables']
   collectionKey: 'items', // state key, e.g. 'accounts', 'plans'
   order: { column: 'date', ascending: false }, // optional
-  prependInsert: true, // optional — new items go to front
   mapRow: (row) => mapRow(row as RowType),
 })
 

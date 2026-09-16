@@ -33,13 +33,23 @@ export function getTable(name: string): Record<string, unknown>[] {
   return tables.get(name)!
 }
 
+// PostgREST delivers JSON payloads, so Date values arrive as ISO strings —
+// normalize them or the mock's string-based ordering breaks on Date keys.
+function normalizePayload(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(row)) {
+    out[key] = row[key] instanceof Date ? (row[key] as Date).toISOString() : row[key]
+  }
+  return out
+}
+
 function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
   const now = new Date().toISOString()
   return {
     id: genId(),
     created_at: now,
     updated_at: now,
-    ...overrides,
+    ...(overrides ? normalizePayload(overrides) : {}),
   }
 }
 
@@ -330,7 +340,9 @@ function createBuilder(tableName: string): any {
 
         for (const target of targets) {
           const oldRow = { ...target }
-          Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
+          Object.assign(target, normalizePayload((_payload ?? {}) as Record<string, unknown>), {
+            updated_at: new Date().toISOString(),
+          })
           if (tableName === 'accounts') {
             // Opening-balance edits re-derive the balance.
             recomputeBalance(target.id as string)

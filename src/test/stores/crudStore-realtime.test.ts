@@ -602,4 +602,185 @@ describe('reconnect reconcile', () => {
     // Existing data is kept.
     expect(useAccountsStore.getState().accounts.map((a) => a.id)).toEqual(['acc-1'])
   })
+
+  it('debounces reconcile refetches on a flapping link', async () => {
+    const cc = controlledChannel()
+    supabase.channel = vi.fn(() => cc.channel)
+    getTable('accounts').push(accountRow('acc-1'))
+
+    await useAccountsStore.getState().load()
+    const fromMock = supabase.from as unknown as ReturnType<typeof vi.fn>
+    const queriesPerLoad = fromMock.mock.calls.length
+
+    // First rejoin: reconcile fires (debounce window is fresh after reset).
+    cc.status('CHANNEL_ERROR')
+    cc.status('SUBSCRIBED')
+    await vi.waitFor(() => {
+      expect(fromMock.mock.calls.length).toBe(queriesPerLoad * 2)
+    })
+
+    // Immediate re-flap within the debounce window: no second refetch.
+    cc.status('CHANNEL_ERROR')
+    cc.status('SUBSCRIBED')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(fromMock.mock.calls.length).toBe(queriesPerLoad * 2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Comparator: id tiebreak for Date sort keys
+// ---------------------------------------------------------------------------
+
+describe('comparator id tiebreak', () => {
+  it('same-date inserts land at the server position (id tiebreak reachable for Date keys)', async () => {
+    const cc = controlledChannel()
+    supabase.channel = vi.fn(() => cc.channel)
+    // Same date for all rows; tx-r2 sorts between tx-r1 and tx-r3 by id.
+    getTable('transactions').push(txRow('tx-r1', '2026-01-01'), txRow('tx-r3', '2026-01-01'))
+
+    await useTransactionsStore.getState().load()
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-r1',
+      'tx-r3',
+    ])
+
+    cc.insert(txRow('tx-r2', '2026-01-01'))
+
+    // Server order for (date desc, id asc) is tx-r1, tx-r2, tx-r3.
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-r1',
+      'tx-r2',
+      'tx-r3',
+    ])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Paged-window rule on the app's own mutation paths
+// ---------------------------------------------------------------------------
+
+describe('paged window rule: app mutation paths', () => {
+  it('add beyond the window defers to loadMore (no silently skipped row)', async () => {
+    // Server order: tx-00002 (01-03), tx-00001 (01-02), tx-00000 (01-01).
+    seedTransactions(3)
+    await useTransactionsStore.getState().load({ limit: 2 })
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-00002',
+      'tx-00001',
+    ])
+
+    // Back-dated row through the public add path: sorts beyond the window.
+    const added = await useTransactionsStore.getState().add({
+      accountId: 'acc-1',
+      categoryId: null,
+      type: 'expense',
+      amount: 5,
+      currency: 'USD',
+      date: new Date('2025-12-01'),
+    })
+
+    // Not appended: it would break the prefix invariant loadMore relies on.
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-00002',
+      'tx-00001',
+    ])
+    expect(useTransactionsStore.getState().total).toBe(4)
+
+    // Paging continues from the right offset: EVERY row loads exactly once.
+    await useTransactionsStore.getState().loadMore()
+    const txs = useTransactionsStore.getState().transactions
+    expect(txs.map((t) => t.id)).toEqual(['tx-00002', 'tx-00001', 'tx-00000', added.id])
+  })
+
+  it('bulkAdd beyond the window defers to loadMore', async () => {
+    seedTransactions(3)
+    await useTransactionsStore.getState().load({ limit: 2 })
+
+    const [imported] = await useTransactionsStore.getState().bulkAdd([
+      {
+        accountId: 'acc-1',
+        categoryId: null,
+        type: 'expense',
+        amount: 9,
+        currency: 'USD',
+        date: new Date('2025-11-01'),
+      },
+    ])
+
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-00002',
+      'tx-00001',
+    ])
+    expect(useTransactionsStore.getState().total).toBe(4)
+
+    await useTransactionsStore.getState().loadMore()
+    const txs = useTransactionsStore.getState().transactions
+    expect(txs.map((t) => t.id)).toEqual(['tx-00002', 'tx-00001', 'tx-00000', imported.id])
+  })
+
+  it('a realtime update moving a held row beyond the window evicts it (loadMore stays consistent)', async () => {
+    const cc = controlledChannel()
+    supabase.channel = vi.fn(() => cc.channel)
+    seedTransactions(3)
+    await useTransactionsStore.getState().load({ limit: 2 })
+
+    // Server-side update + realtime echo: tx-00001 moves out of the window.
+    const table = getTable('transactions')
+    const row = table.find((r) => r.id === 'tx-00001')!
+    row.date = '2025-11-01'
+    cc.update({ ...row })
+
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual(['tx-00002'])
+    expect(useTransactionsStore.getState().total).toBe(3)
+
+    // Paging continues from the right offset: tx-00000 is not skipped.
+    await useTransactionsStore.getState().loadMore()
+    const txs = useTransactionsStore.getState().transactions
+    expect(txs.map((t) => t.id)).toEqual(['tx-00002', 'tx-00000', 'tx-00001'])
+    expect(
+      txs
+        .find((t) => t.id === 'tx-00001')
+        ?.date.toISOString()
+        .slice(0, 10),
+    ).toBe('2025-11-01')
+  })
+
+  it('an optimistic update moving a row beyond the window evicts it', async () => {
+    // The mock validates transaction updates against the accounts table.
+    getTable('accounts').push(accountRow('acc-1'))
+    seedTransactions(3)
+    await useTransactionsStore.getState().load({ limit: 2 })
+
+    // The real mock builder applies the update to the in-memory table too,
+    // keeping the server ordering in sync.
+    await useTransactionsStore.getState().update('tx-00001', { date: new Date('2025-11-01') })
+
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual(['tx-00002'])
+
+    await useTransactionsStore.getState().loadMore()
+    expect(useTransactionsStore.getState().transactions.map((t) => t.id)).toEqual([
+      'tx-00002',
+      'tx-00000',
+      'tx-00001',
+    ])
+  })
+
+  it('an update moving a row within the window keeps replace-in-place', async () => {
+    const cc = controlledChannel()
+    supabase.channel = vi.fn(() => cc.channel)
+    seedTransactions(3)
+    await useTransactionsStore.getState().load({ limit: 2 })
+
+    // New date is still newer than the window head → within the window.
+    cc.update(txRow('tx-00001', '2026-01-25'))
+
+    const state = useTransactionsStore.getState()
+    expect(state.transactions.map((t) => t.id).sort()).toEqual(['tx-00001', 'tx-00002'])
+    expect(
+      state.transactions
+        .find((t) => t.id === 'tx-00001')
+        ?.date.toISOString()
+        .slice(0, 10),
+    ).toBe('2026-01-25')
+  })
 })
