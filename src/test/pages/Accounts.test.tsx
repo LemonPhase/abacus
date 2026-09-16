@@ -76,6 +76,55 @@ describe('Accounts page — opening balance semantics', () => {
     expect(useAccountsStore.getState().accounts[0].openingBalance).toBe(250)
   })
 
+  it('locks and annotates the currency field when the account has transactions', async () => {
+    seedAccount(makeAccount())
+    useTransactionsStore.setState({
+      transactions: [
+        {
+          id: 'tx-1',
+          accountId: 'acc-1',
+          categoryId: null,
+          type: 'expense',
+          amount: 10,
+          currency: 'USD',
+          baseAmount: 10,
+          baseCurrency: 'USD',
+          baseAmountStale: false,
+          fxRate: null,
+          fxDate: null,
+          date: new Date('2026-01-02'),
+          createdAt: new Date('2026-01-02'),
+          updatedAt: new Date('2026-01-02'),
+        },
+      ],
+      loading: false,
+      _unsub: null,
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Checking' }))
+
+    // Pre-emptive guard for the 20260918000001 currency-pinning FK: the field
+    // is disabled with a reason, not left to fail at the database.
+    expect(
+      await screen.findByText(/Currency can.t be changed while transactions reference/),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Currency')).toBeDisabled()
+  })
+
+  it('keeps the currency field editable when the account has no transactions', async () => {
+    seedAccount(makeAccount())
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(await screen.findByRole('button', { name: 'Edit Checking' }))
+
+    await screen.findByLabelText('Opening balance')
+    expect(screen.getByLabelText('Currency')).toBeEnabled()
+    expect(screen.queryByText(/Currency can.t be changed/)).not.toBeInTheDocument()
+  })
+
   it('edit dialog shows the derived current balance read-only and the opening balance', async () => {
     seedAccount(makeAccount())
     const user = userEvent.setup()

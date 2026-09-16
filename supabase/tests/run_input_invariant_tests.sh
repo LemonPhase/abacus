@@ -22,7 +22,8 @@
 #   4. idempotency: re-apply the migration; data state must be unchanged
 #
 # Usage: supabase/tests/run_input_invariant_tests.sh
-# Requires psql + a reachable PostgreSQL server (default: local socket), 14+.
+# Requires psql + a reachable PostgreSQL server (default: local socket).
+# Tested against PostgreSQL 14+ (the migration needs nothing beyond stock PG).
 # Skips with exit 0 (message on stderr) when no server is reachable.
 
 set -euo pipefail
@@ -69,7 +70,7 @@ if ! $PSQL "${PSQL_ARGS[@]}" -d "$ADMIN_DB" -tAc 'select 1' >/dev/null 2>&1; the
 fi
 
 if [ "$($PSQL "${PSQL_ARGS[@]}" -d "$ADMIN_DB" -tAc 'show server_version_num' | cut -c1-2)" -lt 14 ]; then
-  echo "SKIP: PostgreSQL 14+ required (isfinite(numeric)); input invariant DB tests not run" >&2
+  echo "SKIP: PostgreSQL too old (suite tested on 14+); input invariant DB tests not run" >&2
   exit 0
 fi
 

@@ -14,6 +14,12 @@
 --     by the composite FKs below. Remediation: normalize case only — a 3-letter
 --     code in another case is the same currency; anything else has no faithful
 --     repair and fails the constraint so corrupted identifiers surface here.
+--     Known failure mode: if exchange_rates already holds the same currency
+--     pair in both cases for one user/day (e.g. 'usd→eur' and 'USD→EUR'),
+--     case normalization collides with idx_exchange_rates_user_currency_date
+--     and this migration aborts with a unique violation — failing is correct
+--     (deduplicating would delete rows); merge such duplicates before
+--     deploying.
 --
 --   Transaction/account currency consistency (repaired, VALID)
 --     A transaction's amount is denominated in its account's currency
