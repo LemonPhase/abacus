@@ -35,9 +35,18 @@ export interface Transaction {
   categoryId: string | null
   type: TransactionKind
   amount: number
+  /** Currency the amount is denominated in (the account's currency). */
   currency: string
+  /** Amount converted into the reporting currency `baseCurrency`. */
   baseAmount: number
+  /** Reporting currency this conversion was computed for. */
   baseCurrency: string
+  /** FX quote used for the conversion; null for identity conversions or when unavailable. */
+  fxRate: number | null
+  /** Date (YYYY-MM-DD) the FX quote applies to; null for identity conversions. */
+  fxDate: string | null
+  /** True when base_amount predates provenance tracking or no reliable rate was available. */
+  baseAmountStale: boolean
   date: Date
   description?: string
   correlativeId?: string
@@ -109,9 +118,17 @@ export interface UserSettings {
 // clients create/correct accounts via openingBalance only.
 export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'balance'>
 export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+// base fields are derived at write time from amount/currency/date (see transactionsStore)
 export type NewTransaction = Omit<
   Transaction,
-  'id' | 'baseAmount' | 'baseCurrency' | 'createdAt' | 'updatedAt'
+  | 'id'
+  | 'baseAmount'
+  | 'baseCurrency'
+  | 'fxRate'
+  | 'fxDate'
+  | 'baseAmountStale'
+  | 'createdAt'
+  | 'updatedAt'
 >
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
 

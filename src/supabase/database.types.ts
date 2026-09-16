@@ -230,61 +230,61 @@ export type Database = {
       }
       recurring_transactions: {
         Row: {
-          id: string
-          user_id: string
-          created_at: string
-          updated_at: string
           account_id: string
-          category_id: string | null
-          type: string
           amount: number
+          category_id: string | null
+          created_at: string
           currency: string
-          description: string | null
-          frequency: string
-          interval_value: number
           day_of_month: number | null
-          start_date: string
+          description: string | null
           end_date: string | null
-          next_date: string
+          frequency: string
+          id: string
+          interval_value: number
           is_active: boolean
+          next_date: string
+          start_date: string
+          type: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          updated_at?: string
           account_id: string
-          category_id?: string | null
-          type: string
           amount: number
+          category_id?: string | null
+          created_at?: string
           currency?: string
-          description?: string | null
-          frequency: string
-          interval_value?: number
           day_of_month?: number | null
-          start_date?: string
+          description?: string | null
           end_date?: string | null
-          next_date?: string
+          frequency: string
+          id?: string
+          interval_value?: number
           is_active?: boolean
+          next_date?: string
+          start_date?: string
+          type: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          updated_at?: string
           account_id?: string
-          category_id?: string | null
-          type?: string
           amount?: number
+          category_id?: string | null
+          created_at?: string
           currency?: string
-          description?: string | null
-          frequency?: string
-          interval_value?: number
           day_of_month?: number | null
-          start_date?: string
+          description?: string | null
           end_date?: string | null
-          next_date?: string
+          frequency?: string
+          id?: string
+          interval_value?: number
           is_active?: boolean
+          next_date?: string
+          start_date?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -308,6 +308,7 @@ export type Database = {
           account_id: string
           amount: number
           base_amount: number
+          base_amount_stale: boolean
           base_currency: string
           category_id: string | null
           correlative_id: string | null
@@ -315,6 +316,8 @@ export type Database = {
           currency: string
           date: string
           description: string | null
+          fx_date: string | null
+          fx_rate: number | null
           id: string
           type: string
           updated_at: string
@@ -324,6 +327,7 @@ export type Database = {
           account_id: string
           amount: number
           base_amount: number
+          base_amount_stale?: boolean
           base_currency: string
           category_id?: string | null
           correlative_id?: string | null
@@ -331,6 +335,8 @@ export type Database = {
           currency: string
           date: string
           description?: string | null
+          fx_date?: string | null
+          fx_rate?: number | null
           id?: string
           type: string
           updated_at?: string
@@ -340,6 +346,7 @@ export type Database = {
           account_id?: string
           amount?: number
           base_amount?: number
+          base_amount_stale?: boolean
           base_currency?: string
           category_id?: string | null
           correlative_id?: string | null
@@ -347,6 +354,8 @@ export type Database = {
           currency?: string
           date?: string
           description?: string | null
+          fx_date?: string | null
+          fx_rate?: number | null
           id?: string
           type?: string
           updated_at?: string
@@ -374,7 +383,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      account_ledger_effects: {
+        Args: { p_account_id: string }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
@@ -393,12 +405,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -422,11 +434,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -447,11 +459,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -472,11 +484,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -489,11 +501,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

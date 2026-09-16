@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart,
@@ -15,6 +15,8 @@ import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { BudgetGauge } from '@/components/budgets/BudgetGauge'
 import { Loader2, TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
 import { getBudgetColors, getBudgetStatus } from '@/lib/budget'
+import { convertCurrency } from '@/services/exchange'
+import { reliableBaseAmount } from '@/lib/currency'
 import { Button } from '@/components/ui/button'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
@@ -106,7 +108,39 @@ export default function Dashboard() {
     loadCategories()
   }, [loadAccounts, loadTxn, loadBudgets, loadCategories])
 
-  const netWorth = useMemo(() => accounts.reduce((sum, a) => sum + a.balance, 0), [accounts])
+  // Account balances are denominated in each account's currency; convert each
+  // to the reporting currency (current quote — net worth is a current value).
+  // Accounts whose rate is unavailable are excluded and counted, never summed 1:1.
+  const [netWorth, setNetWorth] = useState<number | null>(null)
+  const [unconvertedAccounts, setUnconvertedAccounts] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    async function convertBalances() {
+      let total = 0
+      let failed = 0
+      for (const a of accounts) {
+        const converted = await convertCurrency(a.balance, a.currency, baseCurrency)
+        if (converted === null) failed++
+        else total += converted
+      }
+      if (!cancelled) {
+        setNetWorth(total)
+        setUnconvertedAccounts(failed)
+      }
+    }
+    convertBalances()
+    return () => {
+      cancelled = true
+    }
+  }, [accounts, baseCurrency])
+
+  const unconvertedTxns = useMemo(
+    () =>
+      transactions.filter(
+        (t) => t.type !== 'transfer' && reliableBaseAmount(t, baseCurrency) === null,
+      ).length,
+    [transactions, baseCurrency],
+  )
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
 
@@ -131,11 +165,13 @@ export default function Dashboard() {
         return md.getTime() === nowd.getTime()
       })
       if (idx === -1) continue
-      if (t.type === 'income') months[idx].income += t.baseAmount
-      if (t.type === 'expense') months[idx].expense += t.baseAmount
+      const base = reliableBaseAmount(t, baseCurrency)
+      if (base === null) continue
+      if (t.type === 'income') months[idx].income += base
+      if (t.type === 'expense') months[idx].expense += base
     }
     return months
-  }, [transactions])
+  }, [transactions, baseCurrency])
 
   const categorySpending = useMemo(() => {
     const now = new Date()
@@ -147,12 +183,14 @@ export default function Dashboard() {
       const d = new Date(t.date)
       if (d < start || d > end) continue
       const name = (t.categoryId && categoryMap.get(t.categoryId)?.name) || 'Other'
-      map.set(name, (map.get(name) ?? 0) + t.baseAmount)
+      const base = reliableBaseAmount(t, baseCurrency)
+      if (base === null) continue
+      map.set(name, (map.get(name) ?? 0) + base)
     }
     return Array.from(map.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
-  }, [transactions, categoryMap])
+  }, [transactions, categoryMap, baseCurrency])
 
   const currentMonthIncome = useMemo(() => {
     if (monthlyData.length === 0) return 0
@@ -178,13 +216,15 @@ export default function Dashboard() {
         if (!b.categoryIds.includes(t.categoryId)) continue
         const d = new Date(t.date)
         if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-          spent += t.baseAmount
+          const base = reliableBaseAmount(t, baseCurrency)
+          if (base === null) continue
+          spent += base
         }
       }
       total += b.amount - spent
     }
     return total
-  }, [budgets, transactions])
+  }, [budgets, transactions, baseCurrency])
 
   const aggregateBudgetProgress = useMemo(() => {
     if (budgets.length === 0) return null
@@ -203,13 +243,15 @@ export default function Dashboard() {
             ? d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
             : d.getFullYear() === now.getFullYear()
         ) {
-          totalSpent += t.baseAmount
+          const base = reliableBaseAmount(t, baseCurrency)
+          if (base === null) continue
+          totalSpent += base
         }
       }
     }
     const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
     return { spent: totalSpent, total: totalBudget, percentage: pct }
-  }, [budgets, transactions])
+  }, [budgets, transactions, baseCurrency])
 
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
   const isLoading = loadingAccounts || loadingTxn || loadingBudgets || loadingCategories
@@ -230,7 +272,7 @@ export default function Dashboard() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Net Worth"
-              value={formatCurrency(netWorth, baseCurrency)}
+              value={netWorth === null ? '…' : formatCurrency(netWorth, baseCurrency)}
               icon={Wallet}
               variant="primary"
             />
@@ -252,6 +294,15 @@ export default function Dashboard() {
               icon={PiggyBank}
             />
           </div>
+
+          {(unconvertedAccounts > 0 || unconvertedTxns > 0) && (
+            <p className="text-xs text-muted-foreground">
+              {unconvertedAccounts > 0 &&
+                `${unconvertedAccounts} account${unconvertedAccounts > 1 ? 's' : ''} excluded from Net Worth (exchange rate unavailable). `}
+              {unconvertedTxns > 0 &&
+                `${unconvertedTxns} transaction${unconvertedTxns > 1 ? 's' : ''} not yet converted to ${baseCurrency} ${unconvertedTxns > 1 ? 'are' : 'is'} excluded from totals; edit them to convert.`}
+            </p>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl bg-card p-5 border border-border/30">
@@ -386,7 +437,7 @@ export default function Dashboard() {
                           : tx.type === 'expense' || (tx.type === 'transfer' && tx.amount < 0)
                             ? '−'
                             : '↔'}
-                        {formatCurrency(Math.abs(tx.baseAmount), baseCurrency)}
+                        {formatCurrency(Math.abs(tx.amount), tx.currency)}
                       </span>
                     </div>
                   ))}
@@ -430,7 +481,9 @@ export default function Dashboard() {
                               d.getFullYear() === now.getFullYear()
                             : d.getFullYear() === now.getFullYear()
                         ) {
-                          spent += t.baseAmount
+                          const base = reliableBaseAmount(t, baseCurrency)
+                          if (base === null) continue
+                          spent += base
                         }
                       }
                       const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
