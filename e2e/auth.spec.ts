@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 import {
   test,
   publicTest,
@@ -131,6 +133,36 @@ publicTest.describe('Sign up', () => {
   })
 })
 
+/**
+ * Local Supabase's mail server (Mailpit, port 54324) captures every email the
+ * stack sends; supabase CLI v2 replaced Inbucket, so we use Mailpit's API.
+ * GoTrue rate-limits password-reset emails to 2/hour (supabase/config.toml),
+ * so don't re-run this test in a tight loop.
+ */
+async function fetchRecoveryLink(email: string): Promise<string> {
+  const base = 'http://127.0.0.1:54324/api/v1'
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const res = await fetch(`${base}/search?query=to:${encodeURIComponent(email)}`)
+    if (res.ok) {
+      const { messages } = (await res.json()) as { messages?: Array<{ ID: string }> }
+      const message = messages?.at(-1)
+      if (message) {
+        const full = await fetch(`${base}/message/${message.ID}`)
+        if (full.ok) {
+          const content = JSON.stringify(await full.json())
+          const link = content
+            .match(/https?:\/\/[^"\\\s<>]+/g)
+            ?.find((url) => url.includes('/auth/v1/verify'))
+          if (link) return link.replaceAll('&amp;', '&')
+        }
+      }
+    }
+    await new Promise((done) => setTimeout(done, 500))
+  }
+  throw new Error(`No recovery email arrived in Mailpit for ${email} after 10s`)
+}
+
 publicTest.describe('Forgot password', () => {
   publicTest('submitting the form shows the confirmation view', async ({ page }) => {
     await page.goto('/auth')
@@ -144,6 +176,50 @@ publicTest.describe('Forgot password', () => {
     await expect(page.getByText(/If an account exists for/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back to sign in' })).toBeVisible()
   })
+
+  publicTest(
+    'recovery link redirects to /auth/reset-password and sets a new password',
+    async ({ page }) => {
+      const user = await createTestUser()
+      try {
+        const client = createClient(
+          process.env.SUPABASE_URL!,
+          process.env.SUPABASE_PUBLISHABLE_KEY!,
+          {
+            auth: { autoRefreshToken: false, persistSession: false },
+          },
+        )
+        const { error } = await client.auth.resetPasswordForEmail(user.email, {
+          redirectTo: 'http://localhost:5173/auth/reset-password',
+        })
+        expect(error).toBeNull()
+
+        const link = await fetchRecoveryLink(user.email)
+
+        // The email deep-links into the SPA (/auth/reset-password#access_token=…).
+        // On a static host this only resolves when the deployment serves the app
+        // shell for extensionless paths — the routing config under test (#6).
+        // Resolve GoTrue's verify redirect server-side (node fetch) and navigate
+        // the browser to the SPA deep link it produces: a top-level navigation
+        // to the API port itself is refused on CI runners even though page-level
+        // fetches to the same port succeed.
+        const verify = await fetch(link, { redirect: 'manual' })
+        expect([302, 303]).toContain(verify.status)
+        const deepLink = verify.headers.get('location')
+        expect(deepLink).toBeTruthy()
+        const response = await page.goto(deepLink!)
+        expect(response?.status()).toBe(200)
+        await expect(page).toHaveURL(/\/auth\/reset-password/)
+        await expect(page.locator('input[id="password"]')).toBeVisible()
+
+        await page.locator('input[id="password"]').fill('brand-new-password-456')
+        await page.getByRole('button', { name: 'Set new password' }).click()
+        await expect(page.getByText('Password updated')).toBeVisible()
+      } finally {
+        await deleteTestUser(user.id)
+      }
+    },
+  )
 })
 
 test.describe('Sign out', () => {
