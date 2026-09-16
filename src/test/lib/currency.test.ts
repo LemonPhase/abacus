@@ -21,7 +21,7 @@ describe('formatCurrency', () => {
   })
 })
 
-import { roundCurrency, reliableBaseAmount, sumReliableBase } from '@/lib/currency'
+import { roundCurrency, reliableBaseAmount } from '@/lib/currency'
 import type { Transaction } from '@/types'
 
 function txn(overrides: Partial<Transaction>): Transaction {
@@ -84,18 +84,5 @@ describe('reliableBaseAmount', () => {
         'USD',
       ),
     ).toBeNull()
-  })
-})
-
-describe('sumReliableBase', () => {
-  it('sums reliable rows and counts unconverted ones', () => {
-    const txns = [
-      txn({ id: 'a', currency: 'USD' }),
-      txn({ id: 'b', currency: 'EUR', baseAmount: 50, baseCurrency: 'USD' }),
-      txn({ id: 'c', currency: 'EUR', baseAmount: 99, baseCurrency: 'EUR', baseAmountStale: true }),
-    ]
-    const { total, unconverted } = sumReliableBase(txns, 'USD')
-    expect(total).toBe(150)
-    expect(unconverted).toBe(1)
   })
 })

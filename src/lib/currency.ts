@@ -37,18 +37,3 @@ export function reliableBaseAmount(t: Transaction, reporting: string): number | 
   if (t.baseCurrency === reporting && !t.baseAmountStale) return t.baseAmount
   return null
 }
-
-/** Sum reliable base amounts; `unconverted` counts rows excluded from `total`. */
-export function sumReliableBase(
-  txns: Transaction[],
-  reporting: string,
-): { total: number; unconverted: number } {
-  let total = 0
-  let unconverted = 0
-  for (const t of txns) {
-    const amount = reliableBaseAmount(t, reporting)
-    if (amount === null) unconverted++
-    else total += amount
-  }
-  return { total, unconverted }
-}

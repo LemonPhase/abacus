@@ -73,7 +73,7 @@ describe('transactionsStore currency handling', () => {
     expect(reliableBaseAmount(txn, 'USD')).toBeNull()
   })
 
-  it('labels historical conversions with the real quote date, never back-filling cache', async () => {
+  it('labels historical conversions with the real quote date and fills the fetch-day cache row', async () => {
     const mockFetch = stubRate({ USD: 1.08 })
     const store = useTransactionsStore.getState()
     const txn = await store.add({
@@ -88,7 +88,50 @@ describe('transactionsStore currency handling', () => {
     expect(txn.baseAmount).toBe(108)
     expect(txn.fxDate).toBe(todayStr()) // quote is "as of today", not 2020-06-15
     expect(mockFetch).toHaveBeenCalledTimes(1)
-    expect(getTable('exchange_rates')).toHaveLength(0) // no historical cache fill
+    // The quote is cached under the fetch day — never under the historical date.
+    const cacheRows = getTable('exchange_rates')
+    expect(cacheRows).toHaveLength(1)
+    expect(cacheRows[0].date).toBe(todayStr())
+  })
+
+  // Regression: dialog dates parse as UTC midnight ("yesterday" west of UTC);
+  // the cache read/write used to be skipped there. With a fixed west-of-UTC
+  // test timezone, the cache row must still be written and the stored
+  // transaction date must still round-trip to the entered day.
+  it('fills the cache for dialog-entered dates in a UTC-negative timezone', async () => {
+    const originalTz = process.env.TZ
+    process.env.TZ = 'America/New_York'
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-17T15:00:00Z')) // local: Sep 17, 11:00 EDT
+    const mockFetch = stubRate({ USD: 1.08 })
+
+    try {
+      const store = useTransactionsStore.getState()
+      const txn = await store.add({
+        accountId: 'acc-1',
+        categoryId: null,
+        type: 'expense',
+        amount: 50,
+        currency: 'EUR',
+        date: new Date('2026-09-17'), // dialog-style UTC-midnight parse
+      })
+
+      expect(txn.baseAmount).toBe(54)
+      expect(txn.fxDate).toBe('2026-09-17')
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      expect(getTable('exchange_rates')).toHaveLength(1)
+
+      // The stored date column still yields the entered day: supabase-js
+      // serializes the Date to a full ISO instant, which Postgres casts to a
+      // date per its session timezone — UTC midnight serializes to the entered
+      // day in every zone.
+      const dbRow = getTable('transactions').find((r) => r.id === txn.id)
+      const serialized = JSON.parse(JSON.stringify(dbRow?.date)) as string
+      expect(serialized.slice(0, 10)).toBe('2026-09-17')
+    } finally {
+      vi.useRealTimers()
+      process.env.TZ = originalTz
+    }
   })
 
   it('recalculates base fields when the amount is edited', async () => {

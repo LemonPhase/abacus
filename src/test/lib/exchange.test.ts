@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { fetchExchangeRate, getRate, convertCurrency } from '@/services/exchange'
 import { getTable, resetAllTables } from '@/test/supabase-mock'
 
@@ -87,7 +87,7 @@ describe('getRate', () => {
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it('labels a current quote with today as asOf, even for a historical date', async () => {
+  it('labels a current quote with the fetch day as asOf, even for a historical transaction date', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ result: 'success', rates: { USD: 1.08 } }),
@@ -95,28 +95,26 @@ describe('getRate', () => {
 
     const quote = await getRate('EUR', 'USD', new Date('2020-01-01'))
     expect(quote).toEqual({ rate: 1.08, asOf: todayStr() })
-    // Historical dates must not be filled with a current quote.
-    expect(getTable('exchange_rates')).toHaveLength(0)
+    // The quote is cached under the fetch day — never under the historical date.
+    const rows = getTable('exchange_rates')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].date).toBe(todayStr())
   })
 
-  it('does not read cache rows for historical dates', async () => {
+  it('reuses the cached quote for historical transaction dates (still labeled with the fetch day)', async () => {
     getTable('exchange_rates').push({
-      id: 'old',
+      id: 'today',
       from_currency: 'EUR',
       to_currency: 'USD',
-      rate: 0.5,
-      date: '2020-01-01',
+      rate: 1.05,
+      date: todayStr(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve({ result: 'success', rates: { USD: 1.08 } }),
-    })
 
     const quote = await getRate('EUR', 'USD', new Date('2020-01-01'))
-    expect(quote?.rate).toBe(1.08)
-    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(quote).toEqual({ rate: 1.05, asOf: todayStr() })
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 
   it('reads the cache for same-day quotes without fetching', async () => {
@@ -167,6 +165,48 @@ describe('getRate', () => {
 
     const rate = await getRate('EUR', 'USD', new Date())
     expect(rate).toBeNull()
+  })
+
+  // Regression: dialog dates parse as UTC midnight, which renders locally as
+  // "yesterday" west of UTC. The cacheable check used to compare that against
+  // the local-getter "today" and skipped both the cache read and write. The
+  // cache decision no longer depends on the transaction date, so the write
+  // must happen regardless of the timezone the test env runs in.
+  describe('timezone-sensitive cache path (fixed local timezone west of UTC)', () => {
+    const originalTz = process.env.TZ
+
+    beforeAll(() => {
+      process.env.TZ = 'America/New_York'
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-09-17T15:00:00Z')) // local: Sep 17, 11:00 EDT
+    })
+
+    afterAll(() => {
+      vi.useRealTimers()
+      process.env.TZ = originalTz
+    })
+
+    it('writes and reuses the cache for a dialog-style UTC-midnight date', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ result: 'success', rates: { USD: 1.08 } }),
+      })
+      // new Date('2026-09-17') is 2026-09-17T00:00Z = locally Sep 16, 20:00 EDT.
+      // dateStr(new Date('2026-09-17')) = '2026-09-16' ≠ local today '2026-09-17'.
+      expect(new Date('2026-09-17').getDate()).toBe(16)
+
+      const first = await getRate('EUR', 'USD', new Date('2026-09-17'))
+      expect(first).toEqual({ rate: 1.08, asOf: '2026-09-17' })
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      const rows = getTable('exchange_rates')
+      expect(rows).toHaveLength(1)
+      expect(rows[0].date).toBe('2026-09-17')
+
+      // A later lookup for any date hits the cache instead of refetching.
+      const second = await getRate('EUR', 'USD', new Date('2020-01-01'))
+      expect(second).toEqual({ rate: 1.08, asOf: '2026-09-17' })
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
   })
 })
 

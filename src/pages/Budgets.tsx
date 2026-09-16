@@ -204,6 +204,23 @@ export default function Budgets() {
     return { spent: totalSpent, total: totalBudget, percentage: pct }
   }, [budgets, computeProgress])
 
+  // Unconverted transactions touching any budget's period/categories are
+  // skipped in spend calculations — surface the count like Dashboard/Reports.
+  const unconvertedCount = useMemo(() => {
+    const skipped = new Set<string>()
+    for (const b of budgets) {
+      const { start, end } = getPeriodBounds(currentPeriod, b.period)
+      for (const t of transactions) {
+        if (t.type !== 'expense') continue
+        if (!t.categoryId || !b.categoryIds.includes(t.categoryId)) continue
+        const d = new Date(t.date)
+        if (d < start || d > end) continue
+        if (reliableBaseAmount(t, baseCurrency) === null) skipped.add(t.id)
+      }
+    }
+    return skipped.size
+  }, [budgets, transactions, currentPeriod, baseCurrency])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -216,6 +233,14 @@ export default function Budgets() {
           Add Budget
         </Button>
       </div>
+
+      {unconvertedCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {unconvertedCount} transaction{unconvertedCount > 1 ? 's' : ''} not yet converted to{' '}
+          {baseCurrency} {unconvertedCount > 1 ? 'are' : 'is'} excluded from budget spend; edit them
+          to convert.
+        </p>
+      )}
 
       {totalBudgetProgress && (
         <div className="rounded-xl border bg-card p-6">
