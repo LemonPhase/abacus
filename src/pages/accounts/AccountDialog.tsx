@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Account, AccountType } from '@/types'
+import { formatCurrency } from '@/lib/currency'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'investment', 'credit', 'cash']
@@ -24,7 +25,7 @@ export interface AccountFormData {
   name: string
   type: AccountType
   currency: string
-  balance: string
+  openingBalance: string
   notes: string
 }
 
@@ -109,17 +110,29 @@ export function AccountDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="acct-balance">Balance</Label>
+              <Label htmlFor="acct-balance">Opening balance</Label>
               <Input
                 id="acct-balance"
                 type="number"
                 step="0.01"
-                value={form.balance}
-                onChange={(e) => onFormChange({ ...form, balance: e.target.value })}
+                value={form.openingBalance}
+                onChange={(e) => onFormChange({ ...form, openingBalance: e.target.value })}
                 placeholder="0.00"
               />
             </div>
           </div>
+          {editing && (
+            <div className="grid gap-2">
+              <Label className="text-muted-foreground">Current balance (derived)</Label>
+              <p className="text-sm tabular-nums">
+                {formatCurrency(editing.balance, editing.currency)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The current balance is the opening balance plus this account&apos;s transactions. To
+                correct it, adjust the opening balance.
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

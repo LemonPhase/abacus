@@ -56,6 +56,8 @@ describe('useRecurringTransactionsStore', () => {
       name: 'Checking',
       type: 'checking',
       currency: 'USD',
+      opening_balance: 1000,
+
       balance: 1000,
       notes: null,
       created_at: new Date().toISOString(),

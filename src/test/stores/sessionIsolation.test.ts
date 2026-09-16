@@ -67,7 +67,7 @@ describe('CRUD session isolation', () => {
       name: 'Account A',
       type: 'checking',
       currency: 'USD',
-      balance: 100,
+      openingBalance: 100,
     })
     useAccountsStore.getState().reset()
 

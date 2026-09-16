@@ -24,12 +24,14 @@ describe('Accounts Store', () => {
       name: 'My Savings',
       type: 'savings',
       currency: 'USD',
-      balance: 5000,
+      openingBalance: 5000,
     })
 
     expect(account.name).toBe('My Savings')
     expect(account.type).toBe('savings')
     expect(account.id).toBeDefined()
+    // balance is derived: opening balance + no transactions yet
+    expect(account.balance).toBe(5000)
 
     const loaded = useAccountsStore.getState()
     expect(loaded.accounts).toHaveLength(1)
@@ -42,15 +44,34 @@ describe('Accounts Store', () => {
       name: 'Old Name',
       type: 'checking',
       currency: 'USD',
-      balance: 100,
+      openingBalance: 100,
     })
 
-    await store.update(account.id, { name: 'New Name', balance: 200 })
+    await store.update(account.id, { name: 'New Name', openingBalance: 200 })
 
     const dbRows = getTable('accounts')
     const updated = dbRows.find((r) => r.id === account.id)
     expect(updated?.name).toBe('New Name')
+    expect(updated?.opening_balance).toBe(200)
+    // balance re-derived from the new opening balance
     expect(updated?.balance).toBe(200)
+  })
+
+  it('rejects direct balance edits (balance is derived)', async () => {
+    const store = useAccountsStore.getState()
+    const account = await store.add({
+      name: 'Locked',
+      type: 'checking',
+      currency: 'USD',
+      openingBalance: 100,
+    })
+
+    // The type system forbids sending `balance`; simulate a regression that
+    // re-adds it and confirm the DB (mock) rejects it.
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.update(account.id, { balance: 999 } as any),
+    ).rejects.toThrow(/derived|opening_balance/i)
   })
 
   it('removes an account from the database', async () => {
@@ -59,7 +80,7 @@ describe('Accounts Store', () => {
       name: 'To Delete',
       type: 'cash',
       currency: 'USD',
-      balance: 0,
+      openingBalance: 0,
     })
 
     await store.remove(account.id)
@@ -69,9 +90,9 @@ describe('Accounts Store', () => {
 
   it('filters accounts by type', async () => {
     const store = useAccountsStore.getState()
-    await store.add({ name: 'Checking', type: 'checking', currency: 'USD', balance: 1000 })
-    await store.add({ name: 'Savings', type: 'savings', currency: 'USD', balance: 5000 })
-    await store.add({ name: 'Credit Card', type: 'credit', currency: 'USD', balance: -200 })
+    await store.add({ name: 'Checking', type: 'checking', currency: 'USD', openingBalance: 1000 })
+    await store.add({ name: 'Savings', type: 'savings', currency: 'USD', openingBalance: 5000 })
+    await store.add({ name: 'Credit Card', type: 'credit', currency: 'USD', openingBalance: -200 })
 
     const checking = store.getByType('checking')
     expect(checking).toHaveLength(1)
@@ -84,7 +105,7 @@ describe('Accounts Store', () => {
       name: 'Find Me',
       type: 'investment',
       currency: 'USD',
-      balance: 10000,
+      openingBalance: 10000,
     })
 
     const found = store.getById(account.id)
@@ -107,7 +128,7 @@ describe('Accounts Store', () => {
         name: 'Checking',
         type: 'checking',
         currency: 'USD',
-        balance: 1000,
+        openingBalance: 1000,
       })
       accountId = account.id
     })
@@ -301,6 +322,7 @@ describe('Transactions Store', () => {
           name: `Test Account ${id}`,
           type: 'checking',
           currency: 'USD',
+          opening_balance: 0,
           balance: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
