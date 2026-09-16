@@ -1,6 +1,8 @@
 import { create } from 'zustand'
+import { supabase } from '@/supabase/client'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
 import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
+import { computeBase } from '@/stores/transactionsStore'
 import { roundCurrency } from '@/lib/currency'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { RecurringTransaction, NewRecurringTransaction } from '@/types'
@@ -41,6 +43,10 @@ interface RecurringTransactionsState {
   add: (data: NewRecurringTransaction) => Promise<RecurringTransaction>
   update: (id: string, data: Partial<NewRecurringTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>
+  /** Apply the next due occurrence via the DB engine; returns occurrences applied (0 = nothing due). */
+  applyNow: (id: string) => Promise<number>
+  /** Catch-up-on-open: apply every due schedule. Idempotent (retries/tabs are no-ops). */
+  catchUp: () => Promise<number>
   getById: (id: string) => RecurringTransaction | undefined
   getActive: () => RecurringTransaction[]
   getDue: () => RecurringTransaction[]
@@ -101,9 +107,71 @@ export const useRecurringTransactionsStore = create<RecurringTransactionsState>(
     },
     getActive: () => get().items.filter((i) => i.isActive),
     getDue: () => {
-      const now = new Date()
-      now.setHours(0, 0, 0, 0)
-      return get().items.filter((i) => i.isActive && new Date(i.nextDate) <= now)
+      // Compare UTC calendar dates (the same domain as the server's
+      // current_date, which alone decides due-ness inside the RPC). A local-
+      // clock comparison would delay catch-up by up to 23h for UTC+ zones.
+      const todayUtc = new Date().toISOString().slice(0, 10)
+      return get().items.filter(
+        (i) => i.isActive && new Date(i.nextDate).toISOString().slice(0, 10) <= todayUtc,
+      )
+    },
+    applyNow: async (id) => {
+      const item = get().getById(id)
+      if (!item) throw new Error('Recurring transaction not found')
+      try {
+        const applied = await applyOccurrenceRpc(item)
+        await get().load()
+        return applied
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) })
+        throw e
+      }
+    },
+    catchUp: async () => {
+      await get().load()
+      // The RPC re-checks due-ness against the server date and is idempotent,
+      // so a stale/over-inclusive client prefilter is always safe.
+      const due = get().getDue()
+      let total = 0
+      try {
+        for (const item of due) {
+          // Drain capped catch-up windows: the RPC applies at most
+          // APPLY_OCCURRENCE_CAP occurrences per call and always advances
+          // next_date, so re-invoking while it returns the cap makes progress.
+          let applied: number
+          do {
+            applied = await applyOccurrenceRpc(item)
+            total += applied
+          } while (applied === APPLY_OCCURRENCE_CAP)
+        }
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) })
+        throw e
+      }
+      if (total > 0) await get().load()
+      return total
     },
   }
 })
+
+// Per-call occurrence cap the SQL engine enforces (20260919000001
+// _recurring_engine.sql, v_cap): catchUp drains capped windows by re-invoking
+// while the RPC returns exactly this value.
+const APPLY_OCCURRENCE_CAP = 100
+
+// One engine call: inserts + advances (or deactivates) in a single DB
+// transaction. Base-amount provenance is computed client-side like the
+// transfer RPCs (the reporting currency is a client-only setting).
+async function applyOccurrenceRpc(item: RecurringTransaction): Promise<number> {
+  const base = await computeBase(item.amount, item.currency, new Date(item.nextDate))
+  const { data, error } = await supabase.rpc('apply_recurring_occurrence', {
+    p_recurring_id: item.id,
+    p_base_amount: base.baseAmount,
+    p_base_currency: base.baseCurrency,
+    p_base_stale: base.baseAmountStale,
+    p_fx_rate: base.fxRate ?? undefined,
+    p_fx_date: base.fxDate ?? undefined,
+  })
+  if (error) throw new Error(error.message)
+  return (data as number) ?? 0
+}

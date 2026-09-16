@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import RecurringTransactions from '@/pages/RecurringTransactions'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
-import { getTable, resetAllTables } from '@/test/supabase-mock'
+import { getTable, resetAllTables, mockSupabase } from '@/test/supabase-mock'
 
 function renderPage() {
   return {
@@ -213,6 +213,135 @@ describe('RecurringTransactions page', () => {
     renderPage()
     await waitFor(() => {
       expect(screen.getByText(/day 5/)).toBeInTheDocument()
+    })
+  })
+
+  it('preserves next_date when editing an unrelated field (issue #15)', async () => {
+    seedAccount()
+    seedCategory()
+    getTable('recurring_transactions').push({
+      id: 'rt-1',
+      user_id: 'mock-user-id',
+      account_id: 'acc-1',
+      category_id: 'cat-1',
+      type: 'expense',
+      amount: 15,
+      currency: 'USD',
+      description: 'Netflix',
+      frequency: 'monthly',
+      interval_value: 1,
+      day_of_month: 5,
+      start_date: '2026-01-15',
+      end_date: null,
+      next_date: '2099-02-15',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    const { user } = renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Netflix')).toBeInTheDocument()
+    })
+
+    const row = screen.getByText('Netflix').closest('tr') as HTMLElement
+    await user.click(within(row).getByTitle('Edit'))
+    const descInput = screen.getByDisplayValue('Netflix') as HTMLInputElement
+    await user.clear(descInput)
+    await user.type(descInput, 'Netflix Premium')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      expect(screen.getByText('Netflix Premium')).toBeInTheDocument()
+    })
+
+    const updated = getTable('recurring_transactions').find((r) => r.id === 'rt-1')
+    expect(updated?.description).toBe('Netflix Premium')
+    expect(updated?.next_date).toBe('2099-02-15')
+  })
+
+  it('re-anchors next_date when the start date moves', async () => {
+    seedAccount()
+    seedCategory()
+    getTable('recurring_transactions').push({
+      id: 'rt-1',
+      user_id: 'mock-user-id',
+      account_id: 'acc-1',
+      category_id: 'cat-1',
+      type: 'expense',
+      amount: 15,
+      currency: 'USD',
+      description: 'Netflix',
+      frequency: 'monthly',
+      interval_value: 1,
+      day_of_month: 5,
+      start_date: '2026-01-15',
+      end_date: null,
+      next_date: '2099-02-15',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    const { user } = renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Netflix')).toBeInTheDocument()
+    })
+
+    const row = screen.getByText('Netflix').closest('tr') as HTMLElement
+    await user.click(within(row).getByTitle('Edit'))
+    fireEvent.change(document.getElementById('rc-start') as HTMLInputElement, {
+      target: { value: '2026-03-01' },
+    })
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => {
+      expect(screen.getByText(/Mar 1, 2026/)).toBeInTheDocument()
+    })
+
+    const updated = getTable('recurring_transactions').find((r) => r.id === 'rt-1')
+    expect(updated?.next_date).toEqual(new Date('2026-03-01'))
+  })
+
+  it('apply now goes through the DB engine RPC (issue #15)', async () => {
+    seedAccount()
+    seedCategory()
+    getTable('recurring_transactions').push({
+      id: 'rt-1',
+      user_id: 'mock-user-id',
+      account_id: 'acc-1',
+      category_id: 'cat-1',
+      type: 'expense',
+      amount: 50,
+      currency: 'USD',
+      description: 'Rent',
+      frequency: 'monthly',
+      interval_value: 1,
+      day_of_month: 1,
+      start_date: '2024-01-01',
+      end_date: null,
+      next_date: '2020-01-01',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    mockSupabase.rpc.mockResolvedValue({ data: 1, error: null })
+
+    const { user } = renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Rent')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByTitle('Apply now'))
+    await user.click(screen.getByRole('button', { name: 'Apply Now' }))
+    await waitFor(() => {
+      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+        'apply_recurring_occurrence',
+        expect.objectContaining({
+          p_recurring_id: 'rt-1',
+          p_base_amount: 50,
+          p_base_currency: 'USD',
+          p_base_stale: false,
+        }),
+      )
     })
   })
 })

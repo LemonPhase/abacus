@@ -51,7 +51,11 @@ interface BaseFields {
  * labeled with its own currency, and flagged stale so aggregates exclude it —
  * never silently converted 1:1.
  */
-async function computeBase(amount: number, currency: string, date: Date): Promise<BaseFields> {
+export async function computeBase(
+  amount: number,
+  currency: string,
+  date: Date,
+): Promise<BaseFields> {
   const reporting = useSettingsStore.getState().baseCurrency
   if (currency === reporting) {
     return {
