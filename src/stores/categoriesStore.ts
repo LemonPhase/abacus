@@ -35,6 +35,7 @@ interface CategoriesState {
   getChildren: (parentId: string) => Category[]
   getRootCategories: (type: CategoryKind) => Category[]
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useCategoriesStore = create<CategoriesState>()((set, get) => {

@@ -39,6 +39,7 @@ interface RecurringTransactionsState {
   getActive: () => RecurringTransaction[]
   getDue: () => RecurringTransaction[]
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useRecurringTransactionsStore = create<RecurringTransactionsState>()((set, get) => {

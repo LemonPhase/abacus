@@ -42,6 +42,7 @@ interface TransactionsState {
   getByType: (type: TransactionKind) => Transaction[]
   getById: (id: string) => Transaction | undefined
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useTransactionsStore = create<TransactionsState>()((set, get) => {
