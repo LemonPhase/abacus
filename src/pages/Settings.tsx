@@ -30,6 +30,15 @@ const TABLES = [
   'investment_plans',
 ] as const
 
+// Re-read the signed-in identity from the client session. Export/import
+// capture it at start and re-verify after every await and before every
+// destructive side effect, aborting if the identity changed — so A's data is
+// never downloaded or written during B's session.
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession()
+  return data.session?.user?.id ?? null
+}
+
 export default function Settings() {
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const theme = useSettingsStore((s) => s.theme)
@@ -46,6 +55,7 @@ export default function Settings() {
     try {
       setExportStatus('idle')
       setExportMsg('')
+      const uid = await currentUserId()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: Record<string, any> = {
         version: 2,
@@ -53,6 +63,9 @@ export default function Settings() {
       }
 
       const results = await Promise.all(TABLES.map((table) => supabase.from(table).select('*')))
+      if ((await currentUserId()) !== uid) {
+        throw new Error('Signed-in user changed; export aborted')
+      }
       for (let i = 0; i < TABLES.length; i++) {
         const { data: rows, error } = results[i]
         if (error) throw error
@@ -76,10 +89,13 @@ export default function Settings() {
   }
 
   async function handleImport(file: File) {
+    const abort = () => new Error('Signed-in user changed; import aborted')
     try {
       setImportStatus('idle')
       setImportMsg('')
+      const uid = await currentUserId()
       const text = await file.text()
+      if ((await currentUserId()) !== uid) throw abort()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = JSON.parse(text) as Record<string, any>
 
@@ -111,12 +127,18 @@ export default function Settings() {
         }
       }
 
+      // Identity is re-verified after every await and before every destructive
+      // step, so the delete/insert phases can never run against a different
+      // user's tables than the one the import started for.
+      if ((await currentUserId()) !== uid) throw abort()
+
       // Delete all existing rows from each table (parallel)
       const deleteResults = await Promise.all(
         TABLES.map((table) =>
           supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         ),
       )
+      if ((await currentUserId()) !== uid) throw abort()
       for (const result of deleteResults) {
         if (result.error) throw result.error
       }
@@ -127,6 +149,7 @@ export default function Settings() {
       )
       if (inserts.length > 0) {
         const insertResults = await Promise.all(inserts)
+        if ((await currentUserId()) !== uid) throw abort()
         for (const result of insertResults) {
           if (result.error) throw result.error
         }
@@ -139,6 +162,7 @@ export default function Settings() {
         useBudgetsStore.getState().load(),
         useInvestmentPlansStore.getState().load(),
       ])
+      if ((await currentUserId()) !== uid) throw abort()
       setImportStatus('success')
       setImportMsg(
         `Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`,
@@ -236,7 +260,13 @@ export default function Settings() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Account</h2>
           <p className="text-sm text-muted-foreground">{user?.email}</p>
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void signOut().catch((e: Error) => console.error('Sign-out failed:', e.message))
+            }
+          >
             Sign Out
           </Button>
         </div>

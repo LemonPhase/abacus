@@ -33,6 +33,7 @@ interface BudgetsState {
   remove: (id: string) => Promise<void>
   getById: (id: string) => Budget | undefined
   unsubscribe: () => void
+  reset: () => void
 }
 
 export const useBudgetsStore = create<BudgetsState>()((set, get) => {
