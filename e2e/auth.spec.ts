@@ -199,21 +199,15 @@ publicTest.describe('Forgot password', () => {
         // The email deep-links into the SPA (/auth/reset-password#access_token=…).
         // On a static host this only resolves when the deployment serves the app
         // shell for extensionless paths — the routing config under test (#6).
-        // The verify link targets the local GoTrue port, whose docker port
-        // forward can briefly refuse connections under CI load; a refused
-        // connection never reached GoTrue, so the single-use token stays valid
-        // for the retry.
-        let response: Response | null = null
-        for (let attempt = 0; attempt < 3 && !response; attempt++) {
-          try {
-            response = await page.goto(link, { timeout: 10_000 })
-          } catch (error) {
-            if (attempt === 2 || !(error as Error).message.includes('ERR_CONNECTION_REFUSED')) {
-              throw error
-            }
-            await new Promise((done) => setTimeout(done, 1_000))
-          }
-        }
+        // Resolve GoTrue's verify redirect server-side (node fetch) and navigate
+        // the browser to the SPA deep link it produces: a top-level navigation
+        // to the API port itself is refused on CI runners even though page-level
+        // fetches to the same port succeed.
+        const verify = await fetch(link, { redirect: 'manual' })
+        expect([302, 303]).toContain(verify.status)
+        const deepLink = verify.headers.get('location')
+        expect(deepLink).toBeTruthy()
+        const response = await page.goto(deepLink!)
         expect(response?.status()).toBe(200)
         await expect(page).toHaveURL(/\/auth\/reset-password/)
         await expect(page.locator('input[id="password"]')).toBeVisible()
