@@ -36,6 +36,12 @@ interface AccountDialogProps {
   form: AccountFormData
   onFormChange: (form: AccountFormData) => void
   onSave: () => void
+  /**
+   * 20260918000001_input_invariants.sql pins an account's currency while
+   * transactions reference it; the field is disabled and annotated instead of
+   * letting the user hit the database's foreign-key rejection.
+   */
+  currencyLocked?: boolean
 }
 
 export function AccountDialog({
@@ -45,6 +51,7 @@ export function AccountDialog({
   form,
   onFormChange,
   onSave,
+  currencyLocked = false,
 }: AccountDialogProps) {
   return (
     <Dialog
@@ -92,12 +99,13 @@ export function AccountDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label>Currency</Label>
+              <Label htmlFor="acct-currency">Currency</Label>
               <Select
                 value={form.currency}
+                disabled={currencyLocked}
                 onValueChange={(v) => onFormChange({ ...form, currency: v ?? 'USD' })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="acct-currency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -108,6 +116,11 @@ export function AccountDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {currencyLocked && (
+                <p className="text-xs text-muted-foreground">
+                  Currency can&apos;t be changed while transactions reference this account.
+                </p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="acct-balance">Opening balance</Label>

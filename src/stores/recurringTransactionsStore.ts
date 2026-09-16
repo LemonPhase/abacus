@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
 import { createCrudSlice } from '@/stores/crudStore'
+import { roundCurrency } from '@/lib/currency'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { RecurringTransaction, NewRecurringTransaction } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -42,16 +44,24 @@ interface RecurringTransactionsState {
   reset: () => void
 }
 
+const clampDayOfMonth = (day: number | null | undefined): number | null =>
+  day == null ? null : Math.min(31, Math.max(1, day))
+
 export const useRecurringTransactionsStore = create<RecurringTransactionsState>()((set, get) => {
   const { _add, _update, ...base } = crud(set, get)
   return {
     items: [],
     ...base,
     add: (data) => {
+      // Normalize to the domain the database enforces
+      // (20260918000001_input_invariants.sql): positive money in the
+      // account currency's minor units, interval >= 1, day-of-month 1..31.
       const payload = {
         ...data,
+        amount: roundCurrency(data.amount, data.currency),
         categoryId: data.categoryId || null,
-        dayOfMonth: data.dayOfMonth ?? null,
+        dayOfMonth: clampDayOfMonth(data.dayOfMonth ?? null),
+        intervalValue: Math.max(1, data.intervalValue),
         endDate: data.endDate ?? null,
       }
       return _add(
@@ -68,6 +78,17 @@ export const useRecurringTransactionsStore = create<RecurringTransactionsState>(
       }
       if ('endDate' in data && data.endDate === undefined) {
         clean.endDate = null
+      }
+      if (typeof data.amount === 'number') {
+        const currency =
+          data.currency ?? get().getById(id)?.currency ?? useSettingsStore.getState().baseCurrency
+        clean.amount = roundCurrency(data.amount, currency)
+      }
+      if (typeof data.intervalValue === 'number') {
+        clean.intervalValue = Math.max(1, data.intervalValue)
+      }
+      if ('dayOfMonth' in data) {
+        clean.dayOfMonth = clampDayOfMonth(data.dayOfMonth as number | null | undefined)
       }
       return _update(
         id,
