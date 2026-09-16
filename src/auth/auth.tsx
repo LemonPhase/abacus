@@ -160,6 +160,19 @@ export function AuthGuard({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
+  // Scheduled-worker catch-up (issue #15): occurrences are materialized by
+  // the DB engine the first time the app opens after they fell due. The RPC
+  // is idempotent, so retries, multiple tabs and reloads are no-ops.
+  // Best-effort: a failure leaves the Due badge + manual Apply as fallback.
+  const userId = user?.id
+  useEffect(() => {
+    if (!userId) return
+    useRecurringTransactionsStore
+      .getState()
+      .catchUp()
+      .catch(() => {})
+  }, [userId])
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">

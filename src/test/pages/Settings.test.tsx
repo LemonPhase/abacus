@@ -216,7 +216,7 @@ describe('Settings import — atomic restore via RPC', () => {
     })
 
     expect(rpc).toHaveBeenCalledWith('restore_user_data', {
-      payload: expect.objectContaining({ version: 3 }),
+      p_payload: expect.objectContaining({ version: 3 }),
     })
     expect(screen.getByText(/Imported 1 accounts/)).toBeInTheDocument()
     expect(useAccountsStore.getState().accounts[0]?.balance).toBe(720)

@@ -17,11 +17,10 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
-import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { formatFrequency, computeNextDate } from '@/lib/recurring'
+import { formatFrequency } from '@/lib/recurring'
 import { formatCurrency } from '@/lib/currency'
 import { DEFAULT_CATEGORY_COLOR } from '@/lib/chartColors'
 import { ICON_MAP } from '@/lib/icons'
@@ -53,11 +52,11 @@ export default function RecurringTransactions() {
   const add = useRecurringTransactionsStore((s) => s.add)
   const update = useRecurringTransactionsStore((s) => s.update)
   const remove = useRecurringTransactionsStore((s) => s.remove)
+  const applyNow = useRecurringTransactionsStore((s) => s.applyNow)
   const accounts = useAccountsStore((s) => s.accounts)
   const loadAccounts = useAccountsStore((s) => s.load)
   const categories = useCategoriesStore((s) => s.categories)
   const loadCategories = useCategoriesStore((s) => s.load)
-  const addTx = useTransactionsStore((s) => s.add)
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
 
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -118,7 +117,6 @@ export default function RecurringTransactions() {
       const dayOfMonth = form.dayOfMonth ? parseInt(form.dayOfMonth, 10) : null
 
       const startDate = new Date(form.startDate)
-      const nextDate = startDate
       const endDate = form.endDate ? new Date(form.endDate) : null
 
       const data = {
@@ -133,14 +131,22 @@ export default function RecurringTransactions() {
         dayOfMonth,
         startDate,
         endDate,
-        nextDate,
         isActive: form.isActive,
       }
 
       if (editing) {
-        await update(editing.id, data)
+        // Preserve progression: only re-anchor next_date when the schedule's
+        // start actually moved. Unrelated edits (amount, description,
+        // category, account, type, endDate, isActive) keep the scheduled
+        // progression — the DB engine owns next_date from here on.
+        const startMoved = form.startDate !== new Date(editing.startDate).toISOString().slice(0, 10)
+        await update(editing.id, {
+          ...data,
+          ...(startMoved ? { nextDate: new Date(form.startDate) } : {}),
+        })
       } else {
-        await add(data)
+        // New template: the first occurrence is due on the start date.
+        await add({ ...data, nextDate: startDate })
       }
       setDialogOpen(false)
       setEditing(null)
@@ -162,37 +168,13 @@ export default function RecurringTransactions() {
   async function handleApplyNow() {
     try {
       if (!applyTarget) return
-      const item = applyTarget
-      const account = accounts.find((a) => a.id === item.accountId)
-      const currency = account?.currency ?? baseCurrency
-
-      await addTx({
-        accountId: item.accountId,
-        categoryId: item.categoryId,
-        type: item.type,
-        amount: item.amount,
-        currency,
-        date: new Date(item.nextDate),
-        description: item.description ? `${item.description}` : undefined,
-      })
-
-      const nextDate = computeNextDate(
-        new Date(item.nextDate),
-        item.frequency,
-        item.intervalValue,
-        item.dayOfMonth,
-      )
-
-      if (item.endDate && nextDate > new Date(item.endDate)) {
-        await update(item.id, { isActive: false })
-      } else {
-        await update(item.id, { nextDate })
-      }
-
+      // One RPC: the database inserts the occurrence, advances next_date (or
+      // deactivates past end_date), and locks the row — retries and double
+      // clicks cannot duplicate. Returns 0 when nothing was due.
+      await applyNow(applyTarget.id)
       setApplyTarget(null)
-      loadItems()
     } catch {
-      // Error in store
+      // Error in store → GlobalErrorBanner
     }
   }
 
@@ -303,12 +285,18 @@ export default function RecurringTransactions() {
                             <Play className="size-3" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon-xs" onClick={() => openEdit(item)}>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          title="Edit"
+                          onClick={() => openEdit(item)}
+                        >
                           <Pencil className="size-3" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon-xs"
+                          title="Delete"
                           onClick={() => setDeleteTarget(item)}
                         >
                           <Trash2 className="size-3" />

@@ -59,7 +59,7 @@ export async function restoreUserData(file: File): Promise<RestoreResult> {
   payload.accounts = normalizeLegacyAccounts(payload.accounts, payload.transactions)
 
   const { data, error } = await supabase.rpc('restore_user_data', {
-    payload: payload as unknown as Json,
+    p_payload: payload as unknown as Json,
   })
   if (error) throw new Error(error.message)
   if (!data) throw new Error('Restore failed: database returned no summary')
