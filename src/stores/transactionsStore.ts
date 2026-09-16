@@ -32,7 +32,6 @@ const crud = createCrudSlice<Transaction>({
   table: 'transactions',
   collectionKey: 'transactions',
   order: { column: 'date', ascending: false },
-  prependInsert: true,
   mapRow: (row) => mapRow(row as TransactionRow),
 })
 
@@ -117,7 +116,8 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
 
   const toDateString = (d: Date) => d.toISOString().slice(0, 10)
 
-  // Replace-by-id, prepend new rows (matches prependInsert ordering).
+  // Replace-by-id, prepend new rows (newest first, matching the date-desc
+  // load order).
   const upsertLegs = (legs: Transaction[]) => {
     set((state) => {
       const ids = new Set(legs.map((l) => l.id))
