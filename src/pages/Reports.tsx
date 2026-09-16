@@ -26,7 +26,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ICON_MAP } from '@/lib/icons'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency, reliableBaseAmount } from '@/lib/currency'
 import {
   CHART_COLORS,
   INCOME_COLOR,
@@ -73,11 +73,21 @@ export default function Reports() {
     let income = 0
     let expense = 0
     for (const t of filteredTxn) {
-      if (t.type === 'income') income += t.baseAmount
-      if (t.type === 'expense') expense += t.baseAmount
+      const base = reliableBaseAmount(t, baseCurrency)
+      if (base === null) continue
+      if (t.type === 'income') income += base
+      if (t.type === 'expense') expense += base
     }
     return { income, expense, net: income - expense }
-  }, [filteredTxn])
+  }, [filteredTxn, baseCurrency])
+
+  const unconvertedCount = useMemo(
+    () =>
+      filteredTxn.filter(
+        (t) => t.type !== 'transfer' && reliableBaseAmount(t, baseCurrency) === null,
+      ).length,
+    [filteredTxn, baseCurrency],
+  )
 
   const categoryBreakdown = useMemo(() => {
     const map = new Map<
@@ -97,11 +107,13 @@ export default function Reports() {
         })
       }
       const entry = map.get(key)!
-      if (t.type === 'income') entry.income += t.baseAmount
-      if (t.type === 'expense') entry.expense += t.baseAmount
+      const base = reliableBaseAmount(t, baseCurrency)
+      if (base === null) continue
+      if (t.type === 'income') entry.income += base
+      if (t.type === 'expense') entry.expense += base
     }
     return Array.from(map.values()).sort((a, b) => b.expense + b.income - (a.expense + a.income))
-  }, [filteredTxn, categoryMap])
+  }, [filteredTxn, categoryMap, baseCurrency])
 
   const netWorthTimeline = useMemo(() => {
     const from = new Date(dateFrom)
@@ -131,15 +143,17 @@ export default function Reports() {
         months[monthIdx].netWorth = running
         monthIdx++
       }
-      if (t.type === 'income') running += t.baseAmount
-      if (t.type === 'expense') running -= t.baseAmount
+      const reliable = reliableBaseAmount(t, baseCurrency)
+      if (reliable === null) continue
+      if (t.type === 'income') running += reliable
+      if (t.type === 'expense') running -= reliable
     }
     while (monthIdx < months.length) {
       months[monthIdx].netWorth = running
       monthIdx++
     }
     return months
-  }, [filteredTxn, dateFrom, dateTo])
+  }, [filteredTxn, dateFrom, dateTo, baseCurrency])
 
   const incomeVsExpense = useMemo(() => {
     const from = new Date(dateFrom)
@@ -161,11 +175,13 @@ export default function Reports() {
         return d >= ms && d < new Date(from.getFullYear(), from.getMonth() + i + 1, 1)
       })
       if (idx === -1) continue
-      if (t.type === 'income') months[idx].income += t.baseAmount
-      if (t.type === 'expense') months[idx].expense += t.baseAmount
+      const base = reliableBaseAmount(t, baseCurrency)
+      if (base === null) continue
+      if (t.type === 'income') months[idx].income += base
+      if (t.type === 'expense') months[idx].expense += base
     }
     return months
-  }, [filteredTxn, dateFrom, dateTo])
+  }, [filteredTxn, dateFrom, dateTo, baseCurrency])
 
   return (
     <div className="space-y-6">
@@ -200,6 +216,14 @@ export default function Reports() {
               />
             </div>
           </div>
+
+          {unconvertedCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {unconvertedCount} transaction{unconvertedCount > 1 ? 's' : ''} not yet converted to{' '}
+              {baseCurrency} {unconvertedCount > 1 ? 'are' : 'is'} excluded from these totals; edit
+              them to convert.
+            </p>
+          )}
 
           {filteredTxn.length === 0 ? (
             <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">

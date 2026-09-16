@@ -1,11 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getTable } from '@/test/supabase-mock'
+import { getTable, resetAllTables } from '@/test/supabase-mock'
+
+afterEach(() => {
+  resetAllTables()
+  vi.unstubAllGlobals()
+  useSettingsStore.setState({ baseCurrency: 'USD' })
+})
 
 describe('Accounts Store', () => {
   beforeEach(() => {
@@ -331,7 +337,15 @@ describe('Transactions Store', () => {
     }
   })
 
-  it('adds a transaction with base currency', async () => {
+  it('converts a foreign-currency transaction to the reporting currency', async () => {
+    // EUR → USD at 1.08; fetch stubbed, no cache rows (date is historical → no cache write)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ result: 'success', rates: { USD: 1.08 } }),
+      }),
+    )
     const store = useTransactionsStore.getState()
     const txn = await store.add({
       accountId: 'acc-1',
@@ -339,20 +353,21 @@ describe('Transactions Store', () => {
       type: 'expense',
       amount: 42.5,
       currency: 'EUR',
-      baseAmount: 45.0,
-      baseCurrency: 'USD',
       date: new Date('2026-05-01'),
       description: 'Dinner',
     })
 
     expect(txn.amount).toBe(42.5)
     expect(txn.currency).toBe('EUR')
-    expect(txn.baseAmount).toBe(45.0)
+    expect(txn.baseAmount).toBe(45.9) // 42.5 × 1.08
     expect(txn.baseCurrency).toBe('USD')
+    expect(txn.fxRate).toBe(1.08)
+    expect(txn.fxDate).toBeTruthy()
+    expect(txn.baseAmountStale).toBe(false)
     expect(txn.description).toBe('Dinner')
   })
 
-  it('defaults baseAmount to amount when not provided', async () => {
+  it('stores identity conversions for same-currency transactions', async () => {
     const store = useTransactionsStore.getState()
     const txn = await store.add({
       accountId: 'acc-1',
@@ -365,6 +380,8 @@ describe('Transactions Store', () => {
 
     expect(txn.baseAmount).toBe(100)
     expect(txn.baseCurrency).toBe('USD')
+    expect(txn.fxRate).toBeNull()
+    expect(txn.baseAmountStale).toBe(false)
   })
 
   it('filters by date range', async () => {

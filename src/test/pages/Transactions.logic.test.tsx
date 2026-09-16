@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -52,6 +52,15 @@ const categoryFixture: Category = {
 beforeEach(() => {
   localStorage.clear()
   useSettingsStore.getState().reset()
+  // Cross-currency transfers need an FX quote; stub the provider (USD→EUR at 1
+  // keeps the fixture amounts unchanged).
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ result: 'success', rates: { EUR: 1 } }),
+    }),
+  )
   useAccountsStore.setState({
     accounts: [],
     loading: false,
@@ -75,6 +84,10 @@ beforeEach(() => {
   })
 })
 
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('Transactions transfer logic', () => {
   it('creates two linked transfer transactions', async () => {
     const add = vi.fn()
@@ -89,6 +102,9 @@ describe('Transactions transfer logic', () => {
       currency: accountFixture.currency,
       baseAmount: -125,
       baseCurrency: accountFixture.currency,
+      fxRate: null,
+      fxDate: null,
+      baseAmountStale: false,
       date: new Date('2026-05-01'),
       description: 'Move funds',
       createdAt: new Date(),
@@ -104,6 +120,9 @@ describe('Transactions transfer logic', () => {
       currency: toAccountFixture.currency,
       baseAmount: 125,
       baseCurrency: toAccountFixture.currency,
+      fxRate: null,
+      fxDate: null,
+      baseAmountStale: false,
       date: new Date('2026-05-01'),
       description: 'Move funds',
       correlativeId: outTx.id,

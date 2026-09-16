@@ -38,6 +38,8 @@ interface TransactionDialogProps {
   onOpenChange: (open: boolean) => void
   onFormChange: (form: TxFormData) => void
   onSave: () => void
+  /** Blocking save error (e.g. FX rate unavailable for a cross-currency transfer). */
+  error?: string | null
 }
 
 export function TransactionDialog({
@@ -49,6 +51,7 @@ export function TransactionDialog({
   onOpenChange,
   onFormChange,
   onSave,
+  error,
 }: TransactionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,6 +199,9 @@ export function TransactionDialog({
             />
           </div>
         </div>
+        {error && (
+          <p className="text-destructive bg-destructive/10 rounded-lg px-3 py-2 text-xs">{error}</p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel

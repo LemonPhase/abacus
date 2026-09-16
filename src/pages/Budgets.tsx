@@ -13,7 +13,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Budget, BudgetPeriod } from '@/types'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency, reliableBaseAmount } from '@/lib/currency'
 import { getBudgetStatus, type BudgetStatus } from '@/lib/budget'
 import { BudgetDialog, type BudgetFormData } from '@/pages/budgets/BudgetDialog'
 import { BudgetList } from '@/pages/budgets/BudgetList'
@@ -92,14 +92,17 @@ export default function Budgets() {
           const d = new Date(t.date)
           return d >= start && d <= end
         })
-        .reduce((sum, t) => sum + t.baseAmount, 0)
+        .reduce((sum, t) => {
+          const base = reliableBaseAmount(t, baseCurrency)
+          return base === null ? sum : sum + base
+        }, 0)
 
       const pct = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
       const status = getBudgetStatus(pct)
 
       return { spent, percentage: pct, status }
     },
-    [transactions, currentPeriod],
+    [transactions, currentPeriod, baseCurrency],
   )
 
   function getCategoryName(id: string) {
