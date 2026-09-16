@@ -26,15 +26,20 @@
 -- with any migration; it takes a brief lock on `accounts` and `transactions`.
 
 -- Single definition of the signed ledger effects for an account.
+-- Table references are schema-qualified and the search_path is pinned:
+-- this runs from cascade deletes issued by GoTrue's supabase_auth_admin
+-- (auth.users ON DELETE CASCADE), whose search_path has no `public` —
+-- unqualified names there fail with SQLSTATE 42P01.
 create or replace function account_ledger_effects(p_account_id uuid)
 returns numeric
 language sql
 stable
+set search_path = public
 as $$
   select coalesce(sum(
     case when t.type = 'expense' then -t.amount else t.amount end
   ), 0)
-  from transactions t
+  from public.transactions t
   where t.account_id = p_account_id;
 $$;
 
@@ -61,7 +66,10 @@ set opening_balance = a.balance - account_ledger_effects(a.id);
 -- skip; swap for a DEFERRABLE constraint trigger if a bypass via direct SQL
 -- ever becomes a real threat model.
 create or replace function enforce_account_balance()
-returns trigger as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   if tg_op = 'INSERT' then
     -- New account: no transaction can reference it yet (FK), so effects are 0.
@@ -87,7 +95,7 @@ begin
   end if;
   return new;
 end;
-$$ language plpgsql;
+$$;
 
 drop trigger if exists enforce_account_balance on accounts;
 create trigger enforce_account_balance
@@ -101,8 +109,28 @@ create trigger enforce_account_balance
 -- snapshot with the enforcement trigger's fresh one under READ COMMITTED).
 -- ponytail: deltas + enforced invariant; move to per-statement recompute only
 -- if a drift case ever shows up in practice.
+--
+-- Audit 10 (issue #14): table references are schema-qualified and the
+-- search_path is pinned (GoTrue's supabase_auth_admin fires this function from
+-- auth.users ON DELETE CASCADE and its search_path has no `public` — unqualified
+-- names raised SQLSTATE 42P01 and 500ed the account deletion). On DELETE, a
+-- vanished account means the owning user (and their whole ledger) is being
+-- cascade-deleted in the same statement: there is no live account to keep
+-- balanced, so maintenance is skipped instead of raising — every other path
+-- still validates strictly. Balance semantics are unchanged: deltas are the
+-- same arithmetic, and live-account deletes keep validating ownership.
+-- The function is SECURITY DEFINER with a pinned search_path because the
+-- cascade executes it as supabase_auth_admin, which holds no grants on the
+-- public tables (the alternative - granting that infrastructure role write
+-- access to the ledger - would be strictly worse). The definer context only
+-- removes the grant hurdle: the same-user validation below gates every delta
+-- exactly as before, so balances derive bit-for-bit identically.
 create or replace function update_account_balance()
-returns trigger as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
 declare
   _affected_account_id uuid;
   _affected_user_id uuid;
@@ -128,45 +156,53 @@ begin
     _affected_user_id := old.user_id;
   end if;
 
-  -- Validate that the affected account belongs to the same user as the transaction.
+  -- Validate that the affected account belongs to the same user as the
+  -- transaction. During auth.users cascade deletion (hosted account
+  -- deletion) the account may already be gone by the time its transactions
+  -- fire this trigger — then there is no live ledger to maintain and the
+  -- delete must not abort (the account's balance is being destroyed with
+  -- it). Any other missing/foreign account still raises.
   if not exists (
-    select 1 from accounts
+    select 1 from public.accounts
     where id = _affected_account_id and user_id = _affected_user_id
   ) then
+    if tg_op = 'DELETE' then
+      return null;
+    end if;
     raise exception 'Account does not belong to this user';
   end if;
 
   if tg_op = 'INSERT' then
     if new.type = 'income' or new.type = 'transfer' then
-      update accounts set balance = balance + new.amount where id = new.account_id;
+      update public.accounts set balance = balance + new.amount where id = new.account_id;
     elsif new.type = 'expense' then
-      update accounts set balance = balance - new.amount where id = new.account_id;
+      update public.accounts set balance = balance - new.amount where id = new.account_id;
     end if;
   elsif tg_op = 'UPDATE' then
     if old.account_id != new.account_id then
       if not exists (
-        select 1 from accounts where id = old.account_id and user_id = old.user_id
+        select 1 from public.accounts where id = old.account_id and user_id = old.user_id
       ) then
         raise exception 'Account does not belong to this user';
       end if;
     end if;
 
     if old.type = 'income' or old.type = 'transfer' then
-      update accounts set balance = balance - old.amount where id = old.account_id;
+      update public.accounts set balance = balance - old.amount where id = old.account_id;
     elsif old.type = 'expense' then
-      update accounts set balance = balance + old.amount where id = old.account_id;
+      update public.accounts set balance = balance + old.amount where id = old.account_id;
     end if;
 
     if new.type = 'income' or new.type = 'transfer' then
-      update accounts set balance = balance + new.amount where id = new.account_id;
+      update public.accounts set balance = balance + new.amount where id = new.account_id;
     elsif new.type = 'expense' then
-      update accounts set balance = balance - new.amount where id = new.account_id;
+      update public.accounts set balance = balance - new.amount where id = new.account_id;
     end if;
   elsif tg_op = 'DELETE' then
     if old.type = 'income' or old.type = 'transfer' then
-      update accounts set balance = balance - old.amount where id = old.account_id;
+      update public.accounts set balance = balance - old.amount where id = old.account_id;
     elsif old.type = 'expense' then
-      update accounts set balance = balance + old.amount where id = old.account_id;
+      update public.accounts set balance = balance + old.amount where id = old.account_id;
     end if;
   end if;
   -- Scope the marker to this trigger: restore the caller's value so it is
@@ -174,4 +210,4 @@ begin
   perform set_config('app.balance_maintenance', _prev_maintenance, true);
   return null;
 end;
-$$ language plpgsql;
+$$;
