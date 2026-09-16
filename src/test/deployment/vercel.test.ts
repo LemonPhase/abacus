@@ -39,9 +39,10 @@ describe('Vercel SPA routing', () => {
   })
 
   // Simulates Vercel's documented resolution order — "precedence is given to
-  // the filesystem prior to rewrites being applied" — against the real build
-  // output, so a broken rewrite means broken deep links or broken assets in
-  // production. Needs `npm run build` first; skipped when dist/ is absent.
+  // the filesystem prior to rewrites being applied", then rewrites in order —
+  // against the real build output, so a missing or malformed vercel.json means
+  // broken deep links or broken assets here, not just in production. Needs
+  // `npm run build` first; skipped when dist/ is absent (CI builds it).
   it.skipIf(!distReady)(
     'resolves deep routes to index.html while existing build files bypass the rewrite',
     () => {
@@ -49,10 +50,26 @@ describe('Vercel SPA routing', () => {
       expect(files.has('index.html')).toBe(true)
       expect([...files].some((f) => f.startsWith('assets/'))).toBe(true)
 
-      const serve = (path: string): string => {
+      // resolveRequest returns the path Vercel would actually serve (relative
+      // to dist/). Unmatched paths come back unchanged — a 404 in production.
+      const resolveRequest = (path: string): string => {
         const normalized = path.replace(/^\//, '')
-        if (files.has(normalized)) return normalized // filesystem wins
-        return (config.rewrites?.[0]?.destination ?? path).replace(/^\//, '')
+        // 1. Filesystem precedence: built files win over any rewrite.
+        if (files.has(normalized)) return normalized
+        // 2. Rewrites applied in order; first source matching the path wins.
+        for (const rewrite of config.rewrites ?? []) {
+          const match = compileSource(rewrite.source).exec(path)
+          if (match) {
+            const destination = rewrite.destination.replace(
+              /:([A-Za-z0-9_]+)/g,
+              (_, name: string) => match.groups?.[name] ?? '',
+            )
+            // Vercel serves the destination from the deployment filesystem;
+            // if it doesn't exist there it 404s (deep links fail, loudly).
+            return destination.replace(/^\//, '')
+          }
+        }
+        return path
       }
 
       // Deep links (including unknown paths) fall through to the app shell...
@@ -61,19 +78,56 @@ describe('Vercel SPA routing', () => {
         '/auth/reset-password',
         '/app/dashboard',
         '/app/recurring',
+        '/deep/nested/unknown',
         '/totally-unknown',
       ]) {
         expect(files.has(route.replace(/^\//, ''))).toBe(false)
-        expect(serve(route)).toBe('index.html')
+        expect(resolveRequest(route)).toBe('index.html')
       }
 
-      // ...while every built file — hashed bundles and PWA assets — is served as itself.
+      // ...while representative built assets are served as themselves: hashed
+      // js/css bundles, PWA manifest and service worker, and icons.
+      const hashed = (ext: string): string => {
+        const file = [...files].find((f) => new RegExp(`^assets/index-.+\\.${ext}$`).test(f))
+        expect(file, `expected a hashed assets/index-*.${ext} in the build output`).toBeDefined()
+        return file as string
+      }
+      const representative = [
+        hashed('js'),
+        hashed('css'),
+        'manifest.webmanifest',
+        'sw.js',
+        'pwa-192x192.png',
+        'pwa-512x512.png',
+        'favicon.ico',
+      ]
+      for (const asset of representative) {
+        expect(resolveRequest(`/${asset}`)).toBe(asset)
+      }
+
+      // Every remaining built file — hashed bundles, fonts, workbox — too.
       for (const file of files) {
-        expect(serve(`/${file}`)).toBe(file)
+        expect(resolveRequest(`/${file}`)).toBe(file)
       }
     },
   )
 })
+
+// Minimal path-to-regexp compilation covering the source constructs Vercel
+// rewrites support: literal segments, :param / :param* / :param? named params,
+// and inline (...) regex groups (vercel.json uses the /(.*) catch-all).
+function compileSource(source: string): RegExp {
+  const named = source.replace(
+    /:([A-Za-z0-9_]+)(\*|\+|\?)?/g,
+    (_, name: string, modifier = '') =>
+      `(?<${name}>[^/]+)${modifier === '?' ? '?' : modifier || '+'}`,
+  )
+  // Escape nothing: path-to-regexp sources are regex-flavored (vercel.json's
+  // /(.*) catch-all relies on it). Only expand :param / :param* / :param?
+  // named params, then anchor. Literal regex chars in a source over-match by
+  // a character class — negligible for the segment-y sources Vercel uses.
+  return new RegExp(`^${named}$`)
+}
 
 function collectDistFiles(dir: string, prefix = ''): Set<string> {
   const files = new Set<string>()

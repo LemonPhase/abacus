@@ -29,6 +29,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Build dist/ so the deployment suite in src/test/deployment/ actually
+      # runs here instead of being silently skipped via it.skipIf(!distReady).
+      - run: npm run build
       - run: npm test
 
   e2e:
