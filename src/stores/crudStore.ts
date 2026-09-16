@@ -47,6 +47,11 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   // never repopulate the store after logout / account switch.
   let generation = 0
 
+  // Monotonic load sequence: only the newest load may publish, so a slower
+  // earlier load cannot overwrite a newer snapshot within the same session.
+  // Cross-reset responses stay gated by `generation`.
+  let loadSeq = 0
+
   function getItems(getter: GetFn): T[] {
     return (getter() as Record<string, T[]>)[collectionKey] ?? []
   }
@@ -78,6 +83,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     const isStale = (token: number) => token !== generation
 
     const load = async (options?: { limit?: number; offset?: number }) => {
+      const seq = ++loadSeq
       const token = generation
       set({ loading: true, error: null })
       const { limit, offset } = options ?? {}
@@ -91,7 +97,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         query = query.limit(limit)
       }
       const { data, error } = await query
-      if (isStale(token)) return
+      if (seq !== loadSeq || isStale(token)) return
       if (error) {
         set({ error: error.message, loading: false })
         throw error

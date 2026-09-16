@@ -9,7 +9,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
-import { mockSupabase, simulateAuthEvent } from '@/test/supabase-mock'
+import { mockSupabase, simulateAuthEvent, getTable } from '@/test/supabase-mock'
 
 function TestConsumer() {
   const { user, loading } = useAuth()
@@ -86,6 +86,55 @@ describe('session isolation', () => {
     expect(useInvestmentPlansStore.getState().plans).toEqual([])
     expect(useRecurringTransactionsStore.getState().items).toEqual([])
     for (const unsubscribe of unsubscribers) expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('rehydrates all six financial stores after a direct A-to-B SIGNED_IN transition', async () => {
+    // B's data, served by the in-memory mock once the rehydration loads run.
+    getTable('accounts').push({
+      id: 'account-b',
+      user_id: 'user-b',
+      name: 'B Account',
+      type: 'checking',
+      currency: 'USD',
+      balance: 10,
+      notes: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    })
+
+    renderWithAuth()
+    await waitFor(() => expect(screen.getByText('Logged in as user-a')).toBeInTheDocument())
+
+    // Establish the current identity the way supabase-js does at boot, so the
+    // next SIGNED_IN is a true A→B transition with currentUserId set.
+    simulateAuthEvent('INITIAL_SESSION', { user: { id: 'user-a', email: 'a@example.com' } })
+
+    const stores = [
+      useAccountsStore,
+      useCategoriesStore,
+      useTransactionsStore,
+      useBudgetsStore,
+      useInvestmentPlansStore,
+      useRecurringTransactionsStore,
+    ]
+    type LoadableStore = {
+      getState: () => { load: (options?: { limit?: number; offset?: number }) => Promise<void> }
+    }
+    const loadSpies = stores.map((store) =>
+      vi.spyOn((store as unknown as LoadableStore).getState(), 'load'),
+    )
+
+    // Stale A-era data that must be wiped, then replaced by B's fresh load.
+    useAccountsStore.setState({ accounts: [{ id: 'account-a' } as never] })
+
+    simulateAuthEvent('SIGNED_IN', { user: { id: 'user-b', email: 'b@example.com' } })
+
+    await waitFor(() => expect(screen.getByText('Logged in as user-b')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(useAccountsStore.getState().accounts.map((a) => a.id)).toEqual(['account-b']),
+    )
+    for (const spy of loadSpies) expect(spy).toHaveBeenCalledTimes(1)
+    loadSpies.forEach((spy) => spy.mockRestore())
   })
 
   it('surfaces sign-out failures without claiming the session changed', async () => {

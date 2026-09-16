@@ -82,6 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // authenticated page load (stores start empty on a fresh page anyway).
       if (event === 'SIGNED_OUT' || (currentUserId !== null && uid !== currentUserId)) {
         resetFinancialStores()
+        // Direct A→B switch (no SIGNED_OUT in between): mounted pages keyed
+        // their data loads to the previous identity and will not refire, so
+        // rehydrate the new user's stores here. The loads capture the
+        // post-reset generation, so A's in-flight responses stay rejected.
+        // Boot-time establishment (currentUserId === null) still loads nothing.
+        if (uid) {
+          for (const store of FINANCIAL_STORES) {
+            store
+              .getState()
+              .load()
+              .catch(() => {})
+          }
+        }
       }
       currentUserId = uid
       if (event === 'PASSWORD_RECOVERY' && window.location.pathname !== '/auth/reset-password') {

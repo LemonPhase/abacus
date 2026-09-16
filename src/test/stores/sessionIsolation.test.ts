@@ -164,6 +164,34 @@ describe('CRUD session isolation', () => {
     expect(useAccountsStore.getState().loading).toBe(false)
   })
 
+  it('a newer load wins: an older load completing later does not overwrite the newer snapshot', async () => {
+    let resolveOld: ((value: { data: (typeof accountRow)[]; error: null }) => void) | undefined
+    let resolveNew: ((value: { data: (typeof accountRow)[]; error: null }) => void) | undefined
+    const pending = [
+      new Promise<{ data: (typeof accountRow)[]; error: null }>((resolve) => {
+        resolveOld = resolve
+      }),
+      new Promise<{ data: (typeof accountRow)[]; error: null }>((resolve) => {
+        resolveNew = resolve
+      }),
+    ]
+    let call = 0
+    supabase.from = vi.fn().mockImplementation(() => ({
+      select: vi.fn(() => pending[call++]),
+    }))
+
+    const older = useAccountsStore.getState().load()
+    const newer = useAccountsStore.getState().load()
+
+    resolveNew!({ data: [{ ...accountRow, id: 'account-new', user_id: 'user-a' }], error: null })
+    await newer
+    resolveOld!({ data: [accountRow], error: null })
+    await older
+
+    expect(useAccountsStore.getState().accounts.map((a) => a.id)).toEqual(['account-new'])
+    expect(useAccountsStore.getState().loading).toBe(false)
+  })
+
   it('discards a delayed recurring-transactions load after reset', async () => {
     const recurringRow = {
       id: 'recurring-a',
