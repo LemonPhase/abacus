@@ -367,18 +367,24 @@ export function simulateAuthEvent(event: string, session: Record<string, unknown
 
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
-  rpc: vi.fn((fn: string, args: Record<string, unknown> = {}) => {
-    if (_failNextRpc) {
-      const message = _failNextRpc
-      _failNextRpc = null
-      return Promise.resolve({ data: null, error: { message } })
-    }
-    if (fn === 'replace_budget_categories') {
-      mockReplaceBudgetCategories(args)
-      return Promise.resolve({ data: null, error: null })
-    }
-    return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
-  }),
+  rpc: vi.fn(
+    (
+      fn: string,
+      args: Record<string, unknown> = {},
+    ): Promise<{ data: unknown; error: { message: string } | null }> => {
+      if (_failNextRpc) {
+        const message = _failNextRpc
+        _failNextRpc = null
+        return Promise.resolve({ data: null, error: { message } })
+      }
+      if (fn === 'replace_budget_categories') {
+        mockReplaceBudgetCategories(args)
+        return Promise.resolve({ data: null, error: null })
+      }
+      return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
+    },
+  ),
+
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

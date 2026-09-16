@@ -24,7 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { getRate, type RateQuote } from '@/services/exchange'
 import { roundCurrency } from '@/lib/currency'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
-import type { TransactionKind, NewTransaction } from '@/types'
+import type { Transaction, TransactionKind, NewTransaction } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
 import { DEFAULT_CATEGORY_COLOR } from '@/lib/chartColors'
@@ -59,6 +59,10 @@ export default function Transactions() {
   const bulkAdd = useTransactionsStore((s) => s.bulkAdd)
   const update = useTransactionsStore((s) => s.update)
   const remove = useTransactionsStore((s) => s.remove)
+  const createTransfer = useTransactionsStore((s) => s.createTransfer)
+  const editTransfer = useTransactionsStore((s) => s.editTransfer)
+  const deleteTransfer = useTransactionsStore((s) => s.deleteTransfer)
+  const convertTransferToPlain = useTransactionsStore((s) => s.convertTransferToPlain)
   const accounts = useAccountsStore((s) => s.accounts)
   const loadAccounts = useAccountsStore((s) => s.load)
   const categories = useCategoriesStore((s) => s.categories)
@@ -69,6 +73,8 @@ export default function Transactions() {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyTxForm)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  // Idempotency key for the next transfer RPC; stable across save retries.
+  const [transferKey, setTransferKey] = useState(() => crypto.randomUUID())
   const [saveError, setSaveError] = useState<string | null>(null)
 
   // Filters
@@ -137,22 +143,34 @@ export default function Transactions() {
   function openAdd() {
     setEditing(null)
     setForm({ ...emptyTxForm, date: new Date().toISOString().slice(0, 10) })
+    // Fresh idempotency key per dialog session: save-click retries reuse it.
+    setTransferKey(crypto.randomUUID())
     setSaveError(null)
     setDialogOpen(true)
   }
 
-  function openEdit(tx: (typeof transactions)[0]) {
+  // The partner leg of a transfer row, via the stable transfer id (falling
+  // back to the legacy correlative link for rows written before it existed).
+  function partnerOf(tx: Transaction): Transaction | undefined {
+    if (tx.type !== 'transfer') return undefined
+    if (tx.transferId) {
+      return transactions.find((t) => t.transferId === tx.transferId && t.id !== tx.id)
+    }
+    if (tx.correlativeId) return transactions.find((t) => t.id === tx.correlativeId)
+    return undefined
+  }
+
+  function openEdit(tx: Transaction) {
     setEditing(tx.id)
     let accountId = tx.accountId
     let toAccountId = ''
 
-    if (tx.type === 'transfer' && tx.correlativeId) {
-      const correlative = transactions.find((t) => t.id === tx.correlativeId)
+    const correlative = partnerOf(tx)
+    if (tx.type === 'transfer' && correlative) {
       if (tx.amount < 0) {
-        accountId = tx.accountId
-        toAccountId = correlative?.accountId ?? ''
+        toAccountId = correlative.accountId
       } else {
-        accountId = correlative?.accountId ?? ''
+        accountId = correlative.accountId
         toAccountId = tx.accountId
       }
     }
@@ -166,6 +184,8 @@ export default function Transactions() {
       description: tx.description ?? '',
       toAccountId,
     })
+    // Fresh key in case an edit converts the row into a new transfer pair.
+    setTransferKey(crypto.randomUUID())
     setSaveError(null)
     setDialogOpen(true)
   }
@@ -190,175 +210,79 @@ export default function Transactions() {
 
       if (form.type === 'transfer') {
         if (!form.toAccountId) return
-        let convertedAmount: number
+        const toAccount = accounts.find((a) => a.id === form.toAccountId)
+        const toCurrency = toAccount?.currency ?? currency
+        const quote = await getTransferQuote(currency, toCurrency)
+        if (!quote) {
+          setSaveError(
+            `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
+          )
+          return
+        }
+        const convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
+        const date = new Date(form.date)
+        const description = form.description.trim() || undefined
+        const categoryId = form.categoryId || null
 
+        // One atomic RPC per operation; the RPC owns both legs, their linkage
+        // and the balance effects (20260917000002_atomic_transfers.sql).
+        // Per-leg base-amount provenance is computed in the store (computeBase).
         if (editing) {
-          // Find if this transaction already has a correlative
           const tx = transactions.find((t) => t.id === editing)
-          if (tx && tx.correlativeId) {
-            // Update both
-            const isOutgoing = tx.amount < 0
-            const outId = isOutgoing ? tx.id : tx.correlativeId
-            const inId = isOutgoing ? tx.correlativeId : tx.id
-
-            const toAccount = accounts.find((a) => a.id === form.toAccountId)
-            const toCurrency = toAccount?.currency ?? currency
-            const quote = await getTransferQuote(currency, toCurrency)
-            if (!quote) {
-              setSaveError(
-                `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
-              )
-              return
-            }
-            convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
-
-            await update(outId, {
-              accountId: form.accountId,
-              categoryId: form.categoryId,
-              type: 'transfer',
-              amount: -amount,
-              currency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
-            })
-
-            await update(inId, {
-              accountId: form.toAccountId,
-              categoryId: form.categoryId,
-              type: 'transfer',
-              amount: convertedAmount,
-              currency: toCurrency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
+          if (tx?.type === 'transfer' && tx.transferId) {
+            await editTransfer({
+              transferId: tx.transferId,
+              fromAccountId: form.accountId,
+              toAccountId: form.toAccountId,
+              amount,
+              convertedAmount,
+              categoryId,
+              date,
+              description,
             })
           } else {
-            // Changed from another type to transfer, need to create the missing correlative
-            const toAccount = accounts.find((a) => a.id === form.toAccountId)
-            const toCurrency = toAccount?.currency ?? currency
-            const quote = await getTransferQuote(currency, toCurrency)
-            if (!quote) {
-              setSaveError(
-                `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
-              )
-              return
-            }
-            convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
-
-            // Save original data for rollback
-            const originalTx = tx && {
-              accountId: tx.accountId,
-              categoryId: tx.categoryId || '',
-              type: tx.type,
-              amount: tx.amount,
-              currency: tx.currency,
-              date: tx.date,
-              description: tx.description,
-            }
-
-            await update(editing, {
-              accountId: form.accountId,
-              categoryId: form.categoryId,
-              type: form.type,
-              amount: -amount,
-              currency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
+            // Non-transfer converted into a transfer (or a legacy unlinked
+            // leg adopted): the existing row becomes the outgoing leg.
+            await createTransfer({
+              idempotencyKey: transferKey,
+              fromAccountId: form.accountId,
+              toAccountId: form.toAccountId,
+              amount,
+              convertedAmount,
+              categoryId,
+              date,
+              description,
+              existingTransactionId: editing,
             })
-
-            try {
-              const inTx = await add({
-                accountId: form.toAccountId,
-                categoryId: form.categoryId,
-                type: 'transfer',
-                amount: convertedAmount,
-                currency: toCurrency,
-                date: new Date(form.date),
-                description: form.description.trim() || undefined,
-                correlativeId: editing,
-              })
-
-              await update(editing, { correlativeId: inTx.id })
-            } catch (err) {
-              // Rollback: revert to original non-transfer state
-              if (originalTx) {
-                await remove(editing)
-                await add(originalTx)
-              }
-              throw err
-            }
           }
         } else {
-          // Add two transactions
-          const toAccount = accounts.find((a) => a.id === form.toAccountId)
-          const toCurrency = toAccount?.currency ?? currency
-          const quote = await getTransferQuote(currency, toCurrency)
-          if (!quote) {
-            setSaveError(
-              `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
-            )
-            return
-          }
-          convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
-
-          const outTx = await add({
+          await createTransfer({
+            idempotencyKey: transferKey,
+            fromAccountId: form.accountId,
+            toAccountId: form.toAccountId,
+            amount,
+            convertedAmount,
+            categoryId,
+            date,
+            description,
+          })
+        }
+      } else if (editing) {
+        const tx = transactions.find((t) => t.id === editing)
+        if (tx?.type === 'transfer' && tx.transferId) {
+          // Transfer converted into a plain transaction: partner deleted and
+          // this row rewritten in one RPC.
+          await convertTransferToPlain({
+            transactionId: editing,
+            newType: form.type,
+            amount,
             accountId: form.accountId,
-            categoryId: form.categoryId,
-            type: 'transfer',
-            amount: -amount,
-            currency,
+            categoryId: form.categoryId || null,
             date: new Date(form.date),
             description: form.description.trim() || undefined,
           })
-
-          try {
-            const inTx = await add({
-              accountId: form.toAccountId,
-              categoryId: form.categoryId,
-              type: 'transfer',
-              amount: convertedAmount,
-              currency: toCurrency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
-              correlativeId: outTx.id,
-            })
-
-            await update(outTx.id, { correlativeId: inTx.id })
-          } catch (err) {
-            // Rollback: if the incoming side or linkage fails, remove the
-            // already-inserted outgoing transaction to avoid dangling data.
-            await remove(outTx.id)
-            throw err
-          }
-        }
-      } else {
-        if (editing) {
-          const tx = transactions.find((t) => t.id === editing)
-          if (tx && tx.type === 'transfer' && tx.correlativeId) {
-            // Changed from transfer to another type, remove the correlative
-            await remove(tx.correlativeId)
-            await update(editing, {
-              accountId: form.accountId,
-              categoryId: form.categoryId,
-              type: form.type,
-              amount,
-              currency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
-              correlativeId: null as unknown as string,
-            })
-          } else {
-            await update(editing, {
-              accountId: form.accountId,
-              categoryId: form.categoryId,
-              type: form.type,
-              amount,
-              currency,
-              date: new Date(form.date),
-              description: form.description.trim() || undefined,
-            })
-          }
         } else {
-          await add({
+          await update(editing, {
             accountId: form.accountId,
             categoryId: form.categoryId,
             type: form.type,
@@ -368,6 +292,16 @@ export default function Transactions() {
             description: form.description.trim() || undefined,
           })
         }
+      } else {
+        await add({
+          accountId: form.accountId,
+          categoryId: form.categoryId,
+          type: form.type,
+          amount,
+          currency,
+          date: new Date(form.date),
+          description: form.description.trim() || undefined,
+        })
       }
 
       setDialogOpen(false)
@@ -386,13 +320,13 @@ export default function Transactions() {
       if (!deleteTarget) return
       const tx = transactions.find((t) => t.id === deleteTarget)
 
-      if (tx?.type === 'transfer' && tx.correlativeId) {
-        const corr = transactions.find((t) => t.id === tx.correlativeId)
-        if (corr) {
-          await remove(tx.correlativeId)
-        }
+      if (tx?.type === 'transfer' && tx.transferId) {
+        // Removes both legs atomically (also covers deleting either leg of
+        // the pair — the dialog is per-row but the whole pair goes).
+        await deleteTransfer(tx.transferId)
+      } else {
+        await remove(deleteTarget)
       }
-      await remove(deleteTarget)
       loadAccounts()
       setDeleteTarget(null)
     } catch {
