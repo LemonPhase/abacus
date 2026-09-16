@@ -66,6 +66,7 @@ MIGRATIONS=(
   20260516000000_recurring_transactions.sql
   20260916000000_opening_balance_ledger.sql
   20260917000002_atomic_transfers.sql
+  20260917000003_currency_provenance.sql
 )
 
 run_sql() { # $1=db, rest = files or -c commands
@@ -123,11 +124,11 @@ KEY2=$(run_sql "$T1" -tAc "select gen_random_uuid()")
 # deadlock (each balance trigger locks the accounts in opposite order).
 $PSQL "${PSQL_ARGS[@]}" -q -d "$T1" -v ON_ERROR_STOP=1 -c "
   set app.test_user_id = '$TEST_USER';
-  select create_transfer('$KEY1'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 10, 10);" >/dev/null &
+  select create_transfer('$KEY1'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 10, 10, null, current_date, null, null, -10, 'USD', null, null, false, 10, 'USD', null, null, false);" >/dev/null &
 S1_PID=$!
 $PSQL "${PSQL_ARGS[@]}" -q -d "$T1" -v ON_ERROR_STOP=1 -c "
   set app.test_user_id = '$TEST_USER';
-  select create_transfer('$KEY2'::uuid, '$ACC_B'::uuid, '$ACC_A'::uuid, 20, 20);" >/dev/null &
+  select create_transfer('$KEY2'::uuid, '$ACC_B'::uuid, '$ACC_A'::uuid, 20, 20, null, current_date, null, null, -20, 'USD', null, null, false, 20, 'USD', null, null, false);" >/dev/null &
 S2_PID=$!
 S1_OK=1; S2_OK=1
 wait $S1_PID || S1_OK=0
@@ -151,11 +152,11 @@ echo "== 3. concurrency: same idempotency key, no synchronization =="
 KEY3=$(run_sql "$T1" -tAc "select gen_random_uuid()")
 $PSQL "${PSQL_ARGS[@]}" -q -d "$T1" -v ON_ERROR_STOP=1 -c "
   set app.test_user_id = '$TEST_USER';
-  select count(*) from create_transfer('$KEY3'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 50, 50);" >/dev/null &
+  select count(*) from create_transfer('$KEY3'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 50, 50, null, current_date, null, null, -50, 'USD', null, null, false, 50, 'USD', null, null, false);" >/dev/null &
 S3_PID=$!
 S4_OUT=$($PSQL "${PSQL_ARGS[@]}" -d "$T1" -v ON_ERROR_STOP=1 -tA -c "
   set app.test_user_id = '$TEST_USER';
-  select count(*) from create_transfer('$KEY3'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 50, 50);" 2>&1) || S4_FAIL=1
+  select count(*) from create_transfer('$KEY3'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 50, 50, null, current_date, null, null, -50, 'USD', null, null, false, 50, 'USD', null, null, false);" 2>&1) || S4_FAIL=1
 S4_FAIL=${S4_FAIL:-0}
 wait $S3_PID
 
@@ -182,14 +183,14 @@ KEY5=$(run_sql "$T1" -tAc "select gen_random_uuid()")
 $PSQL "${PSQL_ARGS[@]}" -q -d "$T1" -v ON_ERROR_STOP=1 -c "
   set app.test_user_id = '$TEST_USER';
   begin;
-  select create_transfer('$KEY4'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 30, 30);
+  select create_transfer('$KEY4'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 30, 30, null, current_date, null, null, -30, 'USD', null, null, false, 30, 'USD', null, null, false);
   select pg_sleep(1.0);
   commit;" >/dev/null &
 S4_PID=$!
 sleep 0.3
 START=$(date +%s%N)
 run_sql "$T1" -c "set app.test_user_id = '$TEST_USER';
-  select create_transfer('$KEY5'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 5, 5);" >/dev/null
+  select create_transfer('$KEY5'::uuid, '$ACC_A'::uuid, '$ACC_B'::uuid, 5, 5, null, current_date, null, null, -5, 'USD', null, null, false, 5, 'USD', null, null, false);" >/dev/null
 END=$(date +%s%N)
 ELAPSED_MS=$(( (END - START) / 1000000 ))
 wait $S4_PID

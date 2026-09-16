@@ -21,7 +21,8 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getOrFetchRate } from '@/services/exchange'
+import { getRate, type RateQuote } from '@/services/exchange'
+import { roundCurrency } from '@/lib/currency'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
 import type { Transaction, TransactionKind, NewTransaction } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
@@ -74,6 +75,7 @@ export default function Transactions() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   // Idempotency key for the next transfer RPC; stable across save retries.
   const [transferKey, setTransferKey] = useState(() => crypto.randomUUID())
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Filters
   const [filters, _setFilters] = useState<TransactionFiltersValue>({
@@ -143,6 +145,7 @@ export default function Transactions() {
     setForm({ ...emptyTxForm, date: new Date().toISOString().slice(0, 10) })
     // Fresh idempotency key per dialog session: save-click retries reuse it.
     setTransferKey(crypto.randomUUID())
+    setSaveError(null)
     setDialogOpen(true)
   }
 
@@ -183,16 +186,21 @@ export default function Transactions() {
     })
     // Fresh key in case an edit converts the row into a new transfer pair.
     setTransferKey(crypto.randomUUID())
+    setSaveError(null)
     setDialogOpen(true)
   }
 
-  async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
-    if (fromCurrency === toCurrency) return 1
-    const rate = await getOrFetchRate(fromCurrency, toCurrency, new Date(form.date))
-    return rate ?? 1
+  /** FX quote for a cross-currency transfer, or null when unavailable — no silent 1:1 fallback. */
+  async function getTransferQuote(
+    fromCurrency: string,
+    toCurrency: string,
+  ): Promise<RateQuote | null> {
+    if (fromCurrency === toCurrency) return { rate: 1, asOf: form.date }
+    return getRate(fromCurrency, toCurrency, new Date(form.date))
   }
 
   async function handleSave() {
+    setSaveError(null)
     try {
       const amount = parseFloat(form.amount) || 0
       if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
@@ -204,14 +212,21 @@ export default function Transactions() {
         if (!form.toAccountId) return
         const toAccount = accounts.find((a) => a.id === form.toAccountId)
         const toCurrency = toAccount?.currency ?? currency
-        const rate = await getExchangeRate(currency, toCurrency)
-        const convertedAmount = Math.round(amount * rate * 100) / 100
+        const quote = await getTransferQuote(currency, toCurrency)
+        if (!quote) {
+          setSaveError(
+            `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
+          )
+          return
+        }
+        const convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
         const date = new Date(form.date)
         const description = form.description.trim() || undefined
         const categoryId = form.categoryId || null
 
         // One atomic RPC per operation; the RPC owns both legs, their linkage
         // and the balance effects (20260917000002_atomic_transfers.sql).
+        // Per-leg base-amount provenance is computed in the store (computeBase).
         if (editing) {
           const tx = transactions.find((t) => t.id === editing)
           if (tx?.type === 'transfer' && tx.transferId) {
@@ -553,6 +568,7 @@ export default function Transactions() {
         }}
         onFormChange={setForm}
         onSave={handleSave}
+        error={saveError}
       />
 
       {/* Delete Dialog */}

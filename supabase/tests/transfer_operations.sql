@@ -25,11 +25,20 @@ update accounts set user_id = '22222222-2222-2222-2222-222222222222' where id = 
 create temp table transfer_legs as
   select * from transactions where false;
 
--- ===== 1. create_transfer: pair, linkage, balances =====
+-- Provenance params simulate the client store (transactionsStore.computeBase):
+-- the reporting currency is USD, out legs (USD) are identity conversions, and
+-- in legs (EUR) use a EUR→USD quote of 2.0 recorded with fx_rate/fx_date.
+-- A leg with no available rate is passed with its own amount/currency and
+-- base_amount_stale = true — the RPC stores provenance verbatim, never 1:1.
+
+-- ===== 1. create_transfer: pair, linkage, balances, provenance =====
 insert into transfer_legs
 select * from create_transfer(
   'aaaaaaaa-0000-0000-0000-000000000001', :'src_id', :'dst_id',
-  100, 90, null, current_date, 'first transfer');
+  100, 90, null, current_date, 'first transfer',
+  null,
+  -100, 'USD', null, null, false,
+  180, 'USD', 2, current_date, false);
 select count(*) as n,
        min(amount) as out_amt, max(amount) as in_amt,
        count(*) filter (where correlative_id is not null) as linked
@@ -42,6 +51,20 @@ select test_assert(
   (select currency from transfer_legs where amount < 0) = 'USD'
   and (select currency from transfer_legs where amount > 0) = 'EUR',
   'currencies must come from the accounts, not the client');
+select test_assert(
+  (select base_amount from transfer_legs where amount < 0) = -100
+  and (select base_currency from transfer_legs where amount < 0) = 'USD'
+  and (select fx_rate from transfer_legs where amount < 0) is null
+  and (select fx_date from transfer_legs where amount < 0) is null
+  and (select base_amount_stale from transfer_legs where amount < 0) = false,
+  'out leg stores the client-computed identity provenance');
+select test_assert(
+  (select base_amount from transfer_legs where amount > 0) = 180
+  and (select base_currency from transfer_legs where amount > 0) = 'USD'
+  and (select fx_rate from transfer_legs where amount > 0) = 2
+  and (select fx_date from transfer_legs where amount > 0) = current_date
+  and (select base_amount_stale from transfer_legs where amount > 0) = false,
+  'in leg stores the client-computed FX provenance');
 select test_assert(
   (select balance from accounts where id = :'src_id') = 900,
   'source balance 1000 -> 900 after transfer out of 100');
@@ -59,7 +82,9 @@ delete from transfer_legs;
 -- ===== 2. Idempotent retry: same key returns the committed pair =====
 insert into transfer_legs
 select * from create_transfer(
-  'aaaaaaaa-0000-0000-0000-000000000001', :'src_id', :'dst_id', 100, 90);
+  'aaaaaaaa-0000-0000-0000-000000000001', :'src_id', :'dst_id', 100, 90,
+  null, current_date, null, null,
+  -100, 'USD', null, null, false, 180, 'USD', 2, current_date, false);
 select count(*) as retry_n from transfer_legs \gset
 select test_assert(:'retry_n' = 2, 'retry with same key must not duplicate legs');
 select test_assert(
@@ -74,9 +99,20 @@ delete from transfer_legs;
 -- ===== 3. edit_transfer: re-point accounts and amounts atomically =====
 insert into transfer_legs
 select * from edit_transfer(
-  'aaaaaaaa-0000-0000-0000-000000000001', :'dst_id', :'src_id', 40, 41);
+  'aaaaaaaa-0000-0000-0000-000000000001', :'dst_id', :'src_id', 40, 41,
+  null, current_date, null,
+  -40, 'EUR', 2, current_date, false,
+  82, 'USD', null, null, false);
 select min(amount) as e_out, max(amount) as e_in from transfer_legs \gset
 select test_assert(:'e_out' = -40 and :'e_in' = 41, 'edit must rewrite legs to -40 / +41');
+select test_assert(
+  (select base_amount from transactions
+    where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000001' and amount < 0) = -40
+  and (select fx_rate from transactions
+    where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000001' and amount < 0) = 2
+  and (select base_amount from transactions
+    where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000001' and amount > 0) = 82,
+  'edit must store the fresh per-leg provenance');
 select test_assert(
   (select account_id from transactions
     where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000001' and amount < 0) = :'dst_id'
@@ -117,14 +153,18 @@ select test_assert((select balance from accounts where id = :'src_id') = 940, 'e
 insert into transfer_legs
 select * from create_transfer(
   'aaaaaaaa-0000-0000-0000-000000000002', :'src_id', :'dst_id',
-  60, 55, null, current_date, 'anchored', :'anchor_id');
+  60, 55, null, current_date, 'anchored', :'anchor_id',
+  -60, 'USD', null, null, false,
+  110, 'USD', 2, current_date, false);
 select count(*) as anchored_n from transfer_legs \gset
 select test_assert(:'anchored_n' = 2, 'anchored create returns both legs');
 select test_assert(
   (select amount from transactions where id = :'anchor_id') = -60
   and (select type from transactions where id = :'anchor_id') = 'transfer'
-  and (select transfer_id from transactions where id = :'anchor_id') = 'aaaaaaaa-0000-0000-0000-000000000002',
-  'anchor row must become the outgoing leg of the new pair');
+  and (select transfer_id from transactions where id = :'anchor_id') = 'aaaaaaaa-0000-0000-0000-000000000002'
+  and (select base_amount from transactions where id = :'anchor_id') = -60
+  and (select base_amount_stale from transactions where id = :'anchor_id') = false,
+  'anchor row must become the outgoing leg of the new pair with fresh provenance');
 select test_assert(
   (select balance from accounts where id = :'src_id') = 940
   and (select balance from accounts where id = :'dst_id') = 555,
@@ -136,7 +176,8 @@ delete from transfer_legs;
 
 -- ===== 6. convert_transfer_to_plain: partner deleted, row rewritten =====
 select convert_transfer_to_plain(
-  :'anchor_id', 'income', 75, :'src_id', null, current_date, 'refunded'
+  :'anchor_id', 'income', 75, :'src_id', null, current_date, 'refunded',
+  75, 'USD', null, null, false
 ) as converted_id \gset
 select test_assert(
   (select count(*) from transactions
@@ -145,14 +186,37 @@ select test_assert(
 select test_assert(
   (select type from transactions where id = :'anchor_id') = 'income'
   and (select amount from transactions where id = :'anchor_id') = 75
-  and (select currency from transactions where id = :'anchor_id') = 'USD',
-  'converted row must be a plain 75 USD income');
+  and (select currency from transactions where id = :'anchor_id') = 'USD'
+  and (select base_amount from transactions where id = :'anchor_id') = 75
+  and (select base_amount_stale from transactions where id = :'anchor_id') = false,
+  'converted row must be a plain 75 USD income with identity provenance');
 select test_assert(
   (select balance from accounts where id = :'src_id') = 1075
   and (select balance from accounts where id = :'dst_id') = 500,
   'balances after convert: src 1075 (940+75+partner reversal), dst 500');
 
--- ===== 7. Validation and ownership failures leave nothing behind =====
+-- ===== 7. Stale provenance: a leg without an available rate is kept as-is =====
+delete from transfer_legs;
+insert into transfer_legs
+select * from create_transfer(
+  'aaaaaaaa-0000-0000-0000-000000000007', :'src_id', :'dst_id',
+  10, 9, null, current_date, 'no rate available', null,
+  -10, 'USD', null, null, false,
+  9, 'EUR', null, null, true);
+select test_assert(
+  (select base_amount from transfer_legs where amount > 0) = 9
+  and (select base_currency from transfer_legs where amount > 0) = 'EUR'
+  and (select fx_rate from transfer_legs where amount > 0) is null
+  and (select base_amount_stale from transfer_legs where amount > 0) = true,
+  'in leg with no available rate must keep its own amount/currency, flagged stale');
+select test_assert(
+  (select base_amount from transfer_legs where amount < 0) = -10
+  and (select base_amount_stale from transfer_legs where amount < 0) = false,
+  'out leg provenance is unaffected by the stale partner');
+delete from transfer_legs;
+select delete_transfer('aaaaaaaa-0000-0000-0000-000000000007') as stale_deleted \gset
+
+-- ===== 8. Validation and ownership failures leave nothing behind =====
 do $$
 begin
   -- Foreign destination account.
@@ -160,7 +224,8 @@ begin
     'aaaaaaaa-0000-0000-0000-000000000003',
     (select id from accounts where name = 'checking'),
     (select id from accounts where name = 'foreign'),
-    10, 10);
+    10, 10, null, current_date, null, null,
+    -10, 'USD', null, null, false, 10, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: foreign destination must be rejected';
 exception
   when others then
@@ -173,7 +238,8 @@ begin
     'aaaaaaaa-0000-0000-0000-000000000003',
     (select id from accounts where name = 'foreign'),
     (select id from accounts where name = 'checking'),
-    10, 10);
+    10, 10, null, current_date, null, null,
+    -10, 'USD', null, null, false, 10, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: foreign source must be rejected';
 exception
   when others then
@@ -185,7 +251,8 @@ begin
     'aaaaaaaa-0000-0000-0000-000000000003',
     (select id from accounts where name = 'checking'),
     (select id from accounts where name = 'checking'),
-    10, 10);
+    10, 10, null, current_date, null, null,
+    -10, 'USD', null, null, false, 10, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: same-account transfer must be rejected';
 exception
   when others then
@@ -197,7 +264,8 @@ begin
     'aaaaaaaa-0000-0000-0000-000000000003',
     (select id from accounts where name = 'checking'),
     (select id from accounts where name = 'savings'),
-    0, 10);
+    0, 10, null, current_date, null, null,
+    -10, 'USD', null, null, false, 10, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: zero amount must be rejected';
 exception
   when others then
@@ -212,10 +280,12 @@ select test_assert(
   and (select balance from accounts where id = :'dst_id') = 500,
   'failed creates must not move any balance');
 
--- ===== 8. Cross-user isolation on existing pairs =====
+-- ===== 9. Cross-user isolation on existing pairs =====
 insert into transfer_legs
 select * from create_transfer(
-  'aaaaaaaa-0000-0000-0000-000000000004', :'src_id', :'dst_id', 10, 9);
+  'aaaaaaaa-0000-0000-0000-000000000004', :'src_id', :'dst_id', 10, 9,
+  null, current_date, null, null,
+  -10, 'USD', null, null, false, 18, 'USD', 2, current_date, false);
 delete from transfer_legs;
 do $$
 begin
@@ -223,7 +293,9 @@ begin
   perform edit_transfer(
     'aaaaaaaa-0000-0000-0000-000000000004',
     (select id from accounts where name = 'checking'),
-    (select id from accounts where name = 'savings'), 5, 5);
+    (select id from accounts where name = 'savings'), 5, 5,
+    null, current_date, null,
+    -5, 'USD', null, null, false, 5, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: foreign edit must be rejected';
 exception
   when others then
@@ -244,7 +316,9 @@ begin
   perform convert_transfer_to_plain(
     (select id from transactions where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000004' limit 1),
     'expense', 5,
-    (select id from accounts where name = 'foreign'));
+    (select id from accounts where name = 'foreign'),
+    null, current_date, null,
+    5, 'USD', null, null, false);
   raise exception 'ASSERT FAILED: foreign convert must be rejected';
 exception
   when others then
@@ -252,7 +326,7 @@ exception
 end $$;
 set app.test_user_id = '11111111-1111-1111-1111-111111111111';
 
--- ===== 9. Anchored create refuses a row already owned by another pair =====
+-- ===== 10. Anchored create refuses a row already owned by another pair =====
 do $$
 begin
   perform create_transfer(
@@ -260,7 +334,8 @@ begin
     (select id from accounts where name = 'checking'),
     (select id from accounts where name = 'savings'),
     3, 3, null, current_date, 'steal attempt',
-    (select id from transactions where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000004' limit 1));
+    (select id from transactions where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000004' limit 1),
+    -3, 'USD', null, null, false, 6, 'USD', 2, current_date, false);
   raise exception 'ASSERT FAILED: stealing a paired row must be rejected';
 exception
   when others then
@@ -271,7 +346,7 @@ select test_assert(
     where transfer_id = 'aaaaaaaa-0000-0000-0000-000000000005') = 0,
   'rejected anchor-steal leaves no partial pair');
 
--- ===== 10. Paired-leg enforcement applies to direct SQL too =====
+-- ===== 11. Paired-leg enforcement applies to direct SQL too =====
 do $$
 begin
   insert into transactions (user_id, account_id, type, amount, currency, base_amount, base_currency, date, transfer_id)
@@ -285,11 +360,13 @@ exception
   when unique_violation then null;
 end $$;
 
--- ===== 11. Atomicity: a caller rollback discards everything =====
+-- ===== 12. Atomicity: a caller rollback discards everything =====
 begin;
 insert into transfer_legs
 select * from create_transfer(
-  'aaaaaaaa-0000-0000-0000-000000000006', :'src_id', :'dst_id', 500, 490);
+  'aaaaaaaa-0000-0000-0000-000000000006', :'src_id', :'dst_id', 500, 490,
+  null, current_date, null, null,
+  -500, 'USD', null, null, false, 980, 'USD', 2, current_date, false);
 select count(*) as in_txn from transfer_legs \gset
 select test_assert(:'in_txn' = 2, 'pair visible inside the caller transaction');
 rollback;
@@ -301,7 +378,7 @@ select test_assert(
   (select balance from accounts where id = :'src_id') = 1065,
   'caller rollback must not leave a balance delta');
 
--- ===== 12. Legacy backfill: mutual correlative pairs gained a stable id =====
+-- ===== 13. Legacy backfill: mutual correlative pairs gained a stable id =====
 insert into transactions (user_id, account_id, type, amount, currency, base_amount, base_currency, date, correlative_id)
 values
   ('11111111-1111-1111-1111-111111111111', :'src_id', 'transfer', -20, 'USD', -20, 'USD', current_date, null)

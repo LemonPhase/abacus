@@ -262,19 +262,18 @@ test.describe('Atomic transfers', () => {
       .insert({ name: 'Internal', type: 'expense', color: '#10b981' })
     if (catErr) throw catErr
 
-    // Deterministic exchange rate (USD→EUR 0.5): the app checks this table
-    // before any external API. Match the app's key exactly: it uses the
-    // local-midnight instant formatted as a UTC date.
+    // Deterministic exchange rates. The app checks this table before any
+    // external API. Two rows: USD→EUR 0.5 (the dialog's converted amount) and
+    // EUR→USD 2.0 (the store's base-amount provenance for the incoming leg;
+    // the reporting currency defaults to USD). The cache key is the app's
+    // fetch-day label: today's LOCAL date components (getRate keys cache rows
+    // by the local day, never by the transaction date).
     const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      .toISOString()
-      .split('T')[0]
-    const { error: fxErr } = await userSupabase.from('exchange_rates').insert({
-      from_currency: 'USD',
-      to_currency: 'EUR',
-      rate: 0.5,
-      date: today,
-    })
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const { error: fxErr } = await userSupabase.from('exchange_rates').insert([
+      { from_currency: 'USD', to_currency: 'EUR', rate: 0.5, date: today },
+      { from_currency: 'EUR', to_currency: 'USD', rate: 2.0, date: today },
+    ])
     if (fxErr) throw fxErr
 
     await page.goto('/app/transactions')
@@ -317,6 +316,20 @@ test.describe('Atomic transfers', () => {
     expect(legs[1].account_id).toBe(bank.id)
     expect(legs[0].correlative_id).toBe(legs[1].id)
     expect(legs[1].correlative_id).toBe(legs[0].id)
+
+    // Both legs carry base-amount provenance: the USD out leg is an identity
+    // conversion, the EUR in leg was converted to the reporting currency
+    // (USD) with the seeded quote — never silently 1:1.
+    expect(legs[0].base_amount).toBe(-100)
+    expect(legs[0].base_currency).toBe('USD')
+    expect(legs[0].fx_rate).toBeNull()
+    expect(legs[0].fx_date).toBeNull()
+    expect(legs[0].base_amount_stale).toBe(false)
+    expect(legs[1].base_amount).toBe(100)
+    expect(legs[1].base_currency).toBe('USD')
+    expect(legs[1].fx_rate).toBe(2.0)
+    expect(legs[1].fx_date).toBe(today)
+    expect(legs[1].base_amount_stale).toBe(false)
 
     const { data: afterCreate } = await userSupabase
       .from('accounts')

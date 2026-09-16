@@ -18,6 +18,15 @@
 -- transfer_id. Legacy mutual correlative pairs are backfilled with a group id
 -- so the RPCs can manage them; one-sided legacy leftovers stay untagged and
 -- keep working through the plain row paths.
+--
+-- Base-amount provenance (base_amount / fx_rate / fx_date / base_amount_stale,
+-- see 20260917000003_currency_provenance.sql) is computed CLIENT-SIDE by the
+-- store and passed in as parameters: the reporting currency is a client-only
+-- setting (localStorage) and FX quotes require a provider fetch, neither of
+-- which is reachable from SQL. The store uses the same computeBase path as
+-- plain writes, so a leg without an available rate is stored with its own
+-- amount, its own currency, and base_amount_stale = true — the RPC never
+-- silently converts 1:1.
 
 alter table transactions add column if not exists transfer_id uuid;
 
@@ -107,6 +116,9 @@ $$;
 -- p_out_transaction_id optionally converts an existing row (a non-transfer
 -- being edited into a transfer, or a legacy unlinked leg) into the outgoing
 -- leg instead of inserting a new one.
+--
+-- p_out_* / p_in_* provenance: client-computed base_amount / base_currency /
+-- fx_rate / fx_date / base_amount_stale per leg (see file header).
 create or replace function create_transfer(
   p_idempotency_key uuid,
   p_from_account_id uuid,
@@ -116,7 +128,17 @@ create or replace function create_transfer(
   p_category_id uuid default null,
   p_date date default current_date,
   p_description text default null,
-  p_out_transaction_id uuid default null
+  p_out_transaction_id uuid default null,
+  p_out_base_amount numeric default null,
+  p_out_base_currency text default null,
+  p_out_fx_rate numeric default null,
+  p_out_fx_date date default null,
+  p_out_base_stale boolean default null,
+  p_in_base_amount numeric default null,
+  p_in_base_currency text default null,
+  p_in_fx_rate numeric default null,
+  p_in_fx_date date default null,
+  p_in_base_stale boolean default null
 )
 returns setof public.transactions
 language plpgsql
@@ -128,6 +150,7 @@ declare
   v_from public.accounts;
   v_to public.accounts;
   v_out public.transactions;
+  v_anchor public.transactions;
   v_in_id uuid;
 begin
   if v_user is null then
@@ -141,6 +164,12 @@ begin
   end if;
   if p_from_account_id = p_to_account_id then
     raise exception 'source and destination accounts must differ';
+  end if;
+  -- Provenance is client-computed (file header). A caller that omits it gets
+  -- a clear error instead of silently writing unconverted base amounts.
+  if p_out_base_amount is null or p_out_base_currency is null or p_out_base_stale is null
+    or p_in_base_amount is null or p_in_base_currency is null or p_in_base_stale is null then
+    raise exception 'per-leg provenance (base_amount/base_currency/base_stale) is required';
   end if;
 
   v_from := public.assert_owned_account(p_from_account_id, v_user);
@@ -158,57 +187,67 @@ begin
     return;
   end if;
 
+  -- Anchored create: adopt an existing row. Selected (and row-locked) before
+  -- the account pre-lock so its CURRENT account joins the deterministic lock
+  -- set — the balance trigger would otherwise lock it later, in race order.
+  if p_out_transaction_id is not null then
+    select * into v_anchor from public.transactions
+    where id = p_out_transaction_id
+    for update;
+    if v_anchor.id is null or v_anchor.user_id is distinct from v_user then
+      raise exception 'transaction % not found or not owned by caller', p_out_transaction_id;
+    end if;
+    if v_anchor.transfer_id is not null and v_anchor.transfer_id <> p_idempotency_key then
+      raise exception 'transaction already belongs to another transfer';
+    end if;
+  end if;
+
   -- Lock both accounts up front in deterministic (id) order. The balance
   -- trigger locks account rows as it applies deltas; concurrent opposite
   -- transfers (A→B racing B→A) would otherwise lock in opposite orders and
-  -- deadlock.
+  -- deadlock. v_anchor.account_id is null for a fresh create.
   perform 1 from public.accounts
-  where id in (v_from.id, v_to.id)
+  where id in (v_from.id, v_to.id, v_anchor.account_id)
   order by id
   for update;
 
   begin
-    if p_out_transaction_id is not null then
-      select * into v_out from public.transactions
-      where id = p_out_transaction_id
-      for update;
-      if v_out.id is null or v_out.user_id is distinct from v_user then
-        raise exception 'transaction % not found or not owned by caller', p_out_transaction_id;
-      end if;
-      if v_out.transfer_id is not null and v_out.transfer_id <> p_idempotency_key then
-        raise exception 'transaction already belongs to another transfer';
-      end if;
-
+    if v_anchor.id is not null then
       update public.transactions set
         account_id = v_from.id,
         category_id = p_category_id,
         type = 'transfer',
         amount = -p_amount,
         currency = v_from.currency,
-        base_amount = -p_amount,
-        base_currency = v_from.currency,
+        base_amount = p_out_base_amount,
+        base_currency = p_out_base_currency,
+        fx_rate = p_out_fx_rate,
+        fx_date = p_out_fx_date,
+        base_amount_stale = p_out_base_stale,
         date = p_date,
         description = p_description,
         transfer_id = p_idempotency_key,
         correlative_id = null
-      where id = v_out.id
+      where id = v_anchor.id
       returning * into v_out;
     else
       insert into public.transactions
         (user_id, account_id, category_id, type, amount, currency, base_amount, base_currency,
-         date, description, transfer_id)
+         fx_rate, fx_date, base_amount_stale, date, description, transfer_id)
       values
-        (v_user, v_from.id, p_category_id, 'transfer', -p_amount, v_from.currency, -p_amount,
-         v_from.currency, p_date, p_description, p_idempotency_key)
+        (v_user, v_from.id, p_category_id, 'transfer', -p_amount, v_from.currency,
+         p_out_base_amount, p_out_base_currency, p_out_fx_rate, p_out_fx_date,
+         p_out_base_stale, p_date, p_description, p_idempotency_key)
       returning * into v_out;
     end if;
 
     insert into public.transactions
       (user_id, account_id, category_id, type, amount, currency, base_amount, base_currency,
-       date, description, transfer_id, correlative_id)
+       fx_rate, fx_date, base_amount_stale, date, description, transfer_id, correlative_id)
     values
       (v_user, v_to.id, p_category_id, 'transfer', p_converted_amount, v_to.currency,
-       p_converted_amount, v_to.currency, p_date, p_description, p_idempotency_key, v_out.id)
+       p_in_base_amount, p_in_base_currency, p_in_fx_rate, p_in_fx_date, p_in_base_stale,
+       p_date, p_description, p_idempotency_key, v_out.id)
     returning id into v_in_id;
 
     update public.transactions set correlative_id = v_in_id where id = v_out.id;
@@ -245,7 +284,17 @@ create or replace function edit_transfer(
   p_converted_amount numeric,
   p_category_id uuid default null,
   p_date date default current_date,
-  p_description text default null
+  p_description text default null,
+  p_out_base_amount numeric default null,
+  p_out_base_currency text default null,
+  p_out_fx_rate numeric default null,
+  p_out_fx_date date default null,
+  p_out_base_stale boolean default null,
+  p_in_base_amount numeric default null,
+  p_in_base_currency text default null,
+  p_in_fx_rate numeric default null,
+  p_in_fx_date date default null,
+  p_in_base_stale boolean default null
 )
 returns setof public.transactions
 language plpgsql
@@ -271,12 +320,27 @@ begin
   if p_from_account_id = p_to_account_id then
     raise exception 'source and destination accounts must differ';
   end if;
+  if p_out_base_amount is null or p_out_base_currency is null or p_out_base_stale is null
+    or p_in_base_amount is null or p_in_base_currency is null or p_in_base_stale is null then
+    raise exception 'per-leg provenance (base_amount/base_currency/base_stale) is required';
+  end if;
 
   v_from := public.assert_owned_account(p_from_account_id, v_user);
   v_to := public.assert_owned_account(p_to_account_id, v_user);
 
+  -- Pre-lock the destination/source accounts AND the accounts the legs
+  -- currently sit on, in deterministic (id) order: two concurrent edits
+  -- moving different pairs between the same account sets in opposite
+  -- directions would otherwise deadlock inside the balance trigger.
   perform 1 from public.accounts
-  where id in (v_from.id, v_to.id)
+  where id in (
+    select account_id from public.transactions
+    where transfer_id = p_transfer_id and user_id = v_user
+    union
+    select v_from.id
+    union
+    select v_to.id
+  )
   order by id
   for update;
 
@@ -295,8 +359,11 @@ begin
     category_id = p_category_id,
     amount = -p_amount,
     currency = v_from.currency,
-    base_amount = -p_amount,
-    base_currency = v_from.currency,
+    base_amount = p_out_base_amount,
+    base_currency = p_out_base_currency,
+    fx_rate = p_out_fx_rate,
+    fx_date = p_out_fx_date,
+    base_amount_stale = p_out_base_stale,
     date = p_date,
     description = p_description
   where id = v_out.id;
@@ -306,8 +373,11 @@ begin
     category_id = p_category_id,
     amount = p_converted_amount,
     currency = v_to.currency,
-    base_amount = p_converted_amount,
-    base_currency = v_to.currency,
+    base_amount = p_in_base_amount,
+    base_currency = p_in_base_currency,
+    fx_rate = p_in_fx_rate,
+    fx_date = p_in_fx_date,
+    base_amount_stale = p_in_base_stale,
     date = p_date,
     description = p_description
   where id = v_in.id;
@@ -352,6 +422,7 @@ $$;
 
 -- Convert a transfer leg back into a plain income/expense row: the partner
 -- leg(s) are deleted and the row itself is rewritten in the same transaction.
+-- p_* provenance params are client-computed for the rewritten row (file header).
 create or replace function convert_transfer_to_plain(
   p_transaction_id uuid,
   p_new_type text,
@@ -359,7 +430,12 @@ create or replace function convert_transfer_to_plain(
   p_new_account_id uuid,
   p_category_id uuid default null,
   p_date date default current_date,
-  p_description text default null
+  p_description text default null,
+  p_base_amount numeric default null,
+  p_base_currency text default null,
+  p_fx_rate numeric default null,
+  p_fx_date date default null,
+  p_base_stale boolean default null
 )
 returns public.transactions
 language plpgsql
@@ -380,6 +456,9 @@ begin
   end if;
   if p_amount is null or p_amount <= 0 then
     raise exception 'amount must be positive';
+  end if;
+  if p_base_amount is null or p_base_currency is null or p_base_stale is null then
+    raise exception 'provenance (base_amount/base_currency/base_stale) is required';
   end if;
 
   v_account := public.assert_owned_account(p_new_account_id, v_user);
@@ -417,8 +496,11 @@ begin
     amount = p_amount,
     account_id = v_account.id,
     currency = v_account.currency,
-    base_amount = p_amount,
-    base_currency = v_account.currency,
+    base_amount = p_base_amount,
+    base_currency = p_base_currency,
+    fx_rate = p_fx_rate,
+    fx_date = p_fx_date,
+    base_amount_stale = p_base_stale,
     category_id = p_category_id,
     date = p_date,
     description = p_description,
@@ -434,11 +516,11 @@ $$;
 -- The transfer RPCs are for signed-in users only; the helper must never be
 -- callable directly (it returns account rows for a caller-supplied user id).
 revoke execute on function assert_owned_account(uuid, uuid) from public;
-revoke execute on function create_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, uuid) from public, anon;
-revoke execute on function edit_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text) from public, anon;
+revoke execute on function create_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, uuid, numeric, text, numeric, date, boolean, numeric, text, numeric, date, boolean) from public, anon;
+revoke execute on function edit_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, numeric, text, numeric, date, boolean, numeric, text, numeric, date, boolean) from public, anon;
 revoke execute on function delete_transfer(uuid) from public, anon;
-revoke execute on function convert_transfer_to_plain(uuid, text, numeric, uuid, uuid, date, text) from public, anon;
-grant execute on function create_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, uuid) to authenticated, service_role;
-grant execute on function edit_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text) to authenticated, service_role;
+revoke execute on function convert_transfer_to_plain(uuid, text, numeric, uuid, uuid, date, text, numeric, text, numeric, date, boolean) from public, anon;
+grant execute on function create_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, uuid, numeric, text, numeric, date, boolean, numeric, text, numeric, date, boolean) to authenticated, service_role;
+grant execute on function edit_transfer(uuid, uuid, uuid, numeric, numeric, uuid, date, text, numeric, text, numeric, date, boolean, numeric, text, numeric, date, boolean) to authenticated, service_role;
 grant execute on function delete_transfer(uuid) to authenticated, service_role;
-grant execute on function convert_transfer_to_plain(uuid, text, numeric, uuid, uuid, date, text) to authenticated, service_role;
+grant execute on function convert_transfer_to_plain(uuid, text, numeric, uuid, uuid, date, text, numeric, text, numeric, date, boolean) to authenticated, service_role;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -59,6 +59,9 @@ function transferLeg(overrides: Partial<Transaction>): Transaction {
     currency: accountFixture.currency,
     baseAmount: -125,
     baseCurrency: accountFixture.currency,
+    fxRate: null,
+    fxDate: null,
+    baseAmountStale: false,
     date: new Date('2026-05-01'),
     description: 'Move funds',
     transferId: 'pair-1',
@@ -83,6 +86,15 @@ const noop = vi.fn()
 beforeEach(() => {
   localStorage.clear()
   useSettingsStore.getState().reset()
+  // Cross-currency transfers need an FX quote; stub the provider (USD→EUR at 1
+  // keeps the fixture amounts unchanged).
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ result: 'success', rates: { EUR: 1 } }),
+    }),
+  )
   useAccountsStore.setState({
     accounts: [accountFixture, toAccountFixture],
     loading: false,
@@ -139,6 +151,10 @@ async function openTransferDialog(user: ReturnType<typeof userEvent.setup>) {
 
   return dialog
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('Transactions transfer logic', () => {
   it('creates a transfer with one atomic RPC call', async () => {

@@ -230,61 +230,61 @@ export type Database = {
       }
       recurring_transactions: {
         Row: {
-          id: string
-          user_id: string
-          created_at: string
-          updated_at: string
           account_id: string
-          category_id: string | null
-          type: string
           amount: number
+          category_id: string | null
+          created_at: string
           currency: string
-          description: string | null
-          frequency: string
-          interval_value: number
           day_of_month: number | null
-          start_date: string
+          description: string | null
           end_date: string | null
-          next_date: string
+          frequency: string
+          id: string
+          interval_value: number
           is_active: boolean
+          next_date: string
+          start_date: string
+          type: string
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          updated_at?: string
           account_id: string
-          category_id?: string | null
-          type: string
           amount: number
+          category_id?: string | null
+          created_at?: string
           currency?: string
-          description?: string | null
-          frequency: string
-          interval_value?: number
           day_of_month?: number | null
-          start_date?: string
+          description?: string | null
           end_date?: string | null
-          next_date?: string
+          frequency: string
+          id?: string
+          interval_value?: number
           is_active?: boolean
+          next_date?: string
+          start_date?: string
+          type: string
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          created_at?: string
-          updated_at?: string
           account_id?: string
-          category_id?: string | null
-          type?: string
           amount?: number
+          category_id?: string | null
+          created_at?: string
           currency?: string
-          description?: string | null
-          frequency?: string
-          interval_value?: number
           day_of_month?: number | null
-          start_date?: string
+          description?: string | null
           end_date?: string | null
-          next_date?: string
+          frequency?: string
+          id?: string
+          interval_value?: number
           is_active?: boolean
+          next_date?: string
+          start_date?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: [
           {
@@ -308,6 +308,7 @@ export type Database = {
           account_id: string
           amount: number
           base_amount: number
+          base_amount_stale: boolean
           base_currency: string
           category_id: string | null
           correlative_id: string | null
@@ -315,6 +316,8 @@ export type Database = {
           currency: string
           date: string
           description: string | null
+          fx_date: string | null
+          fx_rate: number | null
           id: string
           transfer_id: string | null
           type: string
@@ -325,6 +328,7 @@ export type Database = {
           account_id: string
           amount: number
           base_amount: number
+          base_amount_stale?: boolean
           base_currency: string
           category_id?: string | null
           correlative_id?: string | null
@@ -332,6 +336,8 @@ export type Database = {
           currency: string
           date: string
           description?: string | null
+          fx_date?: string | null
+          fx_rate?: number | null
           id?: string
           transfer_id?: string | null
           type: string
@@ -342,6 +348,7 @@ export type Database = {
           account_id?: string
           amount?: number
           base_amount?: number
+          base_amount_stale?: boolean
           base_currency?: string
           category_id?: string | null
           correlative_id?: string | null
@@ -349,6 +356,8 @@ export type Database = {
           currency?: string
           date?: string
           description?: string | null
+          fx_date?: string | null
+          fx_rate?: number | null
           id?: string
           transfer_id?: string | null
           type?: string
@@ -377,97 +386,169 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_transfer: {
-        Args: {
-          p_idempotency_key: string
-          p_from_account_id: string
-          p_to_account_id: string
-          p_amount: number
-          p_converted_amount: number
-          p_category_id?: string | null
-          p_date?: string
-          p_description?: string | null
-          p_out_transaction_id?: string | null
-        }
-        Returns: {
-          id: string
-          user_id: string
-          created_at: string
-          updated_at: string
-          account_id: string
-          category_id: string | null
-          type: string
-          amount: number
-          currency: string
-          base_amount: number
-          base_currency: string
-          date: string
-          description: string | null
-          correlative_id: string | null
-          transfer_id: string | null
-        }[]
+      account_ledger_effects: {
+        Args: { p_account_id: string }
+        Returns: number
       }
-      edit_transfer: {
-        Args: {
-          p_transfer_id: string
-          p_from_account_id: string
-          p_to_account_id: string
-          p_amount: number
-          p_converted_amount: number
-          p_category_id?: string | null
-          p_date?: string
-          p_description?: string | null
-        }
+      assert_owned_account: {
+        Args: { p_account_id: string; p_user_id: string }
         Returns: {
-          id: string
-          user_id: string
+          balance: number
           created_at: string
-          updated_at: string
-          account_id: string
-          category_id: string | null
-          type: string
-          amount: number
           currency: string
-          base_amount: number
-          base_currency: string
-          date: string
-          description: string | null
-          correlative_id: string | null
-          transfer_id: string | null
-        }[]
-      }
-      delete_transfer: {
-        Args: {
-          p_transfer_id: string
+          id: string
+          name: string
+          notes: string | null
+          opening_balance: number
+          type: string
+          updated_at: string
+          user_id: string
         }
-        Returns: undefined
+        SetofOptions: {
+          from: "*"
+          to: "accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       convert_transfer_to_plain: {
         Args: {
-          p_transaction_id: string
-          p_new_type: string
           p_amount: number
-          p_new_account_id: string
-          p_category_id?: string | null
+          p_base_amount?: number
+          p_base_currency?: string
+          p_base_stale?: boolean
+          p_category_id?: string
           p_date?: string
-          p_description?: string | null
+          p_description?: string
+          p_fx_date?: string
+          p_fx_rate?: number
+          p_new_account_id: string
+          p_new_type: string
+          p_transaction_id: string
         }
         Returns: {
-          id: string
-          user_id: string
-          created_at: string
-          updated_at: string
           account_id: string
-          category_id: string | null
-          type: string
           amount: number
-          currency: string
           base_amount: number
+          base_amount_stale: boolean
           base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
           date: string
           description: string | null
-          correlative_id: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
           transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_transfer: {
+        Args: {
+          p_amount: number
+          p_category_id?: string
+          p_converted_amount: number
+          p_date?: string
+          p_description?: string
+          p_from_account_id: string
+          p_idempotency_key: string
+          p_in_base_amount?: number
+          p_in_base_currency?: string
+          p_in_base_stale?: boolean
+          p_in_fx_date?: string
+          p_in_fx_rate?: number
+          p_out_base_amount?: number
+          p_out_base_currency?: string
+          p_out_base_stale?: boolean
+          p_out_fx_date?: string
+          p_out_fx_rate?: number
+          p_out_transaction_id?: string
+          p_to_account_id: string
+        }
+        Returns: {
+          account_id: string
+          amount: number
+          base_amount: number
+          base_amount_stale: boolean
+          base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
+          transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      delete_transfer: { Args: { p_transfer_id: string }; Returns: undefined }
+      edit_transfer: {
+        Args: {
+          p_amount: number
+          p_category_id?: string
+          p_converted_amount: number
+          p_date?: string
+          p_description?: string
+          p_from_account_id: string
+          p_in_base_amount?: number
+          p_in_base_currency?: string
+          p_in_base_stale?: boolean
+          p_in_fx_date?: string
+          p_in_fx_rate?: number
+          p_out_base_amount?: number
+          p_out_base_currency?: string
+          p_out_base_stale?: boolean
+          p_out_fx_date?: string
+          p_out_fx_rate?: number
+          p_to_account_id: string
+          p_transfer_id: string
+        }
+        Returns: {
+          account_id: string
+          amount: number
+          base_amount: number
+          base_amount_stale: boolean
+          base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
+          transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
     }
@@ -488,12 +569,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -517,11 +598,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -542,11 +623,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -567,11 +648,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -584,11 +665,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
