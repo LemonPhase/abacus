@@ -107,9 +107,13 @@ export const useRecurringTransactionsStore = create<RecurringTransactionsState>(
     },
     getActive: () => get().items.filter((i) => i.isActive),
     getDue: () => {
-      const now = new Date()
-      now.setHours(0, 0, 0, 0)
-      return get().items.filter((i) => i.isActive && new Date(i.nextDate) <= now)
+      // Compare UTC calendar dates (the same domain as the server's
+      // current_date, which alone decides due-ness inside the RPC). A local-
+      // clock comparison would delay catch-up by up to 23h for UTC+ zones.
+      const todayUtc = new Date().toISOString().slice(0, 10)
+      return get().items.filter(
+        (i) => i.isActive && new Date(i.nextDate).toISOString().slice(0, 10) <= todayUtc,
+      )
     },
     applyNow: async (id) => {
       const item = get().getById(id)
@@ -131,7 +135,14 @@ export const useRecurringTransactionsStore = create<RecurringTransactionsState>(
       let total = 0
       try {
         for (const item of due) {
-          total += await applyOccurrenceRpc(item)
+          // Drain capped catch-up windows: the RPC applies at most
+          // APPLY_OCCURRENCE_CAP occurrences per call and always advances
+          // next_date, so re-invoking while it returns the cap makes progress.
+          let applied: number
+          do {
+            applied = await applyOccurrenceRpc(item)
+            total += applied
+          } while (applied === APPLY_OCCURRENCE_CAP)
         }
       } catch (e) {
         set({ error: e instanceof Error ? e.message : String(e) })
@@ -142,6 +153,11 @@ export const useRecurringTransactionsStore = create<RecurringTransactionsState>(
     },
   }
 })
+
+// Per-call occurrence cap the SQL engine enforces (20260919000001
+// _recurring_engine.sql, v_cap): catchUp drains capped windows by re-invoking
+// while the RPC returns exactly this value.
+const APPLY_OCCURRENCE_CAP = 100
 
 // One engine call: inserts + advances (or deactivates) in a single DB
 // transaction. Base-amount provenance is computed client-side like the

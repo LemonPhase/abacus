@@ -118,4 +118,43 @@ describe('recurring engine store wiring', () => {
     await expect(useRecurringTransactionsStore.getState().catchUp()).rejects.toThrow('engine down')
     expect(useRecurringTransactionsStore.getState().error).toBe('engine down')
   })
+
+  it('catchUp drains capped windows by re-invoking while the RPC returns the cap', async () => {
+    seedItem({ id: 'rt-cap', next_date: '2020-01-01' })
+    await useRecurringTransactionsStore.getState().load()
+
+    let calls = 0
+    rpcMock().mockImplementation(() => {
+      calls += 1
+      // Two full capped batches, then the final (drained) call.
+      return Promise.resolve({ data: calls <= 2 ? 100 : 0, error: null })
+    })
+
+    const total = await useRecurringTransactionsStore.getState().catchUp()
+    expect(total).toBe(200)
+    expect(calls).toBe(3)
+  })
+
+  it('getDue agrees with the server UTC-date contract regardless of local timezone', async () => {
+    // PR #32 review repro B: a local-midnight comparison delays catch-up by
+    // up to 23h east of UTC. Fixed clock mid-day UTC on 2026-09-19 with a
+    // UTC+2 local zone: the server (UTC) considers 2026-09-19 due, and the
+    // prefilter must agree even though the local wall clock also says 09-19
+    // (a local-midnight comparison would still miss it — local midnight is
+    // 2026-09-18T22:00Z, before the occurrence's UTC midnight).
+    const realTz = process.env.TZ
+    process.env.TZ = 'Europe/Berlin'
+    vi.useFakeTimers({ now: new Date('2026-09-19T12:00:00Z'), toFake: ['Date'] })
+    try {
+      seedItem({ id: 'rt-due-utc-today', next_date: '2026-09-19' })
+      seedItem({ id: 'rt-due-utc-tomorrow', next_date: '2026-09-20' })
+      await useRecurringTransactionsStore.getState().load()
+
+      const due = useRecurringTransactionsStore.getState().getDue()
+      expect(due.map((i) => i.id)).toEqual(['rt-due-utc-today'])
+    } finally {
+      vi.useRealTimers()
+      process.env.TZ = realTz
+    }
+  })
 })

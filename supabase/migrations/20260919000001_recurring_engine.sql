@@ -14,7 +14,12 @@
 --   balances are never written directly), records each occurrence in
 --   recurring_occurrences, advances next_date — or deactivates the schedule
 --   when the next occurrence falls past end_date. Retrying the call is a
---   no-op: an already-applied template is no longer due.
+--   no-op: identities already spent in recurring_occurrences (including
+--   those spent before a deactivation that was later reactivated with an
+--   extended end_date) are skipped without error, and next_date always
+--   advances past everything the call walked. A per-call cap (100) keeps a
+--   re-anchored or long-overdue template from building a giant transaction;
+--   the caller drains by re-invoking while the RPC returns the cap.
 --
 --   recurring_occurrences — the unique template/occurrence identifier:
 --   primary key (recurring_id, due_date) makes one applied occurrence per
@@ -163,6 +168,13 @@ declare
   v_next date;
   v_tx_id uuid;
   v_count integer := 0;
+  v_advanced boolean := false;
+  -- Safety cap on one call: a template re-anchored years backward (start-date
+  -- edit) or left unopened for ages must not build a giant single transaction.
+  -- The client (recurringTransactionsStore.catchUp) drains by re-invoking
+  -- while this returns the cap; the loop is resumable by construction
+  -- (next_date always advances before exit).
+  v_cap constant integer := 100;
 begin
   if v_user is null then
     raise exception 'not authenticated';
@@ -190,7 +202,20 @@ begin
   -- Catch up every occurrence due on or before today (server date) that has
   -- not passed end_date — insert + advance atomically, in schedule order.
   while v_next <= current_date
-        and (v_rec.end_date is null or v_next <= v_rec.end_date) loop
+        and (v_rec.end_date is null or v_next <= v_rec.end_date)
+        and v_count < v_cap loop
+    if exists (
+      select 1 from recurring_occurrences
+      where recurring_id = v_rec.id and due_date = v_next
+    ) then
+      -- Identity already spent (e.g. the schedule auto-deactivated at its end
+      -- date and was later reactivated with an extended end_date): never
+      -- resurrect, never error — advance past it without re-inserting.
+      v_next := recurring_next_date(v_next, v_rec.frequency, v_rec.interval_value, v_rec.day_of_month);
+      v_advanced := true;
+      continue;
+    end if;
+
     insert into transactions
       (user_id, account_id, category_id, type, amount, currency,
        base_amount, base_currency, fx_rate, fx_date, base_amount_stale,
@@ -202,19 +227,24 @@ begin
     returning id into v_tx_id;
 
     -- The unique identifier: fails loudly if the same template/due date was
-    -- already applied by any writer (belt to the row lock's braces).
+    -- already applied by any writer outside this loop (belt to the row
+    -- lock's braces; identities spent before this call are skipped above).
     insert into recurring_occurrences (recurring_id, user_id, due_date, transaction_id)
     values (v_rec.id, v_user, v_next, v_tx_id);
 
     v_next := recurring_next_date(v_next, v_rec.frequency, v_rec.interval_value, v_rec.day_of_month);
     v_count := v_count + 1;
+    v_advanced := true;
   end loop;
 
   if v_rec.end_date is not null and v_next > v_rec.end_date then
     -- Schedule ran past its end: deactivate. next_date stays at the last
     -- applied occurrence (the pre-engine client behavior).
     update recurring_transactions set is_active = false where id = v_rec.id;
-  elsif v_count > 0 then
+  elsif v_advanced then
+    -- Advance next_date past everything this call walked, including
+    -- skipped spent identities — it always points at the first unapplied
+    -- occurrence on exit. A pure no-op call (nothing was due) changes nothing.
     update recurring_transactions set next_date = v_next where id = v_rec.id;
   end if;
 

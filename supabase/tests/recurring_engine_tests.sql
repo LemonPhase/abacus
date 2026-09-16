@@ -320,3 +320,102 @@ select test_assert(
 select test_assert(
   public.recurring_next_date('2026-01-25', 'weekly', 2) = '2026-02-08',
   'H: weekly interval 2 crosses the month boundary');
+
+-- ===========================================================================
+-- I. Reactivated ended schedule (PR #32 review repro A): identities spent
+--    before deactivation are skipped — never resurrected, never a duplicate-
+--    key error — and catch-up applies exactly the missed window.
+-- ===========================================================================
+insert into recurring_transactions
+  (id, account_id, type, amount, currency, description, frequency, interval_value,
+   start_date, end_date, next_date)
+values
+  ('eeeeeeee-0000-0000-0000-000000000008', 'aaaaaaaa-0000-0000-0000-000000000001',
+   'expense', 4, 'USD', 'Resubscribed', 'daily', 1,
+   current_date - 10, current_date - 3, current_date - 5);
+
+-- Run to the end date: applies today-5..today-3, then deactivates with
+-- next_date left at the last applied (already spent) occurrence.
+select public.apply_recurring_occurrence(
+  'eeeeeeee-0000-0000-0000-000000000008', 4, 'USD', false) as applied_i1 \gset
+select test_assert(:applied_i1 = 3, 'I: applies the window up to end_date');
+select test_assert(
+  not (select is_active from recurring_transactions
+       where id = 'eeeeeeee-0000-0000-0000-000000000008'),
+  'I: deactivated at end_date');
+
+-- User resubscribes: extends the end date and re-enables (ordinary UI edit,
+-- start date untouched so next_date is preserved).
+update recurring_transactions
+set end_date = current_date + 10, is_active = true
+where id = 'eeeeeeee-0000-0000-0000-000000000008';
+
+select public.apply_recurring_occurrence(
+  'eeeeeeee-0000-0000-0000-000000000008', 4, 'USD', false) as applied_i2 \gset
+select test_assert(:applied_i2 = 3,
+  'I: reactivation applies exactly the newly missed days (spent identity skipped)');
+select test_assert(
+  (select count(*) from recurring_occurrences
+   where recurring_id = 'eeeeeeee-0000-0000-0000-000000000008') = 6,
+  'I: six occurrences total — three spent before deactivation, three new');
+select test_assert(
+  (select count(*) from transactions
+   where description = 'Resubscribed'
+     and date in (current_date - 2, current_date - 1, current_date)) = 3,
+  'I: new transactions land on the reactivated window, not on spent dates');
+select test_assert(
+  (select next_date = current_date + 1 from recurring_transactions
+   where id = 'eeeeeeee-0000-0000-0000-000000000008'),
+  'I: next_date advanced past the whole walked window');
+select test_assert(
+  (select is_active from recurring_transactions
+   where id = 'eeeeeeee-0000-0000-0000-000000000008'),
+  'I: extended schedule stays active');
+
+-- ===========================================================================
+-- J. Catch-up continues past spent identities: a stale next_date pointing at
+--    spent identities walks over them, applies nothing, and still advances.
+-- ===========================================================================
+update recurring_transactions
+set next_date = current_date - 3
+where id = 'eeeeeeee-0000-0000-0000-000000000008';
+
+select public.apply_recurring_occurrence(
+  'eeeeeeee-0000-0000-0000-000000000008', 4, 'USD', false) as applied_j \gset
+select test_assert(:applied_j = 0, 'J: fully-spent window applies nothing');
+select test_assert(
+  (select count(*) from recurring_occurrences
+   where recurring_id = 'eeeeeeee-0000-0000-0000-000000000008') = 6,
+  'J: no duplicate occurrences after walking spent identities');
+select test_assert(
+  (select next_date = current_date + 1 from recurring_transactions
+   where id = 'eeeeeeee-0000-0000-0000-000000000008'),
+  'J: next_date still advances past a fully-spent window');
+
+-- ===========================================================================
+-- K. Per-call cap: a huge overdue window is drained in resumable batches
+--    (next_date always advances; no single giant transaction).
+-- ===========================================================================
+insert into recurring_transactions
+  (id, account_id, type, amount, currency, description, frequency, interval_value,
+   start_date, next_date)
+values
+  ('eeeeeeee-0000-0000-0000-000000000009', 'aaaaaaaa-0000-0000-0000-000000000001',
+   'expense', 1, 'USD', 'Long overdue', 'daily', 1,
+   current_date - 200, current_date - 101);
+
+select public.apply_recurring_occurrence(
+  'eeeeeeee-0000-0000-0000-000000000009', 1, 'USD', false) as applied_k1 \gset
+select test_assert(:applied_k1 = 100, 'K: first call applies at most the cap');
+select test_assert(
+  (select next_date = current_date - 1 from recurring_transactions
+   where id = 'eeeeeeee-0000-0000-0000-000000000009'),
+  'K: next_date advances to the cap boundary (resumable)');
+
+select public.apply_recurring_occurrence(
+  'eeeeeeee-0000-0000-0000-000000000009', 1, 'USD', false) as applied_k2 \gset
+select test_assert(:applied_k2 = 2, 'K: second call finishes the window');
+select test_assert(
+  (select next_date = current_date + 1 from recurring_transactions
+   where id = 'eeeeeeee-0000-0000-0000-000000000009'),
+  'K: fully drained');
