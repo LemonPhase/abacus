@@ -17,6 +17,9 @@
 --      signed transaction effects while the rows are inserted — identical to
 --      the export. The exported `balance` value itself is deliberately not
 --      inserted (it is a derived cache; the INSERT trigger overwrites it).
+--   4. Post-#27 (20260917000004) budgets carry no category_ids column: the
+--      payload keeps the array shape (export derives it from
+--      budget_categories) and the RPC regenerates the association rows.
 --
 -- Ownership enforcement is explicit because security definer bypasses RLS:
 -- rows are written with user_id = auth.uid() only, and payload rows claiming
@@ -154,6 +157,19 @@ begin
     end if;
   end loop;
 
+  -- Budget category_ids shape: if the key is present it must be a JSON array.
+  -- An explicit JSON null (or scalar/object) is a payload defect — reject it
+  -- precisely here instead of letting the association insert fail with a raw
+  -- "cannot extract elements from a scalar" (JSON null is not SQL null, so a
+  -- plain coalesce does not catch it).
+  if exists (
+    select 1 from jsonb_array_elements(v_budgets) b
+    where b->'category_ids' is not null
+      and jsonb_typeof(b->'category_ids') is distinct from 'array'
+  ) then
+    raise exception 'restore_user_data: budgets[].category_ids must be an array';
+  end if;
+
   -- Relationships: every reference must resolve inside the payload (the rest
   -- of the database is deleted during the restore).
   if exists (
@@ -214,6 +230,7 @@ begin
   end if;
 
   -- ---- Phase 2: delete the caller's existing rows, FK-safe order ---------
+  -- (budget_categories rows go with their budgets via ON DELETE CASCADE.)
 
   delete from public.recurring_transactions where user_id = v_uid;
   delete from public.transactions             where user_id = v_uid;
@@ -251,14 +268,17 @@ begin
 
   insert into public.transactions (id, user_id, created_at, updated_at,
                                    account_id, category_id, type, amount, currency,
-                                   base_amount, base_currency, date, description, correlative_id)
+                                   base_amount, base_currency, date, description, correlative_id,
+                                   fx_rate, fx_date, base_amount_stale)
   select r.id, v_uid, coalesce(r.created_at, now()), coalesce(r.updated_at, now()),
          r.account_id, r.category_id, r.type, r.amount, r.currency,
-         r.base_amount, r.base_currency, r.date, r.description, r.correlative_id
+         r.base_amount, r.base_currency, r.date, r.description, r.correlative_id,
+         r.fx_rate, r.fx_date, coalesce(r.base_amount_stale, true)
   from jsonb_to_recordset(v_transactions) as r(
     id uuid, created_at timestamptz, updated_at timestamptz,
     account_id uuid, category_id uuid, type text, amount numeric, currency text,
-    base_amount numeric, base_currency text, date date, description text, correlative_id uuid);
+    base_amount numeric, base_currency text, date date, description text, correlative_id uuid,
+    fx_rate numeric, fx_date date, base_amount_stale boolean);
   get diagnostics v_n = row_count;
   v_counts := v_counts || jsonb_build_object('transactions', v_n);
 
@@ -273,14 +293,29 @@ begin
   perform set_config('app.preserve_updated_at', '', true);
 
   insert into public.budgets (id, user_id, created_at, updated_at,
-                              category_ids, name, amount, period, start_date)
+                              name, amount, period, start_date)
   select r.id, v_uid, coalesce(r.created_at, now()), coalesce(r.updated_at, now()),
-         r.category_ids, r.name, r.amount, r.period, coalesce(r.start_date, current_date)
+         r.name, r.amount, r.period, coalesce(r.start_date, current_date)
   from jsonb_to_recordset(v_budgets) as r(
     id uuid, created_at timestamptz, updated_at timestamptz,
-    category_ids uuid[], name text, amount numeric, period text, start_date date);
+    name text, amount numeric, period text, start_date date);
   get diagnostics v_n = row_count;
   v_counts := v_counts || jsonb_build_object('budgets', v_n);
+
+  -- Audit 08 (PR #27): budgets.category_ids no longer exists — the same-user
+  -- budget -> category links live in the budget_categories association table
+  -- (composite FKs to budgets(id, user_id) and categories(id, user_id)). The
+  -- payload keeps the v3 array shape; derive the association rows from it.
+  -- Every id was already validated to be a payload category, and categories
+  -- were just inserted under v_uid, so the composite FKs are satisfied;
+  -- on conflict absorbs a duplicated id inside one budget's array.
+  insert into public.budget_categories (budget_id, category_id, user_id)
+  select r.id, cid, v_uid
+  from jsonb_to_recordset(v_budgets) as r(id uuid, category_ids uuid[])
+       cross join lateral unnest(coalesce(r.category_ids, '{}'::uuid[])) as cid
+  on conflict (budget_id, category_id) do nothing;
+  get diagnostics v_n = row_count;
+  v_counts := v_counts || jsonb_build_object('budget_categories', v_n);
 
   insert into public.exchange_rates (id, user_id, created_at, updated_at,
                                      from_currency, to_currency, rate, date)
@@ -327,3 +362,21 @@ begin
   return v_counts;
 end;
 $$;
+
+-- User-scoped RPC: no anonymous access (auth.uid() = NULL would fail the
+-- guard anyway, but don't advertise it); same hardening as
+-- replace_budget_categories (20260917000005). The harness cluster has no
+-- anon role, so guard the revoke the same way Supabase's own migrations do.
+do $$
+begin
+  revoke execute on function restore_user_data(jsonb) from public;
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke execute on function restore_user_data(jsonb) from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    grant execute on function restore_user_data(jsonb) to authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function restore_user_data(jsonb) to service_role;
+  end if;
+end $$;

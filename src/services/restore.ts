@@ -1,6 +1,6 @@
 import { supabase } from '@/supabase/client'
 import type { Json } from '@/supabase/database.types'
-import { normalizeLegacyAccounts } from '@/pages/settings/legacyAccounts'
+import { normalizeLegacyAccounts } from '@/lib/legacyAccounts'
 import { parseAndValidateRestorePayload, type RestorePayload } from '@/lib/restoreValidation'
 
 export interface RestoreResult {
@@ -8,6 +8,7 @@ export interface RestoreResult {
   categories: number
   transactions: number
   budgets: number
+  budget_categories: number
   exchange_rates: number
   investment_plans: number
   recurring_transactions: number

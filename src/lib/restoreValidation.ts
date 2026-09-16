@@ -117,7 +117,9 @@ export function parseAndValidateRestorePayload(text: string, uid: string): Resto
 
   typed.budgets.forEach((b, i) => {
     const ids = b.category_ids
-    if (ids === undefined || ids === null) return
+    // Absent is fine (no links). Anything present must be an array — an
+    // explicit JSON null is a payload defect, not an empty list.
+    if (ids === undefined) return
     if (!Array.isArray(ids)) {
       throw new Error(`Invalid export: budgets[${i}].category_ids must be an array`)
     }

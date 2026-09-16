@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeLegacyAccounts } from '@/pages/settings/legacyAccounts'
+import { normalizeLegacyAccounts } from '@/lib/legacyAccounts'
 
 describe('normalizeLegacyAccounts', () => {
   const account = { id: 'acc-1', name: 'Checking', balance: 1234 }

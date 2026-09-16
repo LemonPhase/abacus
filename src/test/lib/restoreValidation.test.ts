@@ -184,10 +184,15 @@ describe('parseAndValidateRestorePayload', () => {
     expect(() => parseAndValidateRestorePayload(JSON.stringify(payload), UID)).not.toThrow()
   })
 
-  it('rejects non-array budget category_ids', () => {
+  it('rejects non-array and explicitly-null budget category_ids', () => {
     const payload = validPayload()
     payload.budgets[0].category_ids = 'cat-1'
     expectError(payload, /budgets\[0\]\.category_ids must be an array/i)
+
+    // JSON null is a payload defect, not an empty list (P3-1 from the PR review)
+    const payload2 = validPayload()
+    payload2.budgets[0].category_ids = null
+    expectError(payload2, /budgets\[0\]\.category_ids must be an array/i)
   })
 
   it('rejects payloads over the row cap', () => {

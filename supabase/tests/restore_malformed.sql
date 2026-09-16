@@ -106,6 +106,14 @@ select test_restore_raises(
 select test_restore_raises(
   '{"version": 3, "accounts": [{"id": "a0000000-0000-0000-0000-000000000009", "name": "x", "type": "cash"}], "transactions": [], "budgets": [{"id": "b0000000-0000-0000-0000-000000000009", "name": "b", "amount": 1, "period": "monthly", "category_ids": ["c0000000-0000-0000-0000-000000000001"]}]}',
   'budget referencing a DB category not in the payload');
+-- explicit JSON-null / non-array category_ids must be rejected precisely
+-- (jsonb null is not SQL null, so coalesce does not catch it)
+select test_restore_raises(
+  '{"version": 3, "accounts": [{"id": "a0000000-0000-0000-0000-000000000009", "name": "x", "type": "cash"}], "transactions": [], "budgets": [{"id": "b0000000-0000-0000-0000-000000000009", "name": "b", "amount": 1, "period": "monthly", "category_ids": null}]}'::jsonb,
+  'budget category_ids explicitly null');
+select test_restore_raises(
+  '{"version": 3, "accounts": [{"id": "a0000000-0000-0000-0000-000000000009", "name": "x", "type": "cash"}], "transactions": [], "budgets": [{"id": "b0000000-0000-0000-0000-000000000009", "name": "b", "amount": 1, "period": "monthly", "category_ids": "c0000000-0000-0000-0000-000000000001"}]}'::jsonb,
+  'budget category_ids scalar');
 -- malformed uuid in a reference
 select test_restore_raises(
   '{"version": 3, "accounts": [{"id": "not-a-uuid", "name": "x", "type": "cash"}], "transactions": []}'::jsonb,
@@ -151,6 +159,7 @@ select test_assert(
 select restore_user_data(jsonb_build_object('version', 3, 'accounts', '[]'::jsonb, 'transactions', '[]'::jsonb)) as result \gset
 select test_assert(:'result'::jsonb = jsonb_build_object(
   'accounts', 0, 'categories', 0, 'transactions', 0, 'budgets', 0,
+  'budget_categories', 0,
   'exchange_rates', 0, 'investment_plans', 0, 'recurring_transactions', 0),
   'empty restore returns zero counts');
 select test_assert(

@@ -63,6 +63,9 @@ MIGRATIONS=(
   20260516000000_recurring_transactions.sql
   20260916000000_opening_balance_ledger.sql
   20260917000001_atomic_restore.sql
+  20260917000003_currency_provenance.sql
+  20260917000004_ownership_enforcement.sql
+  20260917000005_replace_budget_categories_rpc.sql
 )
 
 run_sql() { # $1=db, rest = files or -c commands
@@ -77,7 +80,20 @@ new_db() { # $1=name
     create table if not exists auth.users(id uuid primary key);
     create or replace function auth.uid() returns uuid language sql stable as $fn$
       select nullif(current_setting('"'"'app.test_user_id'"'"', true), '"'"''"'"')::uuid
-    $fn$;' >/dev/null
+    $fn$;
+    do $$ begin
+      -- Supabase standard role set; grants/revokes in migrations (e.g.
+      -- 20260917000001, 20260917000005) expect these roles to exist.
+      if not exists (select 1 from pg_roles where rolname = '"'"'authenticated'"'"') then
+        create role authenticated nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'anon'"'"') then
+        create role anon nologin;
+      end if;
+      if not exists (select 1 from pg_roles where rolname = '"'"'service_role'"'"') then
+        create role service_role nologin;
+      end if;
+    end $$;' >/dev/null
 }
 
 apply_migrations() { # $1=db
@@ -91,6 +107,15 @@ TEST_DB="abacus_restore_$$"
 new_db "$TEST_DB"
 apply_migrations "$TEST_DB"
 run_sql "$TEST_DB" -f supabase/tests/restore_helpers.sql >/dev/null
+
+# P3-2 hardening: anon must not be able to execute the RPC (permission denied
+# before the in-function auth.uid() guard is even reached).
+if run_sql "$TEST_DB" -c 'set role anon; select restore_user_data("{}"::jsonb);' >/dev/null 2>&1; then
+  echo "ASSERT FAILED: anon must not be able to execute restore_user_data" >&2
+  exit 1
+fi
+
+dropdb "${PSQL_ARGS[@]}" "$TEST_DB"
 
 run_case() { # $1=case name, $2=file
   echo "== $1 =="
