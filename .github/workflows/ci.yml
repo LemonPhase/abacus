@@ -43,6 +43,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The CSP e2e specs (e2e/csp.spec.ts) run the production build under the
+      # vercel.json headers, so dist/ must exist before test:e2e.
+      - run: npm run build
       # GitHub-hosted runners share IP ranges with thousands of unrelated
       # workflows, so anonymous registry pulls are rate-limited on a
       # first-come-first-served basis. Logging in counts pulls against our own

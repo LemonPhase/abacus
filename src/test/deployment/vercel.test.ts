@@ -1,14 +1,21 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { FX_PROVIDER_ORIGIN, inlineScriptHashes, parseCsp } from './csp'
 
 interface VercelRewrite {
   source: string
   destination: string
 }
 
+interface VercelHeaderRule {
+  source: string
+  headers: Array<{ key: string; value: string }>
+}
+
 interface VercelConfig {
   rewrites?: VercelRewrite[]
+  headers?: VercelHeaderRule[]
 }
 
 const config = JSON.parse(
@@ -17,6 +24,14 @@ const config = JSON.parse(
 
 const DIST_DIR = resolve(process.cwd(), 'dist')
 const distReady = existsSync(join(DIST_DIR, 'index.html'))
+
+// Audit 14 (#18): security headers. The catch-all source is the same pattern
+// as the SPA rewrite, so every path that can serve the app carries the rules.
+const headerRule = config.headers?.find((h) => h.source === '/(.*)')
+const headerMap = new Map(
+  (headerRule?.headers ?? []).map((h) => [h.key.toLowerCase(), h.value] as const),
+)
+const cspDirectives = parseCsp(headerMap.get('content-security-policy') ?? '')
 
 describe('Vercel SPA routing', () => {
   it('rewrites client-side routes to the Vite app shell', () => {
@@ -111,6 +126,103 @@ describe('Vercel SPA routing', () => {
       }
     },
   )
+})
+
+describe('Vercel security headers', () => {
+  it('sends CSP, nosniff and referrer policy on a catch-all source', () => {
+    // Same catch-all as the SPA rewrite: any path the app can be served on
+    // (deep links, hashed assets, sw.js, manifest) gets the same headers.
+    expect(headerRule).toBeDefined()
+    expect(headerRule?.source).toBe('/(.*)')
+    expect(headerRule?.source).toBe(config.rewrites?.[0]?.source)
+
+    expect(headerMap.get('x-content-type-options')).toBe('nosniff')
+    expect(headerMap.get('referrer-policy')).toBe('strict-origin-when-cross-origin')
+
+    // HSTS is set by Vercel's platform on HTTPS deployments; duplicating it
+    // here risks conflicting values, so the config must not add a second one.
+    expect(headerMap.has('strict-transport-security')).toBe(false)
+  })
+
+  it('covers every app route, asset and PWA endpoint', () => {
+    const match = compileSource('/(.*)')
+    for (const route of [
+      '/',
+      '/auth',
+      '/auth/reset-password',
+      '/app/dashboard',
+      '/app/accounts',
+      '/app/transactions',
+      '/app/recurring',
+      '/app/budgets',
+      '/app/reports',
+      '/app/categories',
+      '/app/investments',
+      '/app/settings',
+      '/any/deep/unknown-route',
+      '/assets/index-abc123.js',
+      '/assets/index-abc123.css',
+      '/registerSW.js',
+      '/sw.js',
+      '/workbox-abc123.js',
+      '/manifest.webmanifest',
+      '/pwa-192x192.png',
+    ]) {
+      expect(match.exec(route), `headers must cover ${route}`).not.toBeNull()
+    }
+  })
+
+  it('defines a restrictive CSP', () => {
+    expect(cspDirectives['default-src']).toEqual(["'self'"])
+
+    // Scripts: same-origin bundles only, plus a hash for the built inline
+    // theme-init script. No 'unsafe-inline' — the hash test below pins it.
+    expect(cspDirectives['script-src']).toContain("'self'")
+    expect(cspDirectives['script-src']).not.toContain("'unsafe-inline'")
+    expect(cspDirectives['script-src']?.some((s) => s.startsWith("'sha256-"))).toBe(true)
+
+    // Styles/fonts/images: bundled assets only; the dot-grid noise background
+    // is an inline data: SVG, so img-src needs data:.
+    expect(cspDirectives['style-src']).toEqual(["'self'"])
+    expect(cspDirectives['font-src']).toEqual(["'self'"])
+    expect(cspDirectives['img-src']).toEqual(["'self'", 'data:'])
+
+    // Connections: same-origin (service-worker precache fetches), the
+    // Supabase REST/auth/realtime origins (HTTP + WebSocket), and the FX
+    // provider extracted from src/services/exchange.ts so a provider change
+    // fails here instead of silently breaking in production.
+    expect([...(cspDirectives['connect-src'] ?? [])].sort()).toEqual(
+      ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', FX_PROVIDER_ORIGIN].sort(),
+    )
+
+    // PWA: the service worker and webmanifest are same-origin.
+    expect(cspDirectives['worker-src']).toEqual(["'self'"])
+    expect(cspDirectives['manifest-src']).toEqual(["'self'"])
+
+    // Containment: no framing, no plugins, no base hijacking.
+    expect(cspDirectives['frame-ancestors']).toEqual(["'none'"])
+    expect(cspDirectives['object-src']).toEqual(["'none'"])
+    expect(cspDirectives['base-uri']).toEqual(["'self'"])
+  })
+
+  // The hash above must match the script Vite actually ships. When dist/ is
+  // present this fails on a stale hash instead of production failing silently
+  // (the theme-init script is blocked and first paint flashes). Needs
+  // `npm run build` first; CI always builds before running tests.
+  it.skipIf(!distReady)('hash-allowlists every inline script in the built index.html', () => {
+    const html = readFileSync(join(DIST_DIR, 'index.html'), 'utf8')
+
+    const hashes = inlineScriptHashes(html)
+    expect(hashes.length, 'theme-init inline script should exist').toBeGreaterThan(0)
+    for (const hash of hashes) {
+      expect(cspDirectives['script-src']).toContain(`'sha256-${hash}'`)
+    }
+
+    // style-src 'self' means the built shell must carry no inline <style>
+    // and no style="" attributes either.
+    expect(html).not.toMatch(/<style[\s>]/)
+    expect(html).not.toMatch(/\sstyle="/)
+  })
 })
 
 // Minimal path-to-regexp compilation covering the source constructs Vercel
