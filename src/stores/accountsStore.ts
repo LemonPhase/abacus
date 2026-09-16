@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
 import { createCrudSlice } from '@/stores/crudStore'
+import { roundCurrency } from '@/lib/currency'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { Account, NewAccount, AccountType } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -38,12 +40,36 @@ interface AccountsState {
 
 export const useAccountsStore = create<AccountsState>()((set, get) => {
   const { _add, _update, ...base } = crud(set, get)
+
+  // opening_balance is user input in the account currency's minor units
+  // (20260918000001_input_invariants rejects sub-cent amounts).
+  const roundOpeningBalance = (data: Partial<NewAccount>, currency: string) => {
+    const clean = { ...data }
+    if (typeof clean.openingBalance === 'number') {
+      clean.openingBalance = roundCurrency(clean.openingBalance, currency)
+    }
+    return clean
+  }
+
   return {
     accounts: [],
     ...base,
-    add: (data) => _add(mapKeysToSnake(data) as Database['public']['Tables']['accounts']['Insert']),
-    update: (id, data) =>
-      _update(id, mapKeysToSnake(data) as Database['public']['Tables']['accounts']['Update']),
+    add: (data) =>
+      _add(
+        mapKeysToSnake(
+          roundOpeningBalance(data, data.currency),
+        ) as Database['public']['Tables']['accounts']['Insert'],
+      ),
+    update: (id, data) => {
+      const currency =
+        data.currency ?? get().getById(id)?.currency ?? useSettingsStore.getState().baseCurrency
+      return _update(
+        id,
+        mapKeysToSnake(
+          roundOpeningBalance(data, currency),
+        ) as Database['public']['Tables']['accounts']['Update'],
+      )
+    },
     getByType: (type) => get().accounts.filter((a) => a.type === type),
   }
 })

@@ -70,6 +70,7 @@ MIGRATIONS=(
   20260917000003_currency_provenance.sql
   20260917000004_ownership_enforcement.sql
   20260917000005_replace_budget_categories_rpc.sql
+  20260918000001_input_invariants.sql
 )
 
 run_sql() { # $1=db, rest = files or -c commands

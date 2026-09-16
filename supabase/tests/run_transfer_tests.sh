@@ -67,6 +67,7 @@ MIGRATIONS=(
   20260916000000_opening_balance_ledger.sql
   20260917000002_atomic_transfers.sql
   20260917000003_currency_provenance.sql
+  20260918000001_input_invariants.sql
 )
 
 run_sql() { # $1=db, rest = files or -c commands
