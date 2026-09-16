@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
 import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
+import { roundCurrency } from '@/lib/currency'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { InvestmentPlan, NewInvestmentPlan } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -41,15 +43,38 @@ interface InvestmentPlansState {
 
 export const useInvestmentPlansStore = create<InvestmentPlansState>()((set, get) => {
   const { _add, _update, ...base } = crud(set, get)
+
+  // Amounts in the plan currency's minor units
+  // (20260918000001_input_invariants rejects sub-cent amounts).
+  const roundAmounts = (data: Partial<NewInvestmentPlan>, currency: string) => {
+    const clean = { ...data }
+    if (typeof clean.initialAmount === 'number') {
+      clean.initialAmount = roundCurrency(clean.initialAmount, currency)
+    }
+    if (typeof clean.monthlyContribution === 'number') {
+      clean.monthlyContribution = roundCurrency(clean.monthlyContribution, currency)
+    }
+    return clean
+  }
+
   return {
     plans: [],
     ...base,
     add: (data) =>
-      _add(mapKeysToSnake(data) as Database['public']['Tables']['investment_plans']['Insert']),
-    update: (id, data) =>
-      _update(
-        id,
-        mapKeysToSnake(data) as Database['public']['Tables']['investment_plans']['Update'],
+      _add(
+        mapKeysToSnake(
+          roundAmounts(data, data.currency),
+        ) as Database['public']['Tables']['investment_plans']['Insert'],
       ),
+    update: (id, data) => {
+      const currency =
+        data.currency ?? get().getById(id)?.currency ?? useSettingsStore.getState().baseCurrency
+      return _update(
+        id,
+        mapKeysToSnake(
+          roundAmounts(data, currency),
+        ) as Database['public']['Tables']['investment_plans']['Update'],
+      )
+    },
   }
 })

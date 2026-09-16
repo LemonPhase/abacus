@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
 import { createCrudSlice, MAX_PAGE_ROWS, type LoadOptions } from '@/stores/crudStore'
 import { supabase } from '@/supabase/client'
+import { roundCurrency } from '@/lib/currency'
+import { useSettingsStore } from '@/stores/settingsStore'
 import type { Budget, NewBudget } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -104,15 +106,21 @@ export const useBudgetsStore = create<BudgetsState>()((set, get) => {
     },
     add: async (data) => {
       const { categoryIds, ...rest } = data
+      // Budgets are denominated in the reporting currency; round to its minor
+      // units (20260918000001_input_invariants rejects sub-cent amounts).
+      const amount = roundCurrency(rest.amount, useSettingsStore.getState().baseCurrency)
       const budget = await _add(
-        mapKeysToSnake(rest) as Database['public']['Tables']['budgets']['Insert'],
+        mapKeysToSnake({ ...rest, amount }) as Database['public']['Tables']['budgets']['Insert'],
       )
       await writeAssociations(budget.id, categoryIds)
       mergeAssociations(budget.id, categoryIds)
-      return { ...budget, categoryIds }
+      return { ...budget, categoryIds, amount }
     },
     update: async (id, data) => {
       const { categoryIds, ...rest } = data
+      if (typeof rest.amount === 'number') {
+        rest.amount = roundCurrency(rest.amount, useSettingsStore.getState().baseCurrency)
+      }
       await _update(id, mapKeysToSnake(rest) as Database['public']['Tables']['budgets']['Update'])
       if (categoryIds) {
         await writeAssociations(id, categoryIds)

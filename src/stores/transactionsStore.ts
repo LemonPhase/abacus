@@ -154,9 +154,13 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
       reset()
     },
     add: async (data) => {
-      const baseFields = await computeBase(data.amount, data.currency, data.date)
+      // Money enters the store in minor units (20260918000001_input_invariants
+      // rejects sub-cent amounts): round typed input to the row's currency.
+      const amount = roundCurrency(data.amount, data.currency)
+      const baseFields = await computeBase(amount, data.currency, data.date)
       const payload = {
         ...data,
+        amount,
         categoryId: data.categoryId || null,
         ...baseFields,
       }
@@ -176,10 +180,11 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
       }
       const payloads = await Promise.all(
         data.map(async (d) => {
+          const amount = roundCurrency(d.amount, d.currency)
           let baseFields: BaseFields
           if (d.currency === reporting) {
             baseFields = {
-              baseAmount: roundCurrency(d.amount, reporting),
+              baseAmount: roundCurrency(amount, reporting),
               baseCurrency: reporting,
               fxRate: null,
               fxDate: null,
@@ -189,14 +194,14 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
             const quote = await quoteFor(d.currency, d.date)
             baseFields = quote
               ? {
-                  baseAmount: roundCurrency(d.amount * quote.rate, reporting),
+                  baseAmount: roundCurrency(amount * quote.rate, reporting),
                   baseCurrency: reporting,
                   fxRate: quote.rate,
                   fxDate: quote.asOf,
                   baseAmountStale: false,
                 }
               : {
-                  baseAmount: d.amount,
+                  baseAmount: amount,
                   baseCurrency: d.currency,
                   fxRate: null,
                   fxDate: null,
@@ -205,6 +210,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
           }
           return {
             ...d,
+            amount,
             categoryId: d.categoryId || null,
             ...baseFields,
           }
@@ -221,13 +227,20 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
       if ('categoryId' in data && !data.categoryId) {
         clean.categoryId = null
       }
+      const current = get().getById(id)
+      if (typeof data.amount === 'number') {
+        const currency =
+          (data.currency as string | undefined) ??
+          current?.currency ??
+          useSettingsStore.getState().baseCurrency
+        clean.amount = roundCurrency(data.amount, currency)
+      }
       // Recalculate derived base fields whenever the value they were derived
       // from changes (amount, currency, or date).
       if ('amount' in data || 'currency' in data || 'date' in data) {
-        const current = get().getById(id)
         if (current) {
           const baseFields = await computeBase(
-            (data.amount as number | undefined) ?? current.amount,
+            (clean.amount as number | undefined) ?? current.amount,
             (data.currency as string | undefined) ?? current.currency,
             (data.date as Date | undefined) ?? current.date,
           )
@@ -257,16 +270,27 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
     createTransfer: async (input) => {
       const gen = rpcGeneration
       set({ error: null })
+      // Leg amounts in their account's minor units (DB rejects sub-cent).
+      const accounts = useAccountsStore.getState().accounts
+      const reporting = useSettingsStore.getState().baseCurrency
+      const amount = roundCurrency(
+        input.amount,
+        accounts.find((a) => a.id === input.fromAccountId)?.currency ?? reporting,
+      )
+      const convertedAmount = roundCurrency(
+        input.convertedAmount,
+        accounts.find((a) => a.id === input.toAccountId)?.currency ?? reporting,
+      )
       const [outBase, inBase] = await Promise.all([
-        legBase(input.fromAccountId, -input.amount, input.date),
-        legBase(input.toAccountId, input.convertedAmount, input.date),
+        legBase(input.fromAccountId, -amount, input.date),
+        legBase(input.toAccountId, convertedAmount, input.date),
       ])
       const { data, error } = await supabase.rpc('create_transfer', {
         p_idempotency_key: input.idempotencyKey,
         p_from_account_id: input.fromAccountId,
         p_to_account_id: input.toAccountId,
-        p_amount: input.amount,
-        p_converted_amount: input.convertedAmount,
+        p_amount: amount,
+        p_converted_amount: convertedAmount,
         p_category_id: input.categoryId ?? undefined,
         p_date: toDateString(input.date),
         p_description: input.description ?? undefined,
@@ -286,16 +310,27 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
     editTransfer: async (input) => {
       const gen = rpcGeneration
       set({ error: null })
+      // Leg amounts in their account's minor units (DB rejects sub-cent).
+      const accounts = useAccountsStore.getState().accounts
+      const reporting = useSettingsStore.getState().baseCurrency
+      const amount = roundCurrency(
+        input.amount,
+        accounts.find((a) => a.id === input.fromAccountId)?.currency ?? reporting,
+      )
+      const convertedAmount = roundCurrency(
+        input.convertedAmount,
+        accounts.find((a) => a.id === input.toAccountId)?.currency ?? reporting,
+      )
       const [outBase, inBase] = await Promise.all([
-        legBase(input.fromAccountId, -input.amount, input.date),
-        legBase(input.toAccountId, input.convertedAmount, input.date),
+        legBase(input.fromAccountId, -amount, input.date),
+        legBase(input.toAccountId, convertedAmount, input.date),
       ])
       const { data, error } = await supabase.rpc('edit_transfer', {
         p_transfer_id: input.transferId,
         p_from_account_id: input.fromAccountId,
         p_to_account_id: input.toAccountId,
-        p_amount: input.amount,
-        p_converted_amount: input.convertedAmount,
+        p_amount: amount,
+        p_converted_amount: convertedAmount,
         p_category_id: input.categoryId ?? undefined,
         p_date: toDateString(input.date),
         p_description: input.description ?? undefined,
@@ -328,11 +363,17 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
       const gen = rpcGeneration
       set({ error: null })
       const previous = get().transactions.find((t) => t.id === input.transactionId)
-      const base = await legBase(input.accountId, input.amount, input.date)
+      // Amount in the target account's minor units (DB rejects sub-cent).
+      const amount = roundCurrency(
+        input.amount,
+        useAccountsStore.getState().accounts.find((a) => a.id === input.accountId)?.currency ??
+          useSettingsStore.getState().baseCurrency,
+      )
+      const base = await legBase(input.accountId, amount, input.date)
       const { data, error } = await supabase.rpc('convert_transfer_to_plain', {
         p_transaction_id: input.transactionId,
         p_new_type: input.newType,
-        p_amount: input.amount,
+        p_amount: amount,
         p_new_account_id: input.accountId,
         p_category_id: input.categoryId ?? undefined,
         p_date: toDateString(input.date),

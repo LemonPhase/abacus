@@ -13,8 +13,8 @@ insert into transactions (id, account_id, category_id, type, amount, currency, b
   ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000001', 'income', 100, 'USD', 100, 'USD', date '2026-01-01');
 insert into budgets (id, name, amount, period) values
   ('b0000000-0000-0000-0000-000000000001', 'Food', 200, 'monthly');
-insert into recurring_transactions (id, account_id, type, amount, frequency, next_date) values
-  ('d1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'expense', 30, 'monthly', date '2026-02-01');
+insert into recurring_transactions (id, account_id, type, amount, frequency, start_date, next_date) values
+  ('d1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'expense', 30, 'monthly', date '2026-01-25', date '2026-02-01');
 
 -- Fingerprint of the untouched state: counts + balances + a canary row.
 create temp table state as

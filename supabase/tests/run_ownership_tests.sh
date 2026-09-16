@@ -66,13 +66,18 @@ fi
 
 OWN_MIGRATION=20260917000004_ownership_enforcement.sql
 RPC_MIGRATION=20260917000005_replace_budget_categories_rpc.sql
+INV_MIGRATION=20260918000001_input_invariants.sql
 MIGRATIONS=(
   20260509000000_initial_schema.sql
   20260511182423_fix_balance_trigger_ownership.sql
   20260516000000_recurring_transactions.sql
   20260916000000_opening_balance_ledger.sql
+  20260917000001_atomic_restore.sql
+  20260917000002_atomic_transfers.sql
+  20260917000003_currency_provenance.sql
   "$OWN_MIGRATION"
   "$RPC_MIGRATION"
+  "$INV_MIGRATION"
 )
 
 run_sql() { # $1=db, rest = files or -c commands
@@ -131,7 +136,7 @@ RPC_CAT_B='cccccccc-0000-0000-0000-000000000012'
 
 echo "== 1. enforcement ($T1) =="
 new_db "$T1"
-apply_migrations "$T1" 6
+apply_migrations "$T1" ${#MIGRATIONS[@]}
 install_grants "$T1"
 run_sql "$T1" -f supabase/tests/ownership_cross_user.sql >/dev/null
 echo "   enforcement: OK (cross-user INSERT/UPDATE rejected, RLS holds, same-user flows work)"

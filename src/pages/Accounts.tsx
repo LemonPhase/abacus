@@ -214,6 +214,7 @@ export default function Accounts() {
         form={form}
         onFormChange={setForm}
         onSave={handleSave}
+        currencyLocked={editing != null && transactions.some((t) => t.accountId === editing.id)}
       />
 
       <Dialog

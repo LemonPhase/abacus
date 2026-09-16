@@ -39,8 +39,8 @@ insert into exchange_rates (id, from_currency, to_currency, rate, date) values
 insert into investment_plans (id, name, type, initial_amount, monthly_contribution, annual_return_rate, currency) values
   ('f0000000-0000-0000-0000-000000000001', 'Index', 'index_fund', 5000, 200, 7.5, 'USD');
 
-insert into recurring_transactions (id, account_id, category_id, type, amount, currency, description, frequency, interval_value, next_date, is_active) values
-  ('d1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'expense', 150, 'USD', 'weekly groceries', 'weekly', 1, date '2026-02-01', true);
+insert into recurring_transactions (id, account_id, category_id, type, amount, currency, description, frequency, interval_value, start_date, next_date, is_active) values
+  ('d1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'expense', 150, 'USD', 'weekly groceries', 'weekly', 1, date '2026-01-25', date '2026-02-01', true);
 
 -- Export: what Settings.handleExport produces post-#27 — whole rows, with
 -- budgets[].category_ids derived from the budget_categories association table.
