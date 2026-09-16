@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart,
@@ -16,12 +16,18 @@ import { BudgetGauge } from '@/components/budgets/BudgetGauge'
 import { Loader2, TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
 import { getBudgetColors, getBudgetStatus } from '@/lib/budget'
 import { convertCurrency } from '@/services/exchange'
-import { reliableBaseAmount } from '@/lib/currency'
+import {
+  fetchBudgetSpending,
+  fetchCategoryBreakdown,
+  fetchMonthlySeries,
+  type BudgetSpendingRow,
+  type CategoryBreakdownRow,
+  type MonthlyBucket,
+} from '@/services/reports'
+import { subscribeToTable } from '@/supabase/realtime'
 import { Button } from '@/components/ui/button'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
-import { useBudgetsStore } from '@/stores/budgetsStore'
-import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { ICON_MAP } from '@/lib/icons'
 import { formatCurrency } from '@/lib/currency'
@@ -85,6 +91,12 @@ function StatCard({
   )
 }
 
+/** Local YYYY-MM-DD (never toISOString — that shifts to UTC). */
+function localDateString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 export default function Dashboard() {
   const accounts = useAccountsStore((s) => s.accounts)
   const loadAccounts = useAccountsStore((s) => s.load)
@@ -92,21 +104,65 @@ export default function Dashboard() {
   const transactions = useTransactionsStore((s) => s.transactions)
   const loadTxn = useTransactionsStore((s) => s.load)
   const loadingTxn = useTransactionsStore((s) => s.loading)
-  const budgets = useBudgetsStore((s) => s.budgets)
-  const loadBudgets = useBudgetsStore((s) => s.load)
-  const loadingBudgets = useBudgetsStore((s) => s.loading)
-  const categories = useCategoriesStore((s) => s.categories)
-  const loadCategories = useCategoriesStore((s) => s.load)
-  const loadingCategories = useCategoriesStore((s) => s.loading)
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const navigate = useNavigate()
 
+  // Income/expense/category/budget aggregates come from DB RPCs
+  // (20260918000002_report_aggregates.sql) so totals cover the full dataset
+  // under RLS instead of whatever subset the client had loaded.
+  const [monthly, setMonthly] = useState<MonthlyBucket[]>([])
+  const [categoryRows, setCategoryRows] = useState<CategoryBreakdownRow[]>([])
+  const [budgetRows, setBudgetRows] = useState<BudgetSpendingRow[]>([])
+  const [unconvertedTxns, setUnconvertedTxns] = useState(0)
+  const [aggregatesLoading, setAggregatesLoading] = useState(true)
+  const [aggregatesError, setAggregatesError] = useState<string | null>(null)
+  // Only the newest aggregate load may publish (rapid baseCurrency changes).
+  const loadSeqRef = useRef(0)
+
+  useEffect(() => {
+    async function loadAggregates() {
+      const now = new Date()
+      const from = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const seq = ++loadSeqRef.current
+      try {
+        const [monthlyRows, categories, budgets] = await Promise.all([
+          fetchMonthlySeries(localDateString(from), localDateString(monthEnd), baseCurrency),
+          fetchCategoryBreakdown(
+            localDateString(monthStart),
+            localDateString(monthEnd),
+            baseCurrency,
+          ),
+          fetchBudgetSpending(localDateString(now), baseCurrency),
+        ])
+        if (seq !== loadSeqRef.current) return
+        setMonthly(monthlyRows)
+        setCategoryRows(categories)
+        setBudgetRows(budgets)
+        setUnconvertedTxns(monthlyRows.reduce((sum, m) => sum + m.unconverted, 0))
+        setAggregatesError(null)
+      } catch (e) {
+        if (seq !== loadSeqRef.current) return
+        setAggregatesError(e instanceof Error ? e.message : 'Failed to load report data')
+      } finally {
+        if (seq === loadSeqRef.current) setAggregatesLoading(false)
+      }
+    }
+
+    void loadAggregates()
+    // Keep the aggregate charts live with the transactions table.
+    return subscribeToTable('transactions', () => {
+      void loadAggregates()
+    })
+  }, [baseCurrency])
+
   useEffect(() => {
     loadAccounts()
-    loadTxn()
-    loadBudgets()
-    loadCategories()
-  }, [loadAccounts, loadTxn, loadBudgets, loadCategories])
+    // Only the recent list is needed locally (page 1 of the date-desc order);
+    // the charts aggregate in the database.
+    loadTxn({ limit: 50 })
+  }, [loadAccounts, loadTxn])
 
   // Account balances are denominated in each account's currency; convert each
   // to the reporting currency (current quote — net worth is a current value).
@@ -134,63 +190,28 @@ export default function Dashboard() {
     }
   }, [accounts, baseCurrency])
 
-  const unconvertedTxns = useMemo(
-    () =>
-      transactions.filter(
-        (t) => t.type !== 'transfer' && reliableBaseAmount(t, baseCurrency) === null,
-      ).length,
-    [transactions, baseCurrency],
-  )
-
-  const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories])
-
-  const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
-
   const monthlyData = useMemo(() => {
     const now = new Date()
+    const byMonth = new Map(monthly.map((m) => [m.month, m]))
     const months: { label: string; income: number; expense: number }[] = []
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const row = byMonth.get(localDateString(d))
       months.push({
         label: d.toLocaleDateString('en-US', { month: 'short' }),
-        income: 0,
-        expense: 0,
+        income: row?.income ?? 0,
+        expense: row?.expense ?? 0,
       })
-    }
-    for (const t of transactions) {
-      const d = new Date(t.date)
-      const idx = months.findIndex((m) => {
-        const md = new Date(d.getFullYear(), d.getMonth(), 1)
-        const nowd = new Date(now.getFullYear(), now.getMonth() - (5 - months.indexOf(m)), 1)
-        return md.getTime() === nowd.getTime()
-      })
-      if (idx === -1) continue
-      const base = reliableBaseAmount(t, baseCurrency)
-      if (base === null) continue
-      if (t.type === 'income') months[idx].income += base
-      if (t.type === 'expense') months[idx].expense += base
     }
     return months
-  }, [transactions, baseCurrency])
+  }, [monthly])
 
   const categorySpending = useMemo(() => {
-    const now = new Date()
-    const start = new Date(now.getFullYear(), now.getMonth(), 1)
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    const map = new Map<string, number>()
-    for (const t of transactions) {
-      if (t.type !== 'expense') continue
-      const d = new Date(t.date)
-      if (d < start || d > end) continue
-      const name = (t.categoryId && categoryMap.get(t.categoryId)?.name) || 'Other'
-      const base = reliableBaseAmount(t, baseCurrency)
-      if (base === null) continue
-      map.set(name, (map.get(name) ?? 0) + base)
-    }
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
+    return categoryRows
+      .filter((c) => c.expense > 0)
+      .map((c) => ({ name: c.name ?? 'Other', value: c.expense, icon: c.icon }))
       .sort((a, b) => b.value - a.value)
-  }, [transactions, categoryMap, baseCurrency])
+  }, [categoryRows])
 
   const currentMonthIncome = useMemo(() => {
     if (monthlyData.length === 0) return 0
@@ -203,58 +224,28 @@ export default function Dashboard() {
   }, [monthlyData])
 
   const budgetRemaining = useMemo(() => {
-    const now = new Date()
     let total = 0
-    for (const b of budgets) {
+    for (const b of budgetRows) {
       if (b.period !== 'monthly') continue
-      const s = new Date(b.startDate)
-      if (s.getFullYear() !== now.getFullYear() || s.getMonth() !== now.getMonth()) continue
-      let spent = 0
-      for (const t of transactions) {
-        if (t.type !== 'expense') continue
-        if (!t.categoryId) continue
-        if (!b.categoryIds.includes(t.categoryId)) continue
-        const d = new Date(t.date)
-        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-          const base = reliableBaseAmount(t, baseCurrency)
-          if (base === null) continue
-          spent += base
-        }
-      }
-      total += b.amount - spent
+      total += b.amount - b.spent
     }
     return total
-  }, [budgets, transactions, baseCurrency])
+  }, [budgetRows])
 
   const aggregateBudgetProgress = useMemo(() => {
-    if (budgets.length === 0) return null
-    const now = new Date()
+    if (budgetRows.length === 0) return null
     let totalSpent = 0
     let totalBudget = 0
-    for (const b of budgets) {
+    for (const b of budgetRows) {
       totalBudget += b.amount
-      for (const t of transactions) {
-        if (t.type !== 'expense') continue
-        if (!t.categoryId) continue
-        if (!b.categoryIds.includes(t.categoryId)) continue
-        const d = new Date(t.date)
-        if (
-          b.period === 'monthly'
-            ? d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-            : d.getFullYear() === now.getFullYear()
-        ) {
-          const base = reliableBaseAmount(t, baseCurrency)
-          if (base === null) continue
-          totalSpent += base
-        }
-      }
+      totalSpent += b.spent
     }
     const pct = totalBudget > 0 ? (totalSpent / totalBudget) * 100 : 0
     return { spent: totalSpent, total: totalBudget, percentage: pct }
-  }, [budgets, transactions, baseCurrency])
+  }, [budgetRows])
 
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions])
-  const isLoading = loadingAccounts || loadingTxn || loadingBudgets || loadingCategories
+  const isLoading = loadingAccounts || loadingTxn || aggregatesLoading
 
   return (
     <div className="space-y-6">
@@ -294,6 +285,8 @@ export default function Dashboard() {
               icon={PiggyBank}
             />
           </div>
+
+          {aggregatesError && <p className="text-sm text-cinnabar">{aggregatesError}</p>}
 
           {(unconvertedAccounts > 0 || unconvertedTxns > 0) && (
             <p className="text-xs text-muted-foreground">
@@ -369,8 +362,7 @@ export default function Dashboard() {
               {categorySpending.length > 0 && (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
                   {categorySpending.slice(0, 6).map((cat, i) => {
-                    const CatIcon =
-                      ICON_MAP[categories.find((c) => c.name === cat.name)?.icon ?? '']
+                    const CatIcon = ICON_MAP[cat.icon ?? '']
                     return (
                       <div
                         key={cat.name}
@@ -415,18 +407,14 @@ export default function Dashboard() {
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">
-                          {tx.description ||
-                            (tx.type === 'transfer'
-                              ? 'Transfer'
-                              : (tx.categoryId && categoryMap.get(tx.categoryId)?.name) ||
-                                'Transaction')}
+                          {tx.description || (tx.type === 'transfer' ? 'Transfer' : 'Transaction')}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(tx.date).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                           })}{' '}
-                          · {accountMap.get(tx.accountId)?.name}
+                          · {accounts.find((a) => a.id === tx.accountId)?.name ?? 'Unknown'}
                         </p>
                       </div>
                       <span
@@ -447,7 +435,7 @@ export default function Dashboard() {
 
             <div className="rounded-xl bg-card p-5 border border-border/30">
               <h2 className="text-sm font-semibold tracking-tight mb-4">Active Budgets</h2>
-              {budgets.length === 0 ? (
+              {budgetRows.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-3">
                   <p className="text-sm">No budgets yet</p>
                   <Button variant="outline" size="sm" onClick={() => navigate('/app/budgets')}>
@@ -467,26 +455,8 @@ export default function Dashboard() {
                     </div>
                   )}
                   <div className="space-y-3">
-                    {budgets.slice(0, 4).map((b) => {
-                      const now = new Date()
-                      let spent = 0
-                      for (const t of transactions) {
-                        if (t.type !== 'expense') continue
-                        if (!t.categoryId) continue
-                        if (!b.categoryIds.includes(t.categoryId)) continue
-                        const d = new Date(t.date)
-                        if (
-                          b.period === 'monthly'
-                            ? d.getMonth() === now.getMonth() &&
-                              d.getFullYear() === now.getFullYear()
-                            : d.getFullYear() === now.getFullYear()
-                        ) {
-                          const base = reliableBaseAmount(t, baseCurrency)
-                          if (base === null) continue
-                          spent += base
-                        }
-                      }
-                      const pct = b.amount > 0 ? Math.min((spent / b.amount) * 100, 100) : 0
+                    {budgetRows.slice(0, 4).map((b) => {
+                      const pct = b.amount > 0 ? Math.min((b.spent / b.amount) * 100, 100) : 0
                       const colors = getBudgetColors(getBudgetStatus(pct))
                       return (
                         <div key={b.id}>

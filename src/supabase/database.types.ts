@@ -416,14 +416,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      restore_user_data: {
-        Args: { payload: Json }
-        Returns: Json
-      }
-      replace_budget_categories: {
-        Args: { p_budget_id: string; p_category_ids: string[] }
-        Returns: undefined
-      }
       account_ledger_effects: {
         Args: { p_account_id: string }
         Returns: number
@@ -448,6 +440,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      budget_spending: {
+        Args: { p_currency: string; p_today: string }
+        Returns: {
+          budget_amount: number
+          budget_id: string
+          budget_name: string
+          budget_period: string
+          spent: number
+        }[]
       }
       convert_transfer_to_plain: {
         Args: {
@@ -589,6 +591,40 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      replace_budget_categories: {
+        Args: { p_budget_id: string; p_category_ids: string[] }
+        Returns: undefined
+      }
+      report_by_category: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          category_color: string
+          category_icon: string
+          category_id: string
+          category_name: string
+          expense: number
+          income: number
+        }[]
+      }
+      report_monthly: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          expense: number
+          income: number
+          month_start: string
+          unconverted: number
+        }[]
+      }
+      report_summary: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          expense: number
+          income: number
+          total: number
+          unconverted: number
+        }[]
+      }
+      restore_user_data: { Args: { p_payload: Json }; Returns: Json }
     }
     Enums: {
       [_ in never]: never

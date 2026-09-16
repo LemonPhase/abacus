@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { supabase } from '@/supabase/client'
+import { chainableSelect } from '@/test/supabase-mock'
 
 describe('Store Error Handling', () => {
   const originalFrom = supabase.from
@@ -13,7 +14,11 @@ describe('Store Error Handling', () => {
   it('sets error on load failure', async () => {
     // Override from to return an error
     supabase.from = vi.fn().mockReturnValue({
-      select: vi.fn().mockResolvedValue({ data: null, error: { message: 'Test load error' } }),
+      select: vi
+        .fn()
+        .mockReturnValue(
+          chainableSelect(Promise.resolve({ data: null, error: { message: 'Test load error' } })),
+        ),
     })
 
     const store = useAccountsStore.getState()

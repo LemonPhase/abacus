@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { createCrudSlice } from '@/stores/crudStore'
+import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
 import { roundCurrency } from '@/lib/currency'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { RecurringTransaction, NewRecurringTransaction } from '@/types'
@@ -33,7 +33,11 @@ interface RecurringTransactionsState {
   error: string | null
   _unsub: (() => void) | null
   clearError: () => void
-  load: (options?: { limit?: number; offset?: number }) => Promise<void>
+  load: (options?: LoadOptions) => Promise<void>
+  loadMore: () => Promise<void>
+  loadingMore: boolean
+  hasMore: boolean
+  total: number | null
   add: (data: NewRecurringTransaction) => Promise<RecurringTransaction>
   update: (id: string, data: Partial<NewRecurringTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>

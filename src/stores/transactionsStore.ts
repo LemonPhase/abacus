@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/supabase/client'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { createCrudSlice } from '@/stores/crudStore'
+import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { getRate, type RateQuote } from '@/services/exchange'
@@ -87,7 +87,11 @@ interface TransactionsState {
   error: string | null
   _unsub: (() => void) | null
   clearError: () => void
-  load: (options?: { limit?: number; offset?: number }) => Promise<void>
+  load: (options?: LoadOptions) => Promise<void>
+  loadMore: () => Promise<void>
+  loadingMore: boolean
+  hasMore: boolean
+  total: number | null
   add: (data: NewTransaction) => Promise<Transaction>
   bulkAdd: (data: NewTransaction[]) => Promise<Transaction[]>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>

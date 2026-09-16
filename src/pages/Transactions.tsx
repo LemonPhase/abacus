@@ -21,6 +21,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import type { CrudFilter } from '@/stores/crudStore'
 import { getRate, type RateQuote } from '@/services/exchange'
 import { roundCurrency } from '@/lib/currency'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
@@ -41,6 +42,17 @@ function formatDate(d: Date) {
 
 const PAGE_SIZE = 50
 
+/** Translate the UI filter bar into server-side (snake_case) filters. */
+function buildFilters(f: TransactionFiltersValue): CrudFilter[] {
+  const out: CrudFilter[] = []
+  if (f.account !== 'all') out.push({ col: 'account_id', op: 'eq', value: f.account })
+  if (f.category !== 'all') out.push({ col: 'category_id', op: 'eq', value: f.category })
+  if (f.type !== 'all') out.push({ col: 'type', op: 'eq', value: f.type })
+  if (f.dateFrom) out.push({ col: 'date', op: 'gte', value: f.dateFrom })
+  if (f.dateTo) out.push({ col: 'date', op: 'lte', value: f.dateTo })
+  return out
+}
+
 const emptyTxForm: TxFormData = {
   accountId: '',
   categoryId: '',
@@ -54,7 +66,11 @@ const emptyTxForm: TxFormData = {
 export default function Transactions() {
   const transactions = useTransactionsStore((s) => s.transactions)
   const loading = useTransactionsStore((s) => s.loading)
+  const loadingMore = useTransactionsStore((s) => s.loadingMore)
+  const hasMore = useTransactionsStore((s) => s.hasMore)
+  const total = useTransactionsStore((s) => s.total)
   const loadTx = useTransactionsStore((s) => s.load)
+  const loadMoreTx = useTransactionsStore((s) => s.loadMore)
   const add = useTransactionsStore((s) => s.add)
   const bulkAdd = useTransactionsStore((s) => s.bulkAdd)
   const update = useTransactionsStore((s) => s.update)
@@ -77,8 +93,8 @@ export default function Transactions() {
   const [transferKey, setTransferKey] = useState(() => crypto.randomUUID())
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Filters
-  const [filters, _setFilters] = useState<TransactionFiltersValue>({
+  // Filters (applied server-side; changing them reloads the first page)
+  const [filters, setFilters] = useState<TransactionFiltersValue>({
     account: 'all',
     category: 'all',
     type: 'all',
@@ -101,19 +117,11 @@ export default function Transactions() {
   const [csvAccountId, setCsvAccountId] = useState('')
   const [csvCategoryId, setCsvCategoryId] = useState('')
 
-  const [page, setPage] = useState(1)
-
-  // Wrap setFilters to reset pagination on filter change
-  const setFilters = (f: TransactionFiltersValue) => {
-    setPage(1)
-    _setFilters(f)
-  }
-
   useEffect(() => {
-    loadTx()
+    loadTx({ limit: PAGE_SIZE, filters: buildFilters(filters) })
     loadAccounts()
     loadCategories()
-  }, [loadTx, loadAccounts, loadCategories])
+  }, [loadTx, loadAccounts, loadCategories, filters])
 
   // Auto-open add dialog when arriving via FAB (?add=true)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -126,19 +134,12 @@ export default function Transactions() {
     }
   }, [searchParams, setSearchParams, loading])
 
-  const filteredTxn = useMemo(() => {
-    return transactions.filter((t) => {
-      if (filters.account !== 'all' && t.accountId !== filters.account) return false
-      if (filters.category !== 'all' && t.categoryId !== filters.category) return false
-      if (filters.type !== 'all' && t.type !== filters.type) return false
-      if (filters.dateFrom && new Date(t.date) < new Date(filters.dateFrom)) return false
-      if (filters.dateTo && new Date(t.date) > new Date(filters.dateTo + 'T23:59:59')) return false
-      return true
-    })
-  }, [transactions, filters])
-
-  const totalPages = Math.max(1, Math.ceil(filteredTxn.length / PAGE_SIZE))
-  const pagedTxn = filteredTxn.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const filtersActive =
+    filters.account !== 'all' ||
+    filters.category !== 'all' ||
+    filters.type !== 'all' ||
+    !!filters.dateFrom ||
+    !!filters.dateTo
 
   function openAdd() {
     setEditing(null)
@@ -434,17 +435,15 @@ export default function Transactions() {
             }
           />
 
-          {filteredTxn.length === 0 ? (
+          {transactions.length === 0 ? (
             <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">
               <p className="text-lg font-medium mb-1">
-                {transactions.length === 0
-                  ? 'No transactions yet'
-                  : 'No transactions match your filters'}
+                {filtersActive ? 'No transactions match your filters' : 'No transactions yet'}
               </p>
               <p className="text-sm">
-                {transactions.length === 0
-                  ? 'Add your first transaction or import a CSV file to get started.'
-                  : 'Try adjusting your filters.'}
+                {filtersActive
+                  ? 'Try adjusting your filters.'
+                  : 'Add your first transaction or import a CSV file to get started.'}
               </p>
             </div>
           ) : (
@@ -462,7 +461,7 @@ export default function Transactions() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pagedTxn.map((tx) => (
+                    {transactions.map((tx) => (
                       <TableRow key={tx.id}>
                         <TableCell className="text-xs tabular-nums">
                           {formatDate(new Date(tx.date))}
@@ -520,34 +519,23 @@ export default function Transactions() {
                   </TableBody>
                 </Table>
               </div>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-3 px-1">
-                  <p className="text-xs text-muted-foreground">
-                    Showing {(page - 1) * PAGE_SIZE + 1}–
-                    {Math.min(page * PAGE_SIZE, filteredTxn.length)} of {filteredTxn.length}{' '}
-                    transactions
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      Previous
-                    </Button>
-                    <span className="text-xs text-muted-foreground px-2 tabular-nums">
-                      Page {page} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages}
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    >
-                      Next
-                    </Button>
-                  </div>
+              {total !== null && (
+                <p className="text-xs text-muted-foreground mt-3 px-1 tabular-nums">
+                  Showing {transactions.length} of {total} transactions
+                </p>
+              )}
+              {hasMore && (
+                <div className="flex justify-center mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingMore}
+                    onClick={() => void loadMoreTx()}
+                    className="gap-2"
+                  >
+                    {loadingMore && <Loader2 className="size-3.5 animate-spin" />}
+                    Load more
+                  </Button>
                 </div>
               )}
             </>

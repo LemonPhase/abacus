@@ -22,6 +22,7 @@ export function resetAllTables(): void {
   _counter = 0
   _onAuthStateChangeCallback = null
   _failNextRpc = null
+  _failNextSelect = null
   // Restore the default RPC dispatch — restore-service tests override it via
   // mockImplementation/mockResolvedValue, which would otherwise leak here.
   mockSupabase.rpc.mockImplementation(defaultRpc)
@@ -85,21 +86,27 @@ function applyUpdateBalanceEffect(
   recomputeBalance(oldRow.account_id as string)
 }
 
-type Filter = { col: string; val: unknown; op: 'eq' | 'neq' }
+type Filter = { col: string; val: unknown; op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' }
 
-function applyOrder(
+type OrderSpec = { col: string; asc: boolean }
+
+function applyOrders(
   rows: Record<string, unknown>[],
-  col: string | null,
-  asc: boolean,
+  orders: OrderSpec[],
 ): Record<string, unknown>[] {
-  if (!col) return rows
-  return [...rows].sort((a, b) => {
-    const av = a[col] as string | number
-    const bv = b[col] as string | number
-    if (av < bv) return asc ? -1 : 1
-    if (av > bv) return asc ? 1 : -1
-    return 0
-  })
+  // Apply secondary orders first; stable sorts refine the previous pass, so
+  // the last-applied (primary) order dominates — matching multi-key ordering.
+  let result = rows
+  for (const o of [...orders].reverse()) {
+    result = [...result].sort((a, b) => {
+      const av = a[o.col] as string | number
+      const bv = b[o.col] as string | number
+      if (av < bv) return o.asc ? -1 : 1
+      if (av > bv) return o.asc ? 1 : -1
+      return 0
+    })
+  }
+  return result
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -109,14 +116,14 @@ function createBuilder(tableName: string): any {
   let _action: 'select' | 'insert' | 'update' | 'delete' = 'select'
   let _payload: Record<string, unknown> | Record<string, unknown>[] | null = null
   const _filters: Filter[] = []
-  let _orderCol: string | null = null
-  let _orderAsc = true
+  const _orders: OrderSpec[] = []
   let _returning = false
   let _single = false
   let _maybeSingle = false
   let _limit = 0
   let _rangeFrom = -1
   let _rangeTo = -1
+  let _countRequested = false
 
   function applyFilters(
     rows: Record<string, unknown>[],
@@ -124,18 +131,32 @@ function createBuilder(tableName: string): any {
   ): Record<string, unknown>[] {
     let result = rows
     for (const f of filters) {
-      if (f.op === 'neq') {
-        result = result.filter((r) => r[f.col] !== f.val)
-      } else {
-        result = result.filter((r) => r[f.col] === f.val)
-      }
+      result = result.filter((r) => {
+        const v = r[f.col] as string | number | null | undefined
+        switch (f.op) {
+          case 'neq':
+            return r[f.col] !== f.val
+          case 'eq':
+            return r[f.col] === f.val
+          // Range filters follow SQL semantics: NULL never matches.
+          case 'gt':
+            return v !== null && v !== undefined && v > (f.val as string | number)
+          case 'gte':
+            return v !== null && v !== undefined && v >= (f.val as string | number)
+          case 'lt':
+            return v !== null && v !== undefined && v < (f.val as string | number)
+          case 'lte':
+            return v !== null && v !== undefined && v <= (f.val as string | number)
+        }
+      })
     }
     return result
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: any = {}
 
-  builder.select = vi.fn(() => {
+  builder.select = vi.fn((_cols?: unknown, opts?: { count?: string }) => {
+    if (opts?.count) _countRequested = true
     if (_action === 'insert') {
       _returning = true
     } else {
@@ -177,9 +198,28 @@ function createBuilder(tableName: string): any {
     return builder
   })
 
+  builder.gt = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'gt' })
+    return builder
+  })
+
+  builder.gte = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'gte' })
+    return builder
+  })
+
+  builder.lt = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'lt' })
+    return builder
+  })
+
+  builder.lte = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'lte' })
+    return builder
+  })
+
   builder.order = vi.fn((col: string, opts?: { ascending?: boolean }) => {
-    _orderCol = col
-    _orderAsc = opts?.ascending ?? true
+    _orders.push({ col, asc: opts?.ascending ?? true })
     return builder
   })
 
@@ -210,9 +250,16 @@ function createBuilder(tableName: string): any {
   builder.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
     try {
       if (_action === 'select') {
+        if (_failNextSelect) {
+          const message = _failNextSelect
+          _failNextSelect = null
+          resolve({ data: null, error: { message }, count: null })
+          return
+        }
         let result = [...rows]
         result = applyFilters(result, _filters)
-        result = applyOrder(result, _orderCol, _orderAsc)
+        const count = _countRequested ? result.length : null
+        result = applyOrders(result, _orders)
         if (_rangeFrom >= 0 && _rangeTo >= _rangeFrom) {
           result = result.slice(_rangeFrom, _rangeTo + 1)
         } else if (_limit > 0) {
@@ -220,9 +267,9 @@ function createBuilder(tableName: string): any {
         }
 
         if (_single || _maybeSingle) {
-          resolve({ data: result[0] ?? null, error: null })
+          resolve({ data: result[0] ?? null, error: null, count })
         } else {
-          resolve({ data: result, error: null })
+          resolve({ data: result, error: null, count })
         }
       } else if (_action === 'insert') {
         const toInsert = Array.isArray(_payload) ? _payload : [_payload ?? {}]
@@ -344,8 +391,31 @@ let _onAuthStateChangeCallback:
 // mutating any table — lets store tests exercise RPC failure paths.
 let _failNextRpc: string | null = null
 
+// When set, the next select-style query resolves with this error without
+// returning rows — lets service tests exercise partial-read failures.
+let _failNextSelect: string | null = null
+
 export function failNextRpc(message = 'rpc failed'): void {
   _failNextRpc = message
+}
+
+export function failNextSelect(message = 'select failed'): void {
+  _failNextSelect = message
+}
+
+/**
+ * Minimal chainable select-builder stub for tests that override
+ * `supabase.from` directly: every filter/order method returns the builder
+ * itself; awaiting it resolves with `result`. crudStore.load always applies
+ * order/range before awaiting, so bare promise stubs no longer suffice.
+ */
+export function chainableSelect(result: Promise<unknown>): Record<string, unknown> {
+  const builder: Record<string, unknown> = {}
+  for (const m of ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'order', 'range', 'limit']) {
+    builder[m] = vi.fn(() => builder)
+  }
+  builder.then = result.then.bind(result)
+  return builder
 }
 
 // Mirrors public.replace_budget_categories (20260917000005): replaces all

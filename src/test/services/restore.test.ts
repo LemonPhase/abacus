@@ -81,9 +81,9 @@ describe('restoreUserData', () => {
     expect(result.restoredFor).toBe('user-a')
     expect(rpc).toHaveBeenCalledTimes(1)
     expect(rpc).toHaveBeenCalledWith('restore_user_data', {
-      payload: expect.objectContaining({ version: 2 }),
+      p_payload: expect.objectContaining({ version: 2 }),
     })
-    const payload = rpc.mock.calls[0][1].payload as Record<string, unknown[]>
+    const payload = rpc.mock.calls[0][1].p_payload as Record<string, unknown[]>
     // legacy normalization: opening = balance - effects = 1234 - (50 - 30)
     expect(payload.accounts[0]).toMatchObject({ opening_balance: 1214, balance: 1234 })
     expect(payload.transactions).toHaveLength(2)
