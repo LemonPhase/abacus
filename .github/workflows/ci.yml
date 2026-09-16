@@ -43,6 +43,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # GitHub-hosted runners share IP ranges with thousands of unrelated
+      # workflows, so anonymous registry pulls are rate-limited on a
+      # first-come-first-served basis. Logging in counts pulls against our own
+      # account budget instead (200/6h on free tier). Harmless no-op until the
+      # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN secrets are set.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Start local Supabase
