@@ -21,7 +21,8 @@ import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getOrFetchRate } from '@/services/exchange'
+import { getRate, type RateQuote } from '@/services/exchange'
+import { roundCurrency } from '@/lib/currency'
 import { parseCSV, detectColumns, parseAmount, parseDate, type ColumnMapping } from '@/lib/csv'
 import type { TransactionKind, NewTransaction } from '@/types'
 import { ICON_MAP } from '@/lib/icons'
@@ -68,6 +69,7 @@ export default function Transactions() {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<TxFormData>(emptyTxForm)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   // Filters
   const [filters, _setFilters] = useState<TransactionFiltersValue>({
@@ -135,6 +137,7 @@ export default function Transactions() {
   function openAdd() {
     setEditing(null)
     setForm({ ...emptyTxForm, date: new Date().toISOString().slice(0, 10) })
+    setSaveError(null)
     setDialogOpen(true)
   }
 
@@ -163,16 +166,21 @@ export default function Transactions() {
       description: tx.description ?? '',
       toAccountId,
     })
+    setSaveError(null)
     setDialogOpen(true)
   }
 
-  async function getExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
-    if (fromCurrency === toCurrency) return 1
-    const rate = await getOrFetchRate(fromCurrency, toCurrency, new Date(form.date))
-    return rate ?? 1
+  /** FX quote for a cross-currency transfer, or null when unavailable — no silent 1:1 fallback. */
+  async function getTransferQuote(
+    fromCurrency: string,
+    toCurrency: string,
+  ): Promise<RateQuote | null> {
+    if (fromCurrency === toCurrency) return { rate: 1, asOf: form.date }
+    return getRate(fromCurrency, toCurrency, new Date(form.date))
   }
 
   async function handleSave() {
+    setSaveError(null)
     try {
       const amount = parseFloat(form.amount) || 0
       if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
@@ -195,8 +203,14 @@ export default function Transactions() {
 
             const toAccount = accounts.find((a) => a.id === form.toAccountId)
             const toCurrency = toAccount?.currency ?? currency
-            const rate = await getExchangeRate(currency, toCurrency)
-            convertedAmount = Math.round(amount * rate * 100) / 100
+            const quote = await getTransferQuote(currency, toCurrency)
+            if (!quote) {
+              setSaveError(
+                `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
+              )
+              return
+            }
+            convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
 
             await update(outId, {
               accountId: form.accountId,
@@ -221,8 +235,14 @@ export default function Transactions() {
             // Changed from another type to transfer, need to create the missing correlative
             const toAccount = accounts.find((a) => a.id === form.toAccountId)
             const toCurrency = toAccount?.currency ?? currency
-            const rate = await getExchangeRate(currency, toCurrency)
-            convertedAmount = Math.round(amount * rate * 100) / 100
+            const quote = await getTransferQuote(currency, toCurrency)
+            if (!quote) {
+              setSaveError(
+                `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
+              )
+              return
+            }
+            convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
 
             // Save original data for rollback
             const originalTx = tx && {
@@ -271,8 +291,14 @@ export default function Transactions() {
           // Add two transactions
           const toAccount = accounts.find((a) => a.id === form.toAccountId)
           const toCurrency = toAccount?.currency ?? currency
-          const rate = await getExchangeRate(currency, toCurrency)
-          convertedAmount = Math.round(amount * rate * 100) / 100
+          const quote = await getTransferQuote(currency, toCurrency)
+          if (!quote) {
+            setSaveError(
+              `Exchange rate ${currency} → ${toCurrency} is unavailable right now. Try again later, or transfer between accounts in the same currency.`,
+            )
+            return
+          }
+          convertedAmount = roundCurrency(amount * quote.rate, toCurrency)
 
           const outTx = await add({
             accountId: form.accountId,
@@ -608,6 +634,7 @@ export default function Transactions() {
         }}
         onFormChange={setForm}
         onSave={handleSave}
+        error={saveError}
       />
 
       {/* Delete Dialog */}
