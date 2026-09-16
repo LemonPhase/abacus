@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { createCrudSlice } from '@/stores/crudStore'
+import { createCrudSlice, MAX_PAGE_ROWS, type LoadOptions } from '@/stores/crudStore'
 import { supabase } from '@/supabase/client'
 import type { Budget, NewBudget } from '@/types'
 import type { Database } from '@/supabase/database.types'
@@ -31,7 +31,11 @@ interface BudgetsState {
   error: string | null
   _unsub: (() => void) | null
   clearError: () => void
-  load: (options?: { limit?: number; offset?: number }) => Promise<void>
+  load: (options?: LoadOptions) => Promise<void>
+  loadMore: () => Promise<void>
+  loadingMore: boolean
+  hasMore: boolean
+  total: number | null
   add: (data: NewBudget) => Promise<Budget>
   update: (id: string, data: Partial<NewBudget>) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -65,12 +69,23 @@ export const useBudgetsStore = create<BudgetsState>()((set, get) => {
   }
 
   const loadAssociations = async () => {
-    const { data, error } = await supabase
-      .from('budget_categories')
-      .select('budget_id, category_id')
-    if (error) throw new Error(error.message)
+    // Page through budget_categories: a single unbounded select is capped by
+    // the API's max_rows and would silently drop associations.
+    const assoc: { budget_id: string; category_id: string }[] = []
+    for (let from = 0; ; from += MAX_PAGE_ROWS) {
+      const { data, error } = await supabase
+        .from('budget_categories')
+        .select('budget_id, category_id')
+        .order('budget_id')
+        .order('category_id')
+        .range(from, from + MAX_PAGE_ROWS - 1)
+      if (error) throw new Error(error.message)
+      const rows = data ?? []
+      assoc.push(...rows)
+      if (rows.length < MAX_PAGE_ROWS) break
+    }
     const byBudget = new Map<string, string[]>()
-    for (const row of data ?? []) {
+    for (const row of assoc) {
       const list = byBudget.get(row.budget_id) ?? []
       list.push(row.category_id)
       byBudget.set(row.budget_id, list)

@@ -5,6 +5,29 @@ import type { Database } from '@/supabase/database.types'
 
 type TableName = keyof Database['public']['Tables']
 
+/** PostgREST max_rows cap (supabase/config.toml) — pages must not exceed it. */
+export const MAX_PAGE_ROWS = 1000
+
+/**
+ * Server-side filter for list queries. Column names are snake_case DB columns
+ * (the same filters are matched against raw realtime payloads).
+ */
+export interface CrudFilter {
+  col: string
+  op: 'eq' | 'gt' | 'gte' | 'lt' | 'lte'
+  value: unknown
+}
+
+export interface LoadOptions {
+  /** Page size — paged mode. Omit to load the complete dataset (auto-pages). */
+  limit?: number
+  offset?: number
+  /** Append results to the collection instead of replacing (load-more). */
+  append?: boolean
+  /** Server-side filters; realtime inserts/updates are matched against them. */
+  filters?: CrudFilter[]
+}
+
 interface CrudConfig<T extends { id: string }> {
   table: TableName
   collectionKey: string
@@ -28,14 +51,35 @@ type SetFn = (
 
 type GetFn = () => Record<string, unknown>
 
+function matchesFilters(row: Record<string, unknown>, filters: CrudFilter[]): boolean {
+  return filters.every((f) => {
+    const v = row[f.col] as string | number | boolean | null | undefined
+    const target = f.value as string | number | boolean
+    if (v === null || v === undefined) return false
+    switch (f.op) {
+      case 'eq':
+        return v === target
+      case 'gt':
+        return v > target
+      case 'gte':
+        return v >= target
+      case 'lt':
+        return v < target
+      case 'lte':
+        return v <= target
+    }
+  })
+}
+
 /**
  * A Zustand store slice factory for CRUD operations on Supabase tables.
  *
  * Each domain store spreads the returned base state and wraps `_add`/`_update`
  * with type-safe public methods. The factory handles:
- * - Loading state & error management
+ * - Loading state & error management (complete loads auto-page past the API's
+ *   max_rows cap; `load({ limit })` gives paged mode with `loadMore`)
  * - Supabase select/insert/update/delete queries
- * - Realtime subscription (INSERT/UPDATE/DELETE)
+ * - Realtime subscription (INSERT/UPDATE/DELETE, filter-matched)
  * - Optimistic local state updates with duplicate guards
  * - Cleanup via `unsubscribe`
  */
@@ -52,6 +96,13 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   // Cross-reset responses stay gated by `generation`.
   let loadSeq = 0
 
+  // Filters of the most recent load — realtime events are matched against
+  // them, so paged/filtered views never display rows outside the query.
+  let lastFilters: CrudFilter[] = []
+  // Options of the most recent paged load (undefined after a complete load);
+  // loadMore() fetches the next page under the same query.
+  let lastPageOptions: { limit: number; filters: CrudFilter[] } | null = null
+
   function getItems(getter: GetFn): T[] {
     return (getter() as Record<string, T[]>)[collectionKey] ?? []
   }
@@ -59,6 +110,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   function handleRealtime(set: SetFn, payload: RealtimePayload) {
     if (payload.eventType === 'INSERT') {
       const item = mapRow(payload.new)
+      if (!matchesFilters(payload.new, lastFilters)) return
       set((state: Record<string, unknown>) => {
         const list = getItems(() => state)
         if (list.some((i) => i.id === item.id)) return state
@@ -66,15 +118,49 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       })
     } else if (payload.eventType === 'UPDATE') {
       const item = mapRow(payload.new)
-      set((state: Record<string, unknown>) => ({
-        [collectionKey]: getItems(() => state).map((i) => (i.id === item.id ? item : i)),
-      }))
+      const matches = matchesFilters(payload.new, lastFilters)
+      set((state: Record<string, unknown>) => {
+        const list = getItems(() => state)
+        if (!matches) {
+          // The row left the filtered set (e.g. edited out of the date range).
+          return { [collectionKey]: list.filter((i) => i.id !== item.id) }
+        }
+        const present = list.some((i) => i.id === item.id)
+        return {
+          [collectionKey]: present
+            ? list.map((i) => (i.id === item.id ? item : i))
+            : prependInsert
+              ? [item, ...list]
+              : [...list, item],
+        }
+      })
     } else if (payload.eventType === 'DELETE') {
       const id = (payload.old as { id: string }).id
       set((state: Record<string, unknown>) => ({
-        [collectionKey]: getItems(() => state).filter((i) => i.id !== id),
+        [collectionKey]: getItems(() => state).filter((item) => item.id !== id),
       }))
     }
+  }
+
+  // Build a page query: filters + deterministic order (config order, then id
+  // as tiebreak so offset pagination never repeats or skips tied rows).
+  function pageQuery(filters: CrudFilter[], from: number, to: number, withCount: boolean) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = supabase.from(table).select('*', withCount ? { count: 'exact' } : undefined)
+    for (const f of filters) {
+      q = q[f.op](f.col, f.value)
+    }
+    if (order) {
+      q = q.order(order.column, { ascending: order.ascending })
+    }
+    q = q.order('id', { ascending: true })
+    return q.range(from, to)
+  }
+
+  type PageResult = {
+    data: Record<string, unknown>[] | null
+    error: { message: string } | null
+    count: number | null
   }
 
   // set/get come from Zustand, which has store-specific types.
@@ -82,28 +168,75 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
   return function build(set: any, get: any) {
     const isStale = (token: number) => token !== generation
 
-    const load = async (options?: { limit?: number; offset?: number }) => {
+    const load = async (options?: LoadOptions) => {
       const seq = ++loadSeq
       const token = generation
-      set({ loading: true, error: null })
-      const { limit, offset } = options ?? {}
-      let query = supabase.from(table).select('*')
-      if (order) {
-        query = query.order(order.column, { ascending: order.ascending })
+      const { limit, offset, append, filters } = options ?? {}
+      const activeFilters = filters ?? []
+      lastFilters = activeFilters
+      set(append ? { loadingMore: true, error: null } : { loading: true, error: null })
+
+      const failOrStale = (res: PageResult): boolean => {
+        if (seq !== loadSeq || isStale(token)) return true
+        if (res.error) {
+          set({ error: res.error.message, loading: false, loadingMore: false })
+          throw res.error
+        }
+        return false
       }
-      if (offset !== undefined && limit !== undefined) {
-        query = query.range(offset, offset + limit - 1)
-      } else if (limit !== undefined) {
-        query = query.limit(limit)
+
+      try {
+        let rows: Record<string, unknown>[] = []
+        let total: number | null = null
+        let hasMore = false
+
+        if (limit === undefined) {
+          // Complete load: page through until a short page so nothing is
+          // silently truncated by the API's max_rows cap.
+          lastPageOptions = null
+          let from = offset ?? 0
+          for (;;) {
+            const res: PageResult = await pageQuery(
+              activeFilters,
+              from,
+              from + MAX_PAGE_ROWS - 1,
+              false,
+            )
+            if (failOrStale(res)) return
+            const chunk = res.data ?? []
+            rows = rows.concat(chunk)
+            from += MAX_PAGE_ROWS
+            if (chunk.length < MAX_PAGE_ROWS) break
+          }
+        } else {
+          lastPageOptions = { limit, filters: activeFilters }
+          const from = offset ?? 0
+          const res: PageResult = await pageQuery(activeFilters, from, from + limit - 1, true)
+          if (failOrStale(res)) return
+          rows = res.data ?? []
+          total = res.count
+          hasMore = rows.length === limit
+        }
+
+        set((state: Record<string, unknown>) => {
+          const prev = getItems(() => state)
+          let items: T[]
+          if (append) {
+            // Offset pages can shift under concurrent inserts (realtime);
+            // skip ids already in the collection.
+            const seen = new Set(prev.map((i) => i.id))
+            items = [...prev, ...rows.map(mapRow).filter((i) => !seen.has(i.id))]
+          } else {
+            items = rows.map(mapRow)
+          }
+          return { [collectionKey]: items, loading: false, loadingMore: false, hasMore, total }
+        })
+      } catch (e) {
+        if (seq === loadSeq && !isStale(token)) {
+          set({ loading: false, loadingMore: false })
+        }
+        throw e
       }
-      const { data, error } = await query
-      if (seq !== loadSeq || isStale(token)) return
-      if (error) {
-        set({ error: error.message, loading: false })
-        throw error
-      }
-      const items: T[] = (data ?? []).map(mapRow)
-      set({ [collectionKey]: items, loading: false })
 
       if (!get()._unsub) {
         const unsub = subscribeToTable(table as string, (payload) => {
@@ -112,6 +245,17 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         })
         set({ _unsub: unsub })
       }
+    }
+
+    /** Fetch the next page of the last paged load (no-op after a complete load). */
+    const loadMore = async (): Promise<void> => {
+      if (!lastPageOptions) return
+      await load({
+        limit: lastPageOptions.limit,
+        offset: getItems(get).length,
+        append: true,
+        filters: lastPageOptions.filters,
+      })
     }
 
     const internalAdd = async (data: Record<string, unknown>): Promise<T> => {
@@ -134,6 +278,9 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         throw error
       }
       const item = mapRow(inserted as Record<string, unknown>)
+      // Optimistic insert only lands in the collection when it matches the
+      // active filters (in paged mode a reload fetches it under the right page).
+      if (!matchesFilters(inserted as Record<string, unknown>, lastFilters)) return item
       set((state: Record<string, unknown>) => {
         const list = getItems(() => state)
         if (list.some((i) => i.id === item.id)) return state
@@ -162,7 +309,9 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         set({ error: error.message, loading: false })
         throw error
       }
-      const items = (inserted as Record<string, unknown>[]).map(mapRow)
+      const items = (inserted as Record<string, unknown>[])
+        .filter((row) => matchesFilters(row, lastFilters))
+        .map(mapRow)
       set((state: Record<string, unknown>) => {
         const list = getItems(() => state)
         const newList = prependInsert ? [...items, ...list] : [...list, ...items]
@@ -221,15 +370,28 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     const reset = () => {
       generation++
       unsubscribe()
-      set({ [collectionKey]: [], loading: false, error: null })
+      lastFilters = []
+      lastPageOptions = null
+      set({
+        [collectionKey]: [],
+        loading: false,
+        loadingMore: false,
+        hasMore: false,
+        total: null,
+        error: null,
+      })
     }
 
     return {
       loading: false,
+      loadingMore: false,
+      hasMore: false,
+      total: null,
       error: null,
       _unsub: null,
       clearError: () => set({ error: null }),
       load,
+      loadMore,
       _add: internalAdd,
       _bulkAdd: internalBulkAdd,
       _update: internalUpdate,

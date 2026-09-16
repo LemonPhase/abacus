@@ -17,21 +17,10 @@ import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useAuth } from '@/auth/auth'
-import { supabase } from '@/supabase/client'
 import { restoreUserData, currentUserId } from '@/services/restore'
+import { exportAllData } from '@/services/export'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
-
-// Table names as used in Supabase (snake_case)
-const TABLES = [
-  'accounts',
-  'categories',
-  'transactions',
-  'budgets',
-  'exchange_rates',
-  'investment_plans',
-  'recurring_transactions',
-] as const
 
 export default function Settings() {
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
@@ -49,43 +38,11 @@ export default function Settings() {
     try {
       setExportStatus('idle')
       setExportMsg('')
-      const uid = await currentUserId()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: Record<string, any> = {
-        version: 3,
-        exportedAt: new Date().toISOString(),
-      }
 
-      const results = await Promise.all(TABLES.map((table) => supabase.from(table).select('*')))
-      if ((await currentUserId()) !== uid) {
-        throw new Error('Signed-in user changed; export aborted')
-      }
-      for (let i = 0; i < TABLES.length; i++) {
-        const { data: rows, error } = results[i]
-        if (error) throw error
-        data[TABLES[i]] = rows ?? []
-      }
-
-      // The v3 payload keeps the budgets[].category_ids array shape so exports
-      // stay stable across the Audit 08 schema change: the DB now stores the
-      // links in the budget_categories association table, so derive the arrays
-      // on export (the restore RPC regenerates the association rows from them).
-      const { data: assoc, error: assocError } = await supabase
-        .from('budget_categories')
-        .select('budget_id, category_id')
-      if ((await currentUserId()) !== uid) {
-        throw new Error('Signed-in user changed; export aborted')
-      }
-      if (assocError) throw assocError
-      const byBudget = new Map<string, string[]>()
-      for (const row of assoc ?? []) {
-        const list = byBudget.get(row.budget_id) ?? []
-        list.push(row.category_id)
-        byBudget.set(row.budget_id, list)
-      }
-      for (const budget of data.budgets) {
-        budget.category_ids = byBudget.get(budget.id) ?? []
-      }
+      // One service call: pages through every table (bounded by the API's
+      // max_rows per request), aborts on identity change or any partial read
+      // failure, and returns the v3 payload the restore path accepts.
+      const data = await exportAllData()
 
       const json = JSON.stringify(data, null, 2)
       const blob = new Blob([json], { type: 'application/json' })

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { createCrudSlice } from '@/stores/crudStore'
+import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
 import type { Account, NewAccount, AccountType } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -26,7 +26,11 @@ interface AccountsState {
   error: string | null
   _unsub: (() => void) | null
   clearError: () => void
-  load: (options?: { limit?: number; offset?: number }) => Promise<void>
+  load: (options?: LoadOptions) => Promise<void>
+  loadMore: () => Promise<void>
+  loadingMore: boolean
+  hasMore: boolean
+  total: number | null
   add: (data: NewAccount) => Promise<Account>
   update: (id: string, data: Partial<NewAccount>) => Promise<void>
   remove: (id: string) => Promise<void>
