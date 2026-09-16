@@ -51,13 +51,15 @@ update accounts a
 set opening_balance = a.balance - account_ledger_effects(a.id);
 
 -- Enforce the invariant on accounts writes.
--- The ledger trigger (below) sets app.balance_maintenance = 'on' for its own
--- transaction: deltas are serialized by the account row lock, and re-checking
--- them here would read a stale snapshot mid-statement (an account move is only
--- half-visible to the scan). Client writes through PostgREST cannot set this
--- GUC, so direct balance edits stay rejected. ponytail: GUC-guarded skip;
--- swap for a DEFERRABLE constraint trigger if a bypass via direct SQL ever
--- becomes a real threat model.
+-- The ledger trigger (below) sets app.balance_maintenance = 'on' for the
+-- duration of its own call and restores the prior value before returning: deltas
+-- are serialized by the account row lock, and re-checking them here would read a
+-- stale snapshot mid-statement (an account move is only half-visible to the
+-- scan). The marker is therefore scoped so a later direct balance write in the
+-- same transaction is still rejected; only sessions that deliberately set the
+-- GUC themselves remain outside the enforcement path. ponytail: GUC-guarded
+-- skip; swap for a DEFERRABLE constraint trigger if a bypass via direct SQL
+-- ever becomes a real threat model.
 create or replace function enforce_account_balance()
 returns trigger as $$
 begin
@@ -104,6 +106,12 @@ returns trigger as $$
 declare
   _affected_account_id uuid;
   _affected_user_id uuid;
+  -- Prior marker value, restored before returning so the maintenance bypass
+  -- never leaks past this trigger into later statements of the same
+  -- transaction (a direct balance write after a transaction write must stay
+  -- rejected). Exception paths need no restore: a raise rolls back the
+  -- (sub)transaction including transaction-local config changes.
+  _prev_maintenance text := coalesce(current_setting('app.balance_maintenance', true), '');
 begin
   -- Mark this transaction as ledger-maintained so enforce_account_balance
   -- skips its recheck for our own delta updates (see comment there).
@@ -161,6 +169,9 @@ begin
       update accounts set balance = balance + old.amount where id = old.account_id;
     end if;
   end if;
+  -- Scope the marker to this trigger: restore the caller's value so it is
+  -- never left enabled after we return.
+  perform set_config('app.balance_maintenance', _prev_maintenance, true);
   return null;
 end;
 $$ language plpgsql;

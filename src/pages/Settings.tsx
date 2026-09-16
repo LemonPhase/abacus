@@ -17,6 +17,7 @@ import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useAuth } from '@/auth/auth'
 import { supabase } from '@/supabase/client'
+import { normalizeLegacyAccounts } from '@/pages/settings/legacyAccounts'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
@@ -121,9 +122,17 @@ export default function Settings() {
         if (result.error) throw result.error
       }
 
+      // Legacy exports (version 2) have no opening_balance; derive it from the
+      // exported balance minus the signed effects of the exported transactions,
+      // so the DB's INSERT trigger (balance := opening_balance) doesn't zero the
+      // restored balances. Exports that already carry opening_balance pass through.
+      const accounts = normalizeLegacyAccounts(data.accounts, data.transactions)
+
       // Import data from each table (parallel)
-      const inserts = TABLES.filter((table) => data[table]?.length).map((table) =>
-        supabase.from(table).insert(data[table]),
+      const rowsFor = (table: (typeof TABLES)[number]) =>
+        table === 'accounts' ? accounts : data[table]
+      const inserts = TABLES.filter((table) => rowsFor(table)?.length).map((table) =>
+        supabase.from(table).insert(rowsFor(table)),
       )
       if (inserts.length > 0) {
         const insertResults = await Promise.all(inserts)

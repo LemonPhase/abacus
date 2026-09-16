@@ -110,4 +110,25 @@ describe('Accounts page — opening balance semantics', () => {
     expect(row?.balance).toBe(1300)
     expect(useAccountsStore.getState().error).toBeNull()
   })
+
+  it('reloads accounts after an opening-balance edit so the store balance is fresh', async () => {
+    // Seed with a drifted balance (opening 1000, balance 1200) as the DB would have it.
+    seedAccount(makeAccount())
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Checking')
+
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+    const input = await screen.findByLabelText('Opening balance')
+    await user.clear(input)
+    await user.type(input, '1300')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    // The optimistic update only merges request fields; the page must reload so
+    // the store's derived balance reflects the database (1300, not the stale 1200).
+    await waitFor(() => {
+      expect(useAccountsStore.getState().accounts[0]?.balance).toBe(1300)
+    })
+    expect(useAccountsStore.getState().accounts[0]?.openingBalance).toBe(1300)
+  })
 })

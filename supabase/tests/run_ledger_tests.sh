@@ -9,6 +9,9 @@
 #      (backfill_seed.sql + backfill_assert.sql)
 #   3. concurrency: two sessions inserting transactions on the same account —
 #      serialized by the account row lock, no lost update
+#   4. GUC bypass: within one transaction, a legitimate transaction insert
+#      followed by a direct balance write — the write is rejected and the
+#      committed balance stays reconstructable (ledger_guc_bypass.sql)
 #
 # Usage: supabase/tests/run_ledger_tests.sh
 # Requires psql + a reachable PostgreSQL server (default: local socket).
@@ -145,5 +148,9 @@ if [ "$BAL" != "1070" ]; then
   exit 1
 fi
 echo "   concurrency: OK (B waited ${ELAPSED_MS}ms behind A; balance = 1070, no lost update)"
+
+echo "== 4. GUC bypass ($T1) =="
+run_sql "$T1" -f supabase/tests/ledger_guc_bypass.sql >/dev/null
+echo "   bypass: OK (direct write after insert rejected; balance reconstructable after commit)"
 
 echo "All ledger DB tests passed."

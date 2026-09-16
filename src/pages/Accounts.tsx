@@ -96,6 +96,9 @@ export default function Accounts() {
 
       if (editing) {
         await update(editing.id, data)
+        // balance is derived in the database; the optimistic update only
+        // merges the request fields, so reload to pick up the authoritative row.
+        await load()
       } else {
         await add(data)
       }
