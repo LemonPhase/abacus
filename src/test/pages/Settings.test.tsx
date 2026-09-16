@@ -104,7 +104,7 @@ describe('Settings identity-safe export/import', () => {
     mockSupabase.from.mockImplementation(originalFrom!)
   })
 
-  it('aborts import before any destructive delete when the signed-in user changes mid-operation', async () => {
+  it('aborts import before the RPC when the signed-in user changes mid-operation', async () => {
     // B's existing data must survive the aborted import untouched.
     getTable('accounts').push({
       id: 'b-acct',
@@ -113,6 +113,7 @@ describe('Settings identity-safe export/import', () => {
       type: 'checking',
       currency: 'USD',
       balance: 5,
+      opening_balance: 5,
       notes: null,
       created_at: '2026-01-01T00:00:00.000Z',
       updated_at: '2026-01-01T00:00:00.000Z',
@@ -130,25 +131,29 @@ describe('Settings identity-safe export/import', () => {
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     fireEvent.change(input, { target: { files: [file] } })
 
-    // Identity flips while the file is still being read, before the delete phase.
+    // Identity flips while the file is still being read, before the RPC.
     await act(async () => {
       currentUser = 'user-b'
-      resolveText!(JSON.stringify({ accounts: [{ id: 'evil' }], transactions: [] }))
+      resolveText!(JSON.stringify({ version: 3, accounts: [{ id: 'evil' }], transactions: [] }))
     })
 
     await waitFor(() => expect(screen.getByText(/import aborted/i)).toBeInTheDocument())
-    expect(mockSupabase.from).not.toHaveBeenCalled()
+    expect(mockSupabase.rpc).not.toHaveBeenCalled()
     expect(getTable('accounts')).toHaveLength(1)
     expect(getTable('accounts')[0].id).toBe('b-acct')
   })
 })
 
-describe('Settings import — legacy export restore', () => {
+describe('Settings import — atomic restore via RPC', () => {
   beforeEach(() => {
     localStorage.clear()
     useSettingsStore.getState().reset()
     mockSignOut.mockClear()
     resetAllTables()
+    mockSupabase.auth.getSession.mockImplementation(async () => ({
+      data: { session: { user: { id: 'mock-user' } } },
+      error: null,
+    }))
     useAccountsStore.setState({ accounts: [], loading: false, _unsub: null })
     useTransactionsStore.setState({ transactions: [], loading: false, _unsub: null })
     useBudgetsStore.setState({ budgets: [], loading: false, _unsub: null })
@@ -166,54 +171,34 @@ describe('Settings import — legacy export restore', () => {
     await screen.findByText(/Import successful/)
   }
 
-  it('restores a legacy (version 2) export without zeroing balances', async () => {
-    await importFile({
-      version: 2,
-      exportedAt: '2026-01-01T00:00:00.000Z',
-      accounts: [
-        {
-          id: 'acc-1',
-          user_id: 'mock-user',
-          name: 'Checking',
-          type: 'checking',
-          currency: 'USD',
-          balance: 1234,
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: '2026-01-01T00:00:00.000Z',
-        },
-      ],
-      transactions: [
-        {
-          id: 'tx-1',
-          user_id: 'mock-user',
-          account_id: 'acc-1',
-          type: 'income',
-          amount: 50,
-          currency: 'USD',
-          date: '2026-01-02',
-        },
-        {
-          id: 'tx-2',
-          user_id: 'mock-user',
-          account_id: 'acc-1',
-          type: 'expense',
-          amount: 30,
-          currency: 'USD',
-          date: '2026-01-03',
-        },
-      ],
+  it('calls the restore RPC with the payload and reloads all stores on success', async () => {
+    // Simulate the RPC having restored data: the reload must pick it up.
+    getTable('accounts').push({
+      id: 'acc-1',
+      user_id: 'mock-user',
+      name: 'Checking',
+      type: 'checking',
+      currency: 'USD',
+      opening_balance: 700,
+      balance: 720,
+      notes: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
     })
+    const rpc = vi.fn().mockResolvedValue({
+      data: {
+        accounts: 1,
+        transactions: 0,
+        categories: 0,
+        budgets: 0,
+        exchange_rates: 0,
+        investment_plans: 0,
+        recurring_transactions: 0,
+      },
+      error: null,
+    })
+    mockSupabase.rpc.mockImplementation(rpc)
 
-    const account = getTable('accounts')[0]
-    // effects = +50 - 30 = 20 → opening = 1234 - 20 = 1214
-    expect(account.opening_balance).toBe(1214)
-    // balance fully restored, not zeroed by the INSERT trigger
-    expect(account.balance).toBe(1234)
-    // the post-import reload reflects the restored balance in the store
-    expect(useAccountsStore.getState().accounts[0]?.balance).toBe(1234)
-  })
-
-  it('preserves opening_balance for exports that already carry it', async () => {
     await importFile({
       version: 3,
       accounts: [
@@ -225,25 +210,63 @@ describe('Settings import — legacy export restore', () => {
           currency: 'USD',
           opening_balance: 700,
           balance: 720,
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: '2026-01-01T00:00:00.000Z',
         },
       ],
-      transactions: [
-        {
-          id: 'tx-1',
-          user_id: 'mock-user',
-          account_id: 'acc-1',
-          type: 'income',
-          amount: 20,
-          currency: 'USD',
-          date: '2026-01-02',
-        },
-      ],
+      transactions: [],
     })
 
-    const account = getTable('accounts')[0]
-    expect(account.opening_balance).toBe(700)
-    expect(account.balance).toBe(720)
+    expect(rpc).toHaveBeenCalledWith('restore_user_data', {
+      payload: expect.objectContaining({ version: 3 }),
+    })
+    expect(screen.getByText(/Imported 1 accounts/)).toBeInTheDocument()
+    expect(useAccountsStore.getState().accounts[0]?.balance).toBe(720)
+  })
+
+  it('shows the database error when the RPC fails', async () => {
+    mockSupabase.rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'restore_user_data: payload must be a JSON object' },
+    })
+
+    const user = userEvent.setup()
+    renderWithRouter(<Settings />)
+    await user.click(screen.getByText('Import Data'))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(
+      [JSON.stringify({ version: 3, accounts: [], transactions: [] })],
+      'export.json',
+      {
+        type: 'application/json',
+      },
+    )
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await screen.findByText(/Import failed/)
+    expect(screen.getByText(/payload must be a JSON object/)).toBeInTheDocument()
+    // Nothing was reloaded into the stores.
+    expect(useAccountsStore.getState().accounts).toHaveLength(0)
+  })
+
+  it('shows validation errors for malformed files without calling the RPC', async () => {
+    const user = userEvent.setup()
+    renderWithRouter(<Settings />)
+    await user.click(screen.getByText('Import Data'))
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(
+      [
+        JSON.stringify({
+          version: 3,
+          accounts: [],
+          transactions: [{ id: 't', account_id: 'missing' }],
+        }),
+      ],
+      'export.json',
+      { type: 'application/json' },
+    )
+    fireEvent.change(input, { target: { files: [file] } })
+
+    await screen.findByText(/Import failed/)
+    expect(screen.getByText(/account_id not found in accounts/)).toBeInTheDocument()
+    expect(mockSupabase.rpc).not.toHaveBeenCalled()
   })
 })

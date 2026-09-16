@@ -21,6 +21,8 @@ export function resetAllTables(): void {
   tables.clear()
   _counter = 0
   _onAuthStateChangeCallback = null
+  mockSupabase.rpc.mockReset()
+  mockSupabase.rpc.mockImplementation(() => Promise.resolve({ data: null, error: null }))
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
@@ -342,6 +344,11 @@ export function simulateAuthEvent(event: string, session: Record<string, unknown
 
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
+  // RPCs are not table queries; tests stub per-call via
+  // mockSupabase.rpc.mockImplementation(...). Default: success with no data.
+  rpc: vi.fn<() => Promise<{ data: unknown; error: { message: string } | null }>>(() =>
+    Promise.resolve({ data: null, error: null }),
+  ),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

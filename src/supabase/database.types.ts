@@ -374,7 +374,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      restore_user_data: {
+        Args: { payload: Json }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
