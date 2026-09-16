@@ -370,7 +370,10 @@ export function simulateAuthEvent(event: string, session: Record<string, unknown
 
 // Default RPC dispatch: failNextRpc injects one failure; known RPCs are
 // simulated; anything else is a loud test bug.
-function defaultRpc(fn: string, args: Record<string, unknown> = {}) {
+function defaultRpc(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<{ data: unknown; error: { message: string } | null }> {
   if (_failNextRpc) {
     const message = _failNextRpc
     _failNextRpc = null

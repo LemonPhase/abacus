@@ -349,6 +349,7 @@ export type Database = {
           fx_date: string | null
           fx_rate: number | null
           id: string
+          transfer_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -368,6 +369,7 @@ export type Database = {
           fx_date?: string | null
           fx_rate?: number | null
           id?: string
+          transfer_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -387,6 +389,7 @@ export type Database = {
           fx_date?: string | null
           fx_rate?: number | null
           id?: string
+          transfer_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -424,6 +427,167 @@ export type Database = {
       account_ledger_effects: {
         Args: { p_account_id: string }
         Returns: number
+      }
+      assert_owned_account: {
+        Args: { p_account_id: string; p_user_id: string }
+        Returns: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          name: string
+          notes: string | null
+          opening_balance: number
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      convert_transfer_to_plain: {
+        Args: {
+          p_amount: number
+          p_base_amount?: number
+          p_base_currency?: string
+          p_base_stale?: boolean
+          p_category_id?: string
+          p_date?: string
+          p_description?: string
+          p_fx_date?: string
+          p_fx_rate?: number
+          p_new_account_id: string
+          p_new_type: string
+          p_transaction_id: string
+        }
+        Returns: {
+          account_id: string
+          amount: number
+          base_amount: number
+          base_amount_stale: boolean
+          base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
+          transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_transfer: {
+        Args: {
+          p_amount: number
+          p_category_id?: string
+          p_converted_amount: number
+          p_date?: string
+          p_description?: string
+          p_from_account_id: string
+          p_idempotency_key: string
+          p_in_base_amount?: number
+          p_in_base_currency?: string
+          p_in_base_stale?: boolean
+          p_in_fx_date?: string
+          p_in_fx_rate?: number
+          p_out_base_amount?: number
+          p_out_base_currency?: string
+          p_out_base_stale?: boolean
+          p_out_fx_date?: string
+          p_out_fx_rate?: number
+          p_out_transaction_id?: string
+          p_to_account_id: string
+        }
+        Returns: {
+          account_id: string
+          amount: number
+          base_amount: number
+          base_amount_stale: boolean
+          base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
+          transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      delete_transfer: { Args: { p_transfer_id: string }; Returns: undefined }
+      edit_transfer: {
+        Args: {
+          p_amount: number
+          p_category_id?: string
+          p_converted_amount: number
+          p_date?: string
+          p_description?: string
+          p_from_account_id: string
+          p_in_base_amount?: number
+          p_in_base_currency?: string
+          p_in_base_stale?: boolean
+          p_in_fx_date?: string
+          p_in_fx_rate?: number
+          p_out_base_amount?: number
+          p_out_base_currency?: string
+          p_out_base_stale?: boolean
+          p_out_fx_date?: string
+          p_out_fx_rate?: number
+          p_to_account_id: string
+          p_transfer_id: string
+        }
+        Returns: {
+          account_id: string
+          amount: number
+          base_amount: number
+          base_amount_stale: boolean
+          base_currency: string
+          category_id: string | null
+          correlative_id: string | null
+          created_at: string
+          currency: string
+          date: string
+          description: string | null
+          fx_date: string | null
+          fx_rate: number | null
+          id: string
+          transfer_id: string | null
+          type: string
+          updated_at: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "transactions"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
     }
     Enums: {

@@ -50,8 +50,48 @@ export interface Transaction {
   date: Date
   description?: string
   correlativeId?: string
+  /** Stable id shared by both legs of a transfer pair; doubles as the RPC idempotency key. */
+  transferId?: string
   createdAt: Date
   updatedAt: Date
+}
+
+/** Input for createTransfer — amounts are positive magnitudes. */
+export interface TransferCreateInput {
+  /** Client-generated uuid; reused across retries so the RPC can deduplicate. */
+  idempotencyKey: string
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  convertedAmount: number
+  categoryId: string | null
+  date: Date
+  description?: string
+  /** Existing row to convert into the outgoing leg (non-transfer edited into a transfer). */
+  existingTransactionId?: string
+}
+
+/** Input for editTransfer — rewrites both legs of an existing pair. */
+export interface TransferEditInput {
+  transferId: string
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  convertedAmount: number
+  categoryId: string | null
+  date: Date
+  description?: string
+}
+
+/** Input for convertTransferToPlain — turns a leg back into a plain transaction. */
+export interface TransferConvertInput {
+  transactionId: string
+  newType: 'income' | 'expense'
+  amount: number
+  accountId: string
+  categoryId: string | null
+  date: Date
+  description?: string
 }
 
 export type BudgetPeriod = 'monthly' | 'yearly'
