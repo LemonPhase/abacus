@@ -19,6 +19,11 @@
 #   5. forged JWT claims: wrong signature, expired, alg=none, role downgrades
 #      (needs JWT_SECRET from `supabase status`, skipped when unavailable)
 #   6. IDOR probes on every RPC parameter
+#   7. account-deletion cascade via the GoTrue admin API (regression: the
+#      balance trigger once 500ed under supabase_auth_admin) and asserted
+#      self-cleanup — the run must not leak its own users
+#
+# A broken/unreachable stack FAILS the suite (exit 1), it never green-lights.
 #
 # REGRESSION CASES ACCUMULATE HERE: when an audit fix lands, append a block
 # that reproduces the attack it closes (a new section, or new check lines in
@@ -56,16 +61,26 @@ if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
 fi
 
 if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
-  echo "SKIP: no SUPABASE_URL / SUPABASE_ANON_KEY and no reachable stack; PostgREST security tests not run" >&2
-  exit 0
+  echo "FAIL: no SUPABASE_URL / SUPABASE_ANON_KEY and no reachable stack — a broken stack must fail the suite (issue #14 review P3-2)" >&2
+  exit 1
 fi
-if ! curl -sf -o /dev/null --max-time 5 "$SUPABASE_URL/auth/v1/health"; then
-  echo "SKIP: Supabase stack at $SUPABASE_URL not reachable; PostgREST security tests not run" >&2
-  exit 0
+# A momentary auth-health blip must not green-light (or red-light) the run:
+# retry before declaring the stack broken.
+HEALTH_OK=0
+for _ in 1 2 3; do
+  if curl -sf -o /dev/null --max-time 5 "$SUPABASE_URL/auth/v1/health"; then HEALTH_OK=1; break; fi
+  sleep 2
+done
+if [ "$HEALTH_OK" != "1" ]; then
+  echo "FAIL: Supabase stack at $SUPABASE_URL not reachable (health check failed 3x)" >&2
+  exit 1
 fi
 if ! command -v psql >/dev/null || [ -z "${SUPABASE_DB_URL:-}" ]; then
   echo "FAIL: psql + SUPABASE_DB_URL are required for the missing-migration assertions" >&2
   exit 1
+fi
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+  echo "WARN: SUPABASE_SERVICE_ROLE_KEY not set — user cleanup cannot run; test users and their rows will leak" >&2
 fi
 
 # ---------------------------------------------------------------------------
@@ -135,9 +150,17 @@ login_uid_token() { # -> "uid token"; nonzero exit when login fails
   u=$(json "d['user']['id'] if isinstance(d,dict) and isinstance(d.get('user'),dict) else ''")
   echo "$u $t"
 }
-cleanup() { # cascade-deletes the test users (and with them all their rows)
-  local uid
-  for uid in "${U1:-}" "${U2:-}"; do
+# admin-del <uid> — GoTrue admin API user deletion (service role)
+admin_del() {
+  curl -s -o "$REST_BODY" -w '%{http_code}' -X DELETE \
+    "$SUPABASE_URL/auth/v1/admin/users/$1" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY:-}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY:-}"
+}
+
+cleanup() { # best-effort fallback (abort paths); the happy path asserts its
+  local uid # own cleanup in section 11
+  for uid in "${U1:-}" "${U2:-}" "${U3:-}"; do
     [ -n "$uid" ] && [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ] && curl -sf -o /dev/null \
       -X DELETE "$SUPABASE_URL/auth/v1/admin/users/$uid" \
       -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
@@ -148,8 +171,14 @@ cleanup() { # cascade-deletes the test users (and with them all their rows)
 
 section "bootstrap users"
 signup "$U1_EMAIL"; signup "$U2_EMAIL"
-read -r U1 T1 <<< "$(login_uid_token "$U1_EMAIL")" || { echo "aborting: U1 unavailable" >&2; exit 1; }
-read -r U2 T2 <<< "$(login_uid_token "$U2_EMAIL")" || { echo "aborting: U2 unavailable" >&2; exit 1; }
+CREDS1=$(login_uid_token "$U1_EMAIL") || { echo "aborting: U1 login failed" >&2; exit 1; }
+read -r U1 T1 <<< "$CREDS1"
+CREDS2=$(login_uid_token "$U2_EMAIL") || { echo "aborting: U2 login failed" >&2; exit 1; }
+read -r U2 T2 <<< "$CREDS2"
+if [ -z "$U1" ] || [ -z "$T1" ] || [ -z "$U2" ] || [ -z "$T2" ]; then
+  echo "aborting: bootstrap did not yield two usable users" >&2
+  exit 1
+fi
 trap cleanup EXIT
 check "two independent authenticated users" \
   $([ -n "$U1" ] && [ -n "$U2" ] && [ "$U1" != "$U2" ] && echo 0 || echo 1)
@@ -194,22 +223,46 @@ for TG in "accounts:set_user_id" "accounts:enforce_account_balance" \
 done
 
 # 1d. RPC surface via OpenAPI (generated from the live schema — a migration
-# that failed to apply makes its objects vanish from here)
-OAPI_STATUS=$(rest "$T1" GET "")
+# that failed to apply makes its objects vanish from here). The expected list
+# is DERIVED from supabase/migrations/ (functions that do not return trigger),
+# so a newly added migration is covered automatically. The assert is a subset
+# check: every migration-derived RPC must be exposed (extra live-stack RPCs
+# from other branches' migrations are tolerated).
+OAPI_STATUS=""
+for _ in 1 2 3; do
+  OAPI_STATUS=$(rest "$T1" GET "")
+  [ "$OAPI_STATUS" = "200" ] && break
+  sleep 1
+done
 OAPI_TABLES=$(json "'\n'.join(sorted(d.get('definitions',{}).keys()))")
 OAPI_RPC=$(json "'\n'.join(sorted(p.split('/')[-1] for p in d.get('paths',{}) if '/rpc/' in p))")
-check "OpenAPI introspection succeeded" $([ "$OAPI_STATUS" = "200" ] && echo 0 || echo 1)
-for T in accounts budget_categories budgets categories exchange_rates \
+check "OpenAPI introspection succeeded (3 attempts)" $([ "$OAPI_STATUS" = "200" ] && echo 0 || echo 1)
+for F in accounts budget_categories budgets categories exchange_rates \
          investment_plans recurring_transactions transactions; do
-  check "OpenAPI exposes table $T" \
-    $(printf '%s' "$OAPI_TABLES" | grep -qx "$T" && echo 0 || echo 1)
+  check "OpenAPI exposes table $F" \
+    $(printf '%s' "$OAPI_TABLES" | grep -qx "$F" && echo 0 || echo 1)
 done
-for F in account_ledger_effects assert_owned_account budget_spending \
-         convert_transfer_to_plain create_transfer delete_transfer edit_transfer \
-         recurring_next_date replace_budget_categories report_by_category \
-         report_monthly report_summary restore_user_data; do
-  check "OpenAPI exposes rpc $F" $(python3 -c "print(0 if '$F' in '''$OAPI_RPC''' else 1)")
-done
+EXPECTED_RPC=$(python3 - <<'PYEOF'
+import glob, re
+names = set()
+for f in sorted(glob.glob('supabase/migrations/*.sql')):
+    s = open(f).read()
+    for m in re.finditer(r'create\s+(?:or\s+replace\s+)?function\s+(?:public\.)?(\w+)', s, re.I):
+        name = m.group(1).lower()
+        tail = s[m.end():m.end() + 2500]
+        cut = tail.find('$$')
+        sig = tail[:cut] if cut >= 0 else tail
+        if re.search(r'returns\s+trigger\b', sig, re.I):
+            continue
+        names.add(name)
+print('\n'.join(sorted(names)))
+PYEOF
+)
+while IFS= read -r F; do
+  [ -z "$F" ] && continue
+  check "OpenAPI exposes rpc $F (derived from migrations)" \
+    $(printf '%s' "$OAPI_RPC" | grep -qx "$F" && echo 0 || echo 1)
+done <<< "$EXPECTED_RPC"
 
 # ---------------------------------------------------------------------------
 # 2. Anonymous role lockdown.
@@ -401,6 +454,53 @@ check "report_summary sees zero foreign rows (RLS-scoped)" $([ "$N" = "0" ] && e
 N=$(rest "$T2" POST rpc/budget_spending "{\"p_today\":\"2026-01-15\",\"p_currency\":\"USD\"}" >/dev/null; json "len([r for r in d if '$BUD' in str(r)])")
 check "budget_spending returns no foreign budgets" $([ "$N" = "0" ] && echo 0 || echo 1)
 
+section "7b. additional RPC IDOR probes"
+# convert_transfer_to_plain: foreign transaction id must be rejected ...
+ST=$(rest "$T2" POST rpc/convert_transfer_to_plain "{\"p_transaction_id\":\"$TRF_IN\",\"p_new_type\":\"income\",\"p_amount\":1,\"p_new_account_id\":\"$SPOOF_ACC\",\"p_base_amount\":1,\"p_base_currency\":\"USD\",\"p_base_stale\":false}")
+N=$(rest "$T1" GET "transactions?id=eq.$TRF_IN&select=type" >/dev/null; json "d[0]['type']=='transfer' if d else False")
+check "convert_transfer_to_plain with foreign transaction -> rejected, row untouched" \
+  $(deny_ok "$ST" && [ "$N" = "True" ] && echo 0 || echo 1)
+# ... and a foreign p_new_account_id must be rejected even for own legs: U2
+# creates a same-user transfer, then tries to re-account it onto U1's account
+rest "$T2" POST accounts '{"name":"u2 second","type":"savings","currency":"USD","opening_balance":50}' >/dev/null
+U2ACC2=$(json "d[0]['id']")
+IDEMU2="44444444-3333-4444-5555-$UID12"
+ST=$(rest "$T2" POST rpc/create_transfer "{\"p_idempotency_key\":\"$IDEMU2\",\"p_from_account_id\":\"$SPOOF_ACC\",\"p_to_account_id\":\"$U2ACC2\",\"p_amount\":5,\"p_converted_amount\":5,\"p_out_base_amount\":5,\"p_out_base_currency\":\"USD\",\"p_out_base_stale\":false,\"p_in_base_amount\":5,\"p_in_base_currency\":\"USD\",\"p_in_base_stale\":false}")
+U2LEG=$(json "[x['id'] for x in d if x['amount']>0][0] if isinstance(d,list) and d else ''")
+ST=$(rest "$T2" POST rpc/convert_transfer_to_plain "{\"p_transaction_id\":\"$U2LEG\",\"p_new_type\":\"income\",\"p_amount\":5,\"p_new_account_id\":\"$ACC\",\"p_base_amount\":5,\"p_base_currency\":\"USD\",\"p_base_stale\":false}")
+N=$(rest "$T2" GET "transactions?id=eq.$U2LEG&select=account_id" >/dev/null; json "d[0]['account_id']!='$ACC' if d else False")
+check "convert_transfer_to_plain with foreign p_new_account_id -> rejected" \
+  $(deny_ok "$ST" && [ "$N" = "True" ] && echo 0 || echo 1)
+# apply_recurring_occurrence (created by a master migration this branch may not
+# carry): probe the foreign p_recurring_id only when the live stack exposes the
+# function, deriving its required parameters from the live catalog.
+if printf '%s' "$OAPI_RPC" | grep -qx 'apply_recurring_occurrence'; then
+  SIG=$(psql "$SUPABASE_DB_URL" -tAc "select pg_get_function_arguments(p.oid) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='apply_recurring_occurrence' limit 1")
+  BODY=$(python3 - "$SIG" "$RECUR" <<'PYEOF'
+import json, re, sys
+sig, recur = sys.argv[1], sys.argv[2]
+body = {}
+for part in sig.split(','):
+    m = re.match(r'\s*(\w+)\s+', part)
+    if not m:
+        continue
+    name = m.group(1)
+    if re.search(r'\bdefault\b', part, re.I):
+        continue  # optional: let the function default apply
+    body[name] = recur if name == 'p_recurring_id' else None
+body['p_recurring_id'] = recur
+print(json.dumps(body))
+PYEOF
+)
+  BEFORE=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from public.recurring_occurrences where recurring_id='$RECUR'" 2>/dev/null)
+  ST=$(rest "$T2" POST rpc/apply_recurring_occurrence "$BODY")
+  AFTER=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from public.recurring_occurrences where recurring_id='$RECUR'" 2>/dev/null)
+  check "apply_recurring_occurrence with foreign recurring id -> rejected, no occurrence" \
+    $(deny_ok "$ST" && [ "$BEFORE" = "$AFTER" ] && echo 0 || echo 1)
+else
+  echo "   (apply_recurring_occurrence not on this stack — probe lands when the migration is present)"
+fi
+
 # ---------------------------------------------------------------------------
 # 8. Concurrent operations (parallel HTTP writers, no lost updates).
 # ---------------------------------------------------------------------------
@@ -471,6 +571,53 @@ if [ -n "${JWT_SECRET:-}" ]; then
 else
   echo "   (JWT_SECRET not exported by `supabase status` — forging section skipped)"
 fi
+
+# ---------------------------------------------------------------------------
+# 10. Account deletion cascade (regression: the supabase_auth_admin trigger
+#     fix). GoTrue's admin API must delete a user whose ledger has rows —
+#     previously it 500ed (SQLSTATE 42P01 / 42501 inside the balance trigger)
+#     and left the user and all rows behind.
+# ---------------------------------------------------------------------------
+section "10. account deletion cascade via GoTrue admin API"
+U3_EMAIL="sec-${RUN_ID}-u3@abacus.test"
+signup "$U3_EMAIL"
+CREDS3=$(login_uid_token "$U3_EMAIL") || true
+read -r U3 T3 <<< "${CREDS3:-}"
+check "third user bootstrapped" $([ -n "$U3" ] && [ -n "$T3" ] && echo 0 || echo 1)
+rest "$T3" POST accounts '{"name":"u3 checking","type":"checking","currency":"USD","opening_balance":80}' >/dev/null
+U3ACC=$(json "d[0]['id']")
+rest "$T3" POST transactions "{\"account_id\":\"$U3ACC\",\"type\":\"income\",\"amount\":30,\"currency\":\"USD\",\"base_amount\":30,\"base_currency\":\"USD\",\"date\":\"2026-02-01\"}" >/dev/null
+rest "$T3" POST recurring_transactions "{\"account_id\":\"$U3ACC\",\"type\":\"expense\",\"amount\":5,\"frequency\":\"monthly\"}" >/dev/null
+rest "$T3" POST categories '{"name":"u3 cat","type":"expense","color":"#445566"}' >/dev/null
+U3CAT=$(json "d[0]['id']")
+rest "$T3" POST budgets '{"name":"u3 budget","amount":20,"period":"monthly"}' >/dev/null
+U3BUD=$(json "d[0]['id']")
+rest "$T3" POST budget_categories "{\"budget_id\":\"$U3BUD\",\"category_id\":\"$U3CAT\"}" >/dev/null
+rest "$T3" POST exchange_rates '{"from_currency":"USD","to_currency":"GBP","rate":0.8,"date":"2026-02-01"}' >/dev/null
+rest "$T3" POST investment_plans '{"name":"u3 plan","type":"stock","currency":"USD"}' >/dev/null
+N=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from (select id from public.accounts where user_id='$U3' union all select id from public.transactions where user_id='$U3' union all select id from public.recurring_transactions where user_id='$U3' union all select budget_id from public.budget_categories where user_id='$U3') x" 2>/dev/null)
+check "U3 owns seeded rows before deletion" $([ "$N" = "4" ] && echo 0 || echo 1)
+
+ST=$(admin_del "$U3")
+check "admin DELETE user with transactions/recurring -> 2xx (was 500)" \
+  $([ "$ST" -ge 200 ] && [ "$ST" -lt 300 ] && echo 0 || echo 1)
+N=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from (select id from public.accounts where user_id='$U3' union all select id from public.transactions where user_id='$U3' union all select id from public.recurring_transactions where user_id='$U3' union all select id from public.categories where user_id='$U3' union all select id from public.budgets where user_id='$U3' union all select budget_id from public.budget_categories where user_id='$U3' union all select id from public.exchange_rates where user_id='$U3' union all select id from public.investment_plans where user_id='$U3') x" 2>/dev/null)
+check "all of U3's rows cascaded away" $([ "$N" = "0" ] && echo 0 || echo 1)
+N=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from auth.users where id='$U3'" 2>/dev/null)
+check "U3 auth user removed" $([ "$N" = "0" ] && echo 0 || echo 1)
+
+# ---------------------------------------------------------------------------
+# 11. Cleanup is part of the contract: the run must not leak its own users.
+# ---------------------------------------------------------------------------
+section "11. self-cleanup (admin API)"
+ST=$(admin_del "$U1")
+N1=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from (select id from public.transactions where user_id='$U1' union all select id from public.accounts where user_id='$U1') x" 2>/dev/null)
+check "U1 (has transactions) admin-deleted, rows cascaded" \
+  $([ "$ST" -ge 200 ] && [ "$ST" -lt 300 ] && [ "$N1" = "0" ] && echo 0 || echo 1)
+ST=$(admin_del "$U2")
+N2=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from public.accounts where user_id='$U2'" 2>/dev/null)
+check "U2 admin-deleted, rows cascaded" \
+  $([ "$ST" -ge 200 ] && [ "$ST" -lt 300 ] && [ "$N2" = "0" ] && echo 0 || echo 1)
 
 # ---------------------------------------------------------------------------
 # Summary
