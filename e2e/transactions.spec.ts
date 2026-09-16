@@ -240,3 +240,110 @@ test.describe('CSV import', () => {
     await expect(coffeeRow).toContainText('−')
   })
 })
+
+test.describe('Atomic transfers', () => {
+  test('creates, verifies, and deletes a transfer pair through atomic RPCs', async ({
+    page,
+    userSupabase,
+  }) => {
+    const { data: accounts, error: accErr } = await userSupabase
+      .from('accounts')
+      .insert([
+        { name: 'Wallet', type: 'checking', currency: 'USD', opening_balance: 1000 },
+        { name: 'Bank', type: 'savings', currency: 'EUR', opening_balance: 500 },
+      ])
+      .select()
+    if (accErr || !accounts) throw accErr
+    const wallet = accounts.find((a) => a.name === 'Wallet')!
+    const bank = accounts.find((a) => a.name === 'Bank')!
+
+    const { error: catErr } = await userSupabase
+      .from('categories')
+      .insert({ name: 'Internal', type: 'expense', color: '#10b981' })
+    if (catErr) throw catErr
+
+    // Deterministic exchange rate (USD→EUR 0.5): the app checks this table
+    // before any external API. Match the app's key exactly: it uses the
+    // local-midnight instant formatted as a UTC date.
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      .toISOString()
+      .split('T')[0]
+    const { error: fxErr } = await userSupabase.from('exchange_rates').insert({
+      from_currency: 'USD',
+      to_currency: 'EUR',
+      rate: 0.5,
+      date: today,
+    })
+    if (fxErr) throw fxErr
+
+    await page.goto('/app/transactions')
+    await expect(page.getByText('No transactions yet')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Add Transaction' }).first().click()
+    const dialog = page.locator('[data-slot="dialog-content"]')
+    await expect(dialog).toBeVisible()
+
+    // Type: Transfer (the trigger shows the current selection).
+    await dialog.locator('[data-slot="select-trigger"]').first().click()
+    await page
+      .locator('[data-slot="select-content"][data-open] [data-slot="select-item"]')
+      .filter({ hasText: 'Transfer' })
+      .click()
+    await openSelectAndChoose(page, 'Select account', 'Wallet (USD)')
+    await openSelectAndChoose(page, 'Select destination account', 'Bank (EUR)')
+    await openSelectAndChoose(page, 'Select category', 'Internal')
+    await dialog.locator('#tx-amount').fill('100')
+    await dialog.locator('#tx-desc').fill('E2E transfer')
+    await dialog.getByRole('button', { name: 'Add Transaction' }).click()
+
+    await expect(dialog).not.toBeVisible()
+
+    // One atomic RPC → both legs share a stable transfer id, correct signs,
+    // currencies and converted amount, and balances moved exactly once.
+    const { data: legs, error: legErr } = await userSupabase
+      .from('transactions')
+      .select('*')
+      .order('amount')
+    if (legErr || !legs) throw legErr
+    expect(legs).toHaveLength(2)
+    expect(legs[0].transfer_id).toBeTruthy()
+    expect(legs[1].transfer_id).toBe(legs[0].transfer_id)
+    expect(legs[0].amount).toBe(-100)
+    expect(legs[0].currency).toBe('USD')
+    expect(legs[0].account_id).toBe(wallet.id)
+    expect(legs[1].amount).toBe(50)
+    expect(legs[1].currency).toBe('EUR')
+    expect(legs[1].account_id).toBe(bank.id)
+    expect(legs[0].correlative_id).toBe(legs[1].id)
+    expect(legs[1].correlative_id).toBe(legs[0].id)
+
+    const { data: afterCreate } = await userSupabase
+      .from('accounts')
+      .select('id, balance')
+      .order('name')
+    const balances = Object.fromEntries((afterCreate ?? []).map((a) => [a.id, a.balance]))
+    expect(balances[wallet.id]).toBe(900)
+    expect(balances[bank.id]).toBe(550)
+
+    // Deleting one leg removes the whole pair atomically.
+    const row = page.locator('tr', { hasText: 'E2E transfer' }).first()
+    await row.locator('button').nth(1).click()
+    const confirm = page.locator('[data-slot="dialog-content"]')
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole('button', { name: 'Delete' }).click()
+    await expect(confirm).not.toBeVisible()
+
+    const { data: remaining, error: remErr } = await userSupabase.from('transactions').select('id')
+    if (remErr) throw remErr
+    expect(remaining).toHaveLength(0)
+
+    const { data: afterDelete } = await userSupabase
+      .from('accounts')
+      .select('id, balance')
+      .order('name')
+    const restored = Object.fromEntries((afterDelete ?? []).map((a) => [a.id, a.balance]))
+    expect(restored[wallet.id]).toBe(1000)
+    expect(restored[bank.id]).toBe(500)
+  })
+})

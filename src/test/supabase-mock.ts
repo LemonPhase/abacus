@@ -342,6 +342,10 @@ export function simulateAuthEvent(event: string, session: Record<string, unknown
 
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
+  rpc: vi.fn(async () => ({
+    data: null as unknown,
+    error: null as unknown,
+  })),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

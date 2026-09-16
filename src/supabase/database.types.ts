@@ -316,6 +316,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          transfer_id: string | null
           type: string
           updated_at: string
           user_id: string
@@ -332,6 +333,7 @@ export type Database = {
           date: string
           description?: string | null
           id?: string
+          transfer_id?: string | null
           type: string
           updated_at?: string
           user_id: string
@@ -348,6 +350,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          transfer_id?: string | null
           type?: string
           updated_at?: string
           user_id?: string
@@ -374,7 +377,99 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_transfer: {
+        Args: {
+          p_idempotency_key: string
+          p_from_account_id: string
+          p_to_account_id: string
+          p_amount: number
+          p_converted_amount: number
+          p_category_id?: string | null
+          p_date?: string
+          p_description?: string | null
+          p_out_transaction_id?: string | null
+        }
+        Returns: {
+          id: string
+          user_id: string
+          created_at: string
+          updated_at: string
+          account_id: string
+          category_id: string | null
+          type: string
+          amount: number
+          currency: string
+          base_amount: number
+          base_currency: string
+          date: string
+          description: string | null
+          correlative_id: string | null
+          transfer_id: string | null
+        }[]
+      }
+      edit_transfer: {
+        Args: {
+          p_transfer_id: string
+          p_from_account_id: string
+          p_to_account_id: string
+          p_amount: number
+          p_converted_amount: number
+          p_category_id?: string | null
+          p_date?: string
+          p_description?: string | null
+        }
+        Returns: {
+          id: string
+          user_id: string
+          created_at: string
+          updated_at: string
+          account_id: string
+          category_id: string | null
+          type: string
+          amount: number
+          currency: string
+          base_amount: number
+          base_currency: string
+          date: string
+          description: string | null
+          correlative_id: string | null
+          transfer_id: string | null
+        }[]
+      }
+      delete_transfer: {
+        Args: {
+          p_transfer_id: string
+        }
+        Returns: undefined
+      }
+      convert_transfer_to_plain: {
+        Args: {
+          p_transaction_id: string
+          p_new_type: string
+          p_amount: number
+          p_new_account_id: string
+          p_category_id?: string | null
+          p_date?: string
+          p_description?: string | null
+        }
+        Returns: {
+          id: string
+          user_id: string
+          created_at: string
+          updated_at: string
+          account_id: string
+          category_id: string | null
+          type: string
+          amount: number
+          currency: string
+          base_amount: number
+          base_currency: string
+          date: string
+          description: string | null
+          correlative_id: string | null
+          transfer_id: string | null
+        }
+      }
     }
     Enums: {
       [_ in never]: never
