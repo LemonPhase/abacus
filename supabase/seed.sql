@@ -60,10 +60,17 @@ values
 on conflict do nothing;
 
 -- Create some budgets
-insert into public.budgets (id, name, amount, period, start_date, category_ids)
+insert into public.budgets (id, name, amount, period, start_date)
 values
-  (gen_random_uuid(), 'Monthly Groceries', 500.00, 'monthly', date_trunc('month', current_date)::date, '{22222222-2222-2222-2222-222222222222}'),
-  (gen_random_uuid(), 'Entertainment', 100.00, 'monthly', date_trunc('month', current_date)::date, '{33333333-3333-3333-3333-333333333333}')
+  ('bbbbbbbb-0000-0000-0000-000000000001', 'Monthly Groceries', 500.00, 'monthly', date_trunc('month', current_date)::date),
+  ('bbbbbbbb-0000-0000-0000-000000000002', 'Entertainment', 100.00, 'monthly', date_trunc('month', current_date)::date)
+on conflict do nothing;
+
+-- Budget -> category associations (same-user composite FKs; user_id filled by trigger)
+insert into public.budget_categories (budget_id, category_id)
+values
+  ('bbbbbbbb-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222'),
+  ('bbbbbbbb-0000-0000-0000-000000000002', '33333333-3333-3333-3333-333333333333')
 on conflict do nothing;
 
 commit;
