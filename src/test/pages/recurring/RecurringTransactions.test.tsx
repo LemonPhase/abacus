@@ -298,7 +298,7 @@ describe('RecurringTransactions page', () => {
     })
 
     const updated = getTable('recurring_transactions').find((r) => r.id === 'rt-1')
-    expect(updated?.next_date).toEqual(new Date('2026-03-01'))
+    expect(updated?.next_date).toBe(new Date('2026-03-01').toISOString())
   })
 
   it('apply now goes through the DB engine RPC (issue #15)', async () => {
