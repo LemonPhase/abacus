@@ -123,7 +123,7 @@ Classic branch protection via API (admin) — settings → Branches → Add rule
 PUT /repos/LemonPhase/abacus/branches/master/protection
 {
   "required_status_checks": { "strict": true, "contexts": ["check", "test", "e2e", "security"] },
-  "enforce_admins": false,
+  "enforce_admins": true,
   "required_pull_request_reviews": {
     "required_approving_review_count": 1,
     "dismiss_stale_reviews": true
