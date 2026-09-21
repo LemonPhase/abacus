@@ -233,7 +233,7 @@ describe('Categories View', () => {
       },
     )
 
-    renderWithRouter(<Categories />)
+    renderWithRouter(<CategoriesView />)
 
     await waitFor(() => {
       expect(screen.getByText('Food')).toBeInTheDocument()

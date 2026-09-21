@@ -63,10 +63,20 @@ function CategoryItem({
           {cat.parentId && <span className="text-xs text-muted-foreground">Subcategory</span>}
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-xs" onClick={() => onMoveUp(cat)}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Move ${cat.name} up`}
+            onClick={() => onMoveUp(cat)}
+          >
             <ChevronUp className="size-3" />
           </Button>
-          <Button variant="ghost" size="icon-xs" onClick={() => onMoveDown(cat)}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Move ${cat.name} down`}
+            onClick={() => onMoveDown(cat)}
+          >
             <ChevronDown className="size-3" />
           </Button>
           <Button variant="ghost" size="icon-xs" onClick={() => onEdit(cat)}>
