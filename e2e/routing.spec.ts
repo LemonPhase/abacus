@@ -136,7 +136,7 @@ test.describe('App pages (authenticated)', () => {
   test('categories route shows the Settings categories section', async ({ page }) => {
     await page.goto('/app/categories')
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Settings')
-    await expect(page.getByText('Categories')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Expenses' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Income' })).toBeVisible()
     await expect(page.getByText('No categories yet. Add one to get started.')).toBeVisible()
@@ -155,7 +155,7 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Settings')
     await expect(page.getByText('Base Currency')).toBeVisible()
     await expect(page.getByText('Theme')).toBeVisible()
-    await expect(page.getByText('Categories')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible()
     await expect(page.getByText('Data Management')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
     await expect(page.getByText('About Abacus')).toBeVisible()
