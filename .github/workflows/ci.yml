@@ -29,6 +29,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Build dist/ so the deployment suite in src/test/deployment/ actually
+      # runs here instead of being silently skipped via it.skipIf(!distReady).
+      - run: npm run build
       - run: npm test
 
   e2e:
@@ -40,6 +43,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # GitHub-hosted runners share IP ranges with thousands of unrelated
+      # workflows, so anonymous registry pulls are rate-limited on a
+      # first-come-first-served basis. Logging in counts pulls against our own
+      # account budget instead (200/6h on free tier). Harmless no-op until the
+      # DOCKERHUB_USERNAME / DOCKERHUB_TOKEN secrets are set.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Start local Supabase
@@ -49,7 +63,42 @@ jobs:
           eval "$(npx supabase status -o env)"
           echo "VITE_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
           echo "VITE_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY" >> "$GITHUB_ENV"
+      # The CSP e2e specs (e2e/csp.spec.ts) run the production build under the
+      # vercel.json headers, so dist/ must exist before test:e2e — and the
+      # build must happen AFTER the env export above, or the bundle bakes in
+      # no VITE_SUPABASE_URL and the app crashes on load (client.ts throws).
+      - run: npm run build
       - run: npm run test:e2e
+      - name: Stop local Supabase
+        if: always()
+        run: npx supabase stop
+
+  # Audit 10 (issue #14): adversarial PostgREST-level security suite against a
+  # real local Supabase stack — anonymous + two authenticated users, per-table
+  # cross-user isolation, ownership spoofing, trigger balances, rollback,
+  # concurrency, forged JWTs, IDOR on RPC parameters. Also asserts every
+  # migration-created schema object exists, so a migration that fails to
+  # apply fails the job. Runs the harness from supabase/tests/
+  # (run_postgrest_security_tests.sh); regression cases accumulate there.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+      - name: Start local Supabase
+        run: npx supabase start
+      - name: Run PostgREST security suite
+        run: supabase/tests/run_postgrest_security_tests.sh
       - name: Stop local Supabase
         if: always()
         run: npx supabase stop

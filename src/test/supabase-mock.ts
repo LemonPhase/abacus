@@ -21,11 +21,26 @@ export function resetAllTables(): void {
   tables.clear()
   _counter = 0
   _onAuthStateChangeCallback = null
+  _failNextRpc = null
+  _failNextSelect = null
+  // Restore the default RPC dispatch — restore-service tests override it via
+  // mockImplementation/mockResolvedValue, which would otherwise leak here.
+  mockSupabase.rpc.mockImplementation(defaultRpc)
 }
 
 export function getTable(name: string): Record<string, unknown>[] {
   if (!tables.has(name)) tables.set(name, [])
   return tables.get(name)!
+}
+
+// PostgREST delivers JSON payloads, so Date values arrive as ISO strings —
+// normalize them or the mock's string-based ordering breaks on Date keys.
+function normalizePayload(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(row)) {
+    out[key] = row[key] instanceof Date ? (row[key] as Date).toISOString() : row[key]
+  }
+  return out
 }
 
 function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
@@ -34,7 +49,7 @@ function newRow(overrides?: Record<string, unknown>): Record<string, unknown> {
     id: genId(),
     created_at: now,
     updated_at: now,
-    ...overrides,
+    ...(overrides ? normalizePayload(overrides) : {}),
   }
 }
 
@@ -46,57 +61,62 @@ function validateAccountOwnership(accountId: string, userId: string): boolean {
   return account.user_id === userId
 }
 
-function adjustBalance(accountId: string, delta: number) {
-  const accounts = ensureTable('accounts')
-  const account = accounts.find((r) => r.id === accountId)!
-  account.balance = ((account.balance as number) ?? 0) + delta
+// Mirrors the real DB (20260916000000_opening_balance_ledger.sql):
+// balance = opening_balance + signed transaction effects, enforced.
+function accountEffectsSum(accountId: string): number {
+  const txns = (tables.get('transactions') ?? []).filter((t) => t.account_id === accountId)
+  return txns.reduce((sum, t) => {
+    const amount = (t.amount as number) ?? 0
+    return t.type === 'expense' ? sum - amount : sum + amount
+  }, 0)
 }
 
+function recomputeBalance(accountId: string) {
+  const account = ensureTable('accounts').find((r) => r.id === accountId)
+  if (!account) return
+  account.balance = ((account.opening_balance as number) ?? 0) + accountEffectsSum(accountId)
+}
+
+const DERIVED_BALANCE_ERROR =
+  'account balance is derived (opening_balance + transaction effects); update opening_balance instead'
+
 function applyInsertBalanceEffect(row: Record<string, unknown>) {
-  const type = row.type as string
-  const amount = (row.amount as number) ?? 0
-  const accountId = row.account_id as string
-  if (type === 'income' || type === 'transfer') {
-    adjustBalance(accountId, amount)
-  } else if (type === 'expense') {
-    adjustBalance(accountId, -amount)
-  }
+  recomputeBalance(row.account_id as string)
 }
 
 function applyDeleteBalanceEffect(row: Record<string, unknown>) {
-  const type = row.type as string
-  const amount = (row.amount as number) ?? 0
-  const accountId = row.account_id as string
-  if (type === 'income' || type === 'transfer') {
-    adjustBalance(accountId, -amount)
-  } else if (type === 'expense') {
-    adjustBalance(accountId, amount)
-  }
+  recomputeBalance(row.account_id as string)
 }
 
 function applyUpdateBalanceEffect(
   oldRow: Record<string, unknown>,
   newRow: Record<string, unknown>,
 ) {
-  applyDeleteBalanceEffect(oldRow)
-  applyInsertBalanceEffect(newRow)
+  recomputeBalance(newRow.account_id as string)
+  recomputeBalance(oldRow.account_id as string)
 }
 
-type Filter = { col: string; val: unknown; op: 'eq' | 'neq' }
+type Filter = { col: string; val: unknown; op: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' }
 
-function applyOrder(
+type OrderSpec = { col: string; asc: boolean }
+
+function applyOrders(
   rows: Record<string, unknown>[],
-  col: string | null,
-  asc: boolean,
+  orders: OrderSpec[],
 ): Record<string, unknown>[] {
-  if (!col) return rows
-  return [...rows].sort((a, b) => {
-    const av = a[col] as string | number
-    const bv = b[col] as string | number
-    if (av < bv) return asc ? -1 : 1
-    if (av > bv) return asc ? 1 : -1
-    return 0
-  })
+  // Apply secondary orders first; stable sorts refine the previous pass, so
+  // the last-applied (primary) order dominates — matching multi-key ordering.
+  let result = rows
+  for (const o of [...orders].reverse()) {
+    result = [...result].sort((a, b) => {
+      const av = a[o.col] as string | number
+      const bv = b[o.col] as string | number
+      if (av < bv) return o.asc ? -1 : 1
+      if (av > bv) return o.asc ? 1 : -1
+      return 0
+    })
+  }
+  return result
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -106,14 +126,14 @@ function createBuilder(tableName: string): any {
   let _action: 'select' | 'insert' | 'update' | 'delete' = 'select'
   let _payload: Record<string, unknown> | Record<string, unknown>[] | null = null
   const _filters: Filter[] = []
-  let _orderCol: string | null = null
-  let _orderAsc = true
+  const _orders: OrderSpec[] = []
   let _returning = false
   let _single = false
   let _maybeSingle = false
   let _limit = 0
   let _rangeFrom = -1
   let _rangeTo = -1
+  let _countRequested = false
 
   function applyFilters(
     rows: Record<string, unknown>[],
@@ -121,18 +141,32 @@ function createBuilder(tableName: string): any {
   ): Record<string, unknown>[] {
     let result = rows
     for (const f of filters) {
-      if (f.op === 'neq') {
-        result = result.filter((r) => r[f.col] !== f.val)
-      } else {
-        result = result.filter((r) => r[f.col] === f.val)
-      }
+      result = result.filter((r) => {
+        const v = r[f.col] as string | number | null | undefined
+        switch (f.op) {
+          case 'neq':
+            return r[f.col] !== f.val
+          case 'eq':
+            return r[f.col] === f.val
+          // Range filters follow SQL semantics: NULL never matches.
+          case 'gt':
+            return v !== null && v !== undefined && v > (f.val as string | number)
+          case 'gte':
+            return v !== null && v !== undefined && v >= (f.val as string | number)
+          case 'lt':
+            return v !== null && v !== undefined && v < (f.val as string | number)
+          case 'lte':
+            return v !== null && v !== undefined && v <= (f.val as string | number)
+        }
+      })
     }
     return result
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const builder: any = {}
 
-  builder.select = vi.fn(() => {
+  builder.select = vi.fn((_cols?: unknown, opts?: { count?: string }) => {
+    if (opts?.count) _countRequested = true
     if (_action === 'insert') {
       _returning = true
     } else {
@@ -174,9 +208,28 @@ function createBuilder(tableName: string): any {
     return builder
   })
 
+  builder.gt = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'gt' })
+    return builder
+  })
+
+  builder.gte = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'gte' })
+    return builder
+  })
+
+  builder.lt = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'lt' })
+    return builder
+  })
+
+  builder.lte = vi.fn((col: string, val: unknown) => {
+    _filters.push({ col, val, op: 'lte' })
+    return builder
+  })
+
   builder.order = vi.fn((col: string, opts?: { ascending?: boolean }) => {
-    _orderCol = col
-    _orderAsc = opts?.ascending ?? true
+    _orders.push({ col, asc: opts?.ascending ?? true })
     return builder
   })
 
@@ -207,9 +260,16 @@ function createBuilder(tableName: string): any {
   builder.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
     try {
       if (_action === 'select') {
+        if (_failNextSelect) {
+          const message = _failNextSelect
+          _failNextSelect = null
+          resolve({ data: null, error: { message }, count: null })
+          return
+        }
         let result = [...rows]
         result = applyFilters(result, _filters)
-        result = applyOrder(result, _orderCol, _orderAsc)
+        const count = _countRequested ? result.length : null
+        result = applyOrders(result, _orders)
         if (_rangeFrom >= 0 && _rangeTo >= _rangeFrom) {
           result = result.slice(_rangeFrom, _rangeTo + 1)
         } else if (_limit > 0) {
@@ -217,9 +277,9 @@ function createBuilder(tableName: string): any {
         }
 
         if (_single || _maybeSingle) {
-          resolve({ data: result[0] ?? null, error: null })
+          resolve({ data: result[0] ?? null, error: null, count })
         } else {
-          resolve({ data: result, error: null })
+          resolve({ data: result, error: null, count })
         }
       } else if (_action === 'insert') {
         const toInsert = Array.isArray(_payload) ? _payload : [_payload ?? {}]
@@ -237,6 +297,10 @@ function createBuilder(tableName: string): any {
 
         const inserted = toInsert.map((d) => {
           const row = newRow(d as Record<string, unknown>)
+          if (tableName === 'accounts') {
+            // New account: balance is derived, no transactions can exist yet.
+            row.balance = (row.opening_balance as number) ?? 0
+          }
           rows.push(row)
           if (tableName === 'transactions') applyInsertBalanceEffect(row)
           return row
@@ -254,6 +318,14 @@ function createBuilder(tableName: string): any {
       } else if (_action === 'update') {
         const targets = applyFilters([...rows], _filters)
 
+        if (tableName === 'accounts') {
+          // balance is derived: reject direct writes, mirror enforce_account_balance.
+          if (_payload && 'balance' in _payload) {
+            resolve({ data: null, error: { message: DERIVED_BALANCE_ERROR } })
+            return
+          }
+        }
+
         if (tableName === 'transactions') {
           for (const target of targets) {
             const payload = _payload as Record<string, unknown>
@@ -268,7 +340,13 @@ function createBuilder(tableName: string): any {
 
         for (const target of targets) {
           const oldRow = { ...target }
-          Object.assign(target, _payload ?? {}, { updated_at: new Date().toISOString() })
+          Object.assign(target, normalizePayload((_payload ?? {}) as Record<string, unknown>), {
+            updated_at: new Date().toISOString(),
+          })
+          if (tableName === 'accounts') {
+            // Opening-balance edits re-derive the balance.
+            recomputeBalance(target.id as string)
+          }
           if (tableName === 'transactions') applyUpdateBalanceEffect(oldRow, target)
         }
         if (_returning) {
@@ -292,9 +370,10 @@ function createBuilder(tableName: string): any {
           }
 
           for (const r of matched) {
-            if (tableName === 'transactions') applyDeleteBalanceEffect(r)
             const idx = rows.indexOf(r)
             if (idx >= 0) rows.splice(idx, 1)
+            // recompute after removal — matches AFTER DELETE trigger semantics
+            if (tableName === 'transactions') applyDeleteBalanceEffect(r)
           }
         }
         resolve({ data: null, error: null })
@@ -320,12 +399,78 @@ let _onAuthStateChangeCallback:
   | ((event: string, session: Record<string, unknown> | null) => void)
   | null = null
 
+// When set, the next rpc() call resolves with this error message without
+// mutating any table — lets store tests exercise RPC failure paths.
+let _failNextRpc: string | null = null
+
+// When set, the next select-style query resolves with this error without
+// returning rows — lets service tests exercise partial-read failures.
+let _failNextSelect: string | null = null
+
+export function failNextRpc(message = 'rpc failed'): void {
+  _failNextRpc = message
+}
+
+export function failNextSelect(message = 'select failed'): void {
+  _failNextSelect = message
+}
+
+/**
+ * Minimal chainable select-builder stub for tests that override
+ * `supabase.from` directly: every filter/order method returns the builder
+ * itself; awaiting it resolves with `result`. crudStore.load always applies
+ * order/range before awaiting, so bare promise stubs no longer suffice.
+ */
+export function chainableSelect(result: Promise<unknown>): Record<string, unknown> {
+  const builder: Record<string, unknown> = {}
+  for (const m of ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'order', 'range', 'limit']) {
+    builder[m] = vi.fn(() => builder)
+  }
+  builder.then = result.then.bind(result)
+  return builder
+}
+
+// Mirrors public.replace_budget_categories (20260917000005): replaces all
+// association rows for one budget in a single atomic step.
+function mockReplaceBudgetCategories(args: Record<string, unknown>) {
+  const budgetId = args.p_budget_id as string
+  const categoryIds = (args.p_category_ids as string[]) ?? []
+  const assoc = ensureTable('budget_categories')
+  for (let i = assoc.length - 1; i >= 0; i--) {
+    if (assoc[i].budget_id === budgetId) assoc.splice(i, 1)
+  }
+  for (const category_id of categoryIds) {
+    if (!assoc.some((r) => r.budget_id === budgetId && r.category_id === category_id)) {
+      assoc.push({ budget_id: budgetId, category_id, user_id: 'user-1' })
+    }
+  }
+}
+
 export function simulateAuthEvent(event: string, session: Record<string, unknown> | null = null) {
   _onAuthStateChangeCallback?.(event, session)
 }
 
+// Default RPC dispatch: failNextRpc injects one failure; known RPCs are
+// simulated; anything else is a loud test bug.
+function defaultRpc(
+  fn: string,
+  args: Record<string, unknown> = {},
+): Promise<{ data: unknown; error: { message: string } | null }> {
+  if (_failNextRpc) {
+    const message = _failNextRpc
+    _failNextRpc = null
+    return Promise.resolve({ data: null, error: { message } })
+  }
+  if (fn === 'replace_budget_categories') {
+    mockReplaceBudgetCategories(args)
+    return Promise.resolve({ data: null, error: null })
+  }
+  return Promise.resolve({ data: null, error: { message: `Unknown RPC: ${fn}` } })
+}
+
 export const mockSupabase = {
   from: vi.fn((table: string) => createBuilder(table)),
+  rpc: vi.fn(defaultRpc),
   channel: vi.fn(() => createMockChannel()),
   removeChannel: vi.fn(),
   removeAllChannels: vi.fn(),

@@ -1,11 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getTable } from '@/test/supabase-mock'
+import { getTable, failNextRpc, resetAllTables } from '@/test/supabase-mock'
+
+afterEach(() => {
+  resetAllTables()
+  vi.unstubAllGlobals()
+  useSettingsStore.setState({ baseCurrency: 'USD' })
+})
 
 describe('Accounts Store', () => {
   beforeEach(() => {
@@ -24,12 +30,14 @@ describe('Accounts Store', () => {
       name: 'My Savings',
       type: 'savings',
       currency: 'USD',
-      balance: 5000,
+      openingBalance: 5000,
     })
 
     expect(account.name).toBe('My Savings')
     expect(account.type).toBe('savings')
     expect(account.id).toBeDefined()
+    // balance is derived: opening balance + no transactions yet
+    expect(account.balance).toBe(5000)
 
     const loaded = useAccountsStore.getState()
     expect(loaded.accounts).toHaveLength(1)
@@ -42,15 +50,34 @@ describe('Accounts Store', () => {
       name: 'Old Name',
       type: 'checking',
       currency: 'USD',
-      balance: 100,
+      openingBalance: 100,
     })
 
-    await store.update(account.id, { name: 'New Name', balance: 200 })
+    await store.update(account.id, { name: 'New Name', openingBalance: 200 })
 
     const dbRows = getTable('accounts')
     const updated = dbRows.find((r) => r.id === account.id)
     expect(updated?.name).toBe('New Name')
+    expect(updated?.opening_balance).toBe(200)
+    // balance re-derived from the new opening balance
     expect(updated?.balance).toBe(200)
+  })
+
+  it('rejects direct balance edits (balance is derived)', async () => {
+    const store = useAccountsStore.getState()
+    const account = await store.add({
+      name: 'Locked',
+      type: 'checking',
+      currency: 'USD',
+      openingBalance: 100,
+    })
+
+    // The type system forbids sending `balance`; simulate a regression that
+    // re-adds it and confirm the DB (mock) rejects it.
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.update(account.id, { balance: 999 } as any),
+    ).rejects.toThrow(/derived|opening_balance/i)
   })
 
   it('removes an account from the database', async () => {
@@ -59,7 +86,7 @@ describe('Accounts Store', () => {
       name: 'To Delete',
       type: 'cash',
       currency: 'USD',
-      balance: 0,
+      openingBalance: 0,
     })
 
     await store.remove(account.id)
@@ -69,9 +96,9 @@ describe('Accounts Store', () => {
 
   it('filters accounts by type', async () => {
     const store = useAccountsStore.getState()
-    await store.add({ name: 'Checking', type: 'checking', currency: 'USD', balance: 1000 })
-    await store.add({ name: 'Savings', type: 'savings', currency: 'USD', balance: 5000 })
-    await store.add({ name: 'Credit Card', type: 'credit', currency: 'USD', balance: -200 })
+    await store.add({ name: 'Checking', type: 'checking', currency: 'USD', openingBalance: 1000 })
+    await store.add({ name: 'Savings', type: 'savings', currency: 'USD', openingBalance: 5000 })
+    await store.add({ name: 'Credit Card', type: 'credit', currency: 'USD', openingBalance: -200 })
 
     const checking = store.getByType('checking')
     expect(checking).toHaveLength(1)
@@ -84,7 +111,7 @@ describe('Accounts Store', () => {
       name: 'Find Me',
       type: 'investment',
       currency: 'USD',
-      balance: 10000,
+      openingBalance: 10000,
     })
 
     const found = store.getById(account.id)
@@ -107,7 +134,7 @@ describe('Accounts Store', () => {
         name: 'Checking',
         type: 'checking',
         currency: 'USD',
-        balance: 1000,
+        openingBalance: 1000,
       })
       accountId = account.id
     })
@@ -370,6 +397,7 @@ describe('Transactions Store', () => {
           name: `Test Account ${id}`,
           type: 'checking',
           currency: 'USD',
+          opening_balance: 0,
           balance: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -378,7 +406,15 @@ describe('Transactions Store', () => {
     }
   })
 
-  it('adds a transaction with base currency', async () => {
+  it('converts a foreign-currency transaction to the reporting currency', async () => {
+    // EUR → USD at 1.08; fetch stubbed, no cache rows (date is historical → no cache write)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ result: 'success', rates: { USD: 1.08 } }),
+      }),
+    )
     const store = useTransactionsStore.getState()
     const txn = await store.add({
       accountId: 'acc-1',
@@ -386,20 +422,21 @@ describe('Transactions Store', () => {
       type: 'expense',
       amount: 42.5,
       currency: 'EUR',
-      baseAmount: 45.0,
-      baseCurrency: 'USD',
       date: new Date('2026-05-01'),
       description: 'Dinner',
     })
 
     expect(txn.amount).toBe(42.5)
     expect(txn.currency).toBe('EUR')
-    expect(txn.baseAmount).toBe(45.0)
+    expect(txn.baseAmount).toBe(45.9) // 42.5 × 1.08
     expect(txn.baseCurrency).toBe('USD')
+    expect(txn.fxRate).toBe(1.08)
+    expect(txn.fxDate).toBeTruthy()
+    expect(txn.baseAmountStale).toBe(false)
     expect(txn.description).toBe('Dinner')
   })
 
-  it('defaults baseAmount to amount when not provided', async () => {
+  it('stores identity conversions for same-currency transactions', async () => {
     const store = useTransactionsStore.getState()
     const txn = await store.add({
       accountId: 'acc-1',
@@ -412,6 +449,8 @@ describe('Transactions Store', () => {
 
     expect(txn.baseAmount).toBe(100)
     expect(txn.baseCurrency).toBe('USD')
+    expect(txn.fxRate).toBeNull()
+    expect(txn.baseAmountStale).toBe(false)
   })
 
   it('filters by date range', async () => {
@@ -598,6 +637,55 @@ describe('Budgets Store', () => {
     expect(budget.categoryIds).toHaveLength(2)
     const state = useBudgetsStore.getState()
     expect(state.budgets).toHaveLength(1)
+    // Associations are written to the constrained budget_categories table.
+    const assoc = getTable('budget_categories').map((r) => r.category_id)
+    expect(assoc).toHaveLength(2)
+    expect(assoc).toContain('cat-food')
+    expect(assoc).toContain('cat-drinks')
+  })
+
+  it('replaces category associations on update', async () => {
+    const store = useBudgetsStore.getState()
+    const budget = await store.add({
+      categoryIds: ['cat-1'],
+      name: 'Old Budget',
+      amount: 300,
+      period: 'yearly',
+      startDate: new Date('2026-01-01'),
+    })
+
+    await store.update(budget.id, { categoryIds: ['cat-2', 'cat-3'] })
+
+    const assoc = getTable('budget_categories')
+      .filter((r) => r.budget_id === budget.id)
+      .map((r) => r.category_id)
+    expect(assoc).toHaveLength(2)
+    expect(assoc).toContain('cat-2')
+    expect(assoc).toContain('cat-3')
+    expect(useBudgetsStore.getState().budgets[0].categoryIds).toEqual(['cat-2', 'cat-3'])
+  })
+
+  it('loads category associations into budgets', async () => {
+    getTable('budgets').push({
+      id: 'budget-1',
+      user_id: 'user-1',
+      name: 'Food Budget',
+      amount: 500,
+      period: 'monthly',
+      start_date: new Date('2026-01-01').toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    getTable('budget_categories').push(
+      { budget_id: 'budget-1', category_id: 'cat-food', user_id: 'user-1' },
+      { budget_id: 'budget-1', category_id: 'cat-drinks', user_id: 'user-1' },
+    )
+
+    await useBudgetsStore.getState().load()
+
+    const budget = useBudgetsStore.getState().budgets.find((b) => b.id === 'budget-1')
+    expect(budget).toBeDefined()
+    expect([...budget!.categoryIds].sort()).toEqual(['cat-drinks', 'cat-food'])
   })
 
   it('updates a budget in the database', async () => {
@@ -616,6 +704,28 @@ describe('Budgets Store', () => {
     const updated = dbRows.find((r) => r.id === budget.id)
     expect(updated?.amount).toBe(1000)
     expect(updated?.name).toBe('Updated Budget')
+  })
+
+  it('leaves prior associations intact when the replace fails', async () => {
+    const store = useBudgetsStore.getState()
+    const budget = await store.add({
+      categoryIds: ['cat-1'],
+      name: 'Steady Budget',
+      amount: 100,
+      period: 'monthly',
+      startDate: new Date('2026-01-01'),
+    })
+
+    failNextRpc('replace_budget_categories failed')
+    await expect(store.update(budget.id, { categoryIds: ['cat-2'] })).rejects.toThrow(
+      'replace_budget_categories failed',
+    )
+
+    // The old delete-then-insert flow would have wiped cat-1 on failure.
+    const assoc = getTable('budget_categories')
+      .filter((r) => r.budget_id === budget.id)
+      .map((r) => r.category_id)
+    expect(assoc).toEqual(['cat-1'])
   })
 
   it('removes a budget from the database', async () => {

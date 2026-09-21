@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Download, Upload, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,22 +16,17 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
+import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useAuth } from '@/auth/auth'
-import { supabase } from '@/supabase/client'
+import { restoreUserData, currentUserId } from '@/services/restore'
+import { exportAllData } from '@/services/export'
+import CategoriesView from '@/pages/categories/CategoriesView'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
-// Table names as used in Supabase (snake_case)
-const TABLES = [
-  'accounts',
-  'categories',
-  'transactions',
-  'budgets',
-  'exchange_rates',
-  'investment_plans',
-] as const
-
 export default function Settings() {
+  const { pathname } = useLocation()
+  const categoriesRef = useRef<HTMLDivElement>(null)
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const theme = useSettingsStore((s) => s.theme)
   const setBaseCurrency = useSettingsStore((s) => s.setBaseCurrency)
@@ -42,22 +38,21 @@ export default function Settings() {
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [exportMsg, setExportMsg] = useState('')
 
+  useEffect(() => {
+    if (pathname === '/app/categories') {
+      categoriesRef.current?.scrollIntoView({ block: 'start' })
+    }
+  }, [pathname])
+
   async function handleExport() {
     try {
       setExportStatus('idle')
       setExportMsg('')
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: Record<string, any> = {
-        version: 2,
-        exportedAt: new Date().toISOString(),
-      }
 
-      const results = await Promise.all(TABLES.map((table) => supabase.from(table).select('*')))
-      for (let i = 0; i < TABLES.length; i++) {
-        const { data: rows, error } = results[i]
-        if (error) throw error
-        data[TABLES[i]] = rows ?? []
-      }
+      // One service call: pages through every table (bounded by the API's
+      // max_rows per request), aborts on identity change or any partial read
+      // failure, and returns the v3 payload the restore path accepts.
+      const data = await exportAllData()
 
       const json = JSON.stringify(data, null, 2)
       const blob = new Blob([json], { type: 'application/json' })
@@ -76,61 +71,16 @@ export default function Settings() {
   }
 
   async function handleImport(file: File) {
+    const abort = () => new Error('Signed-in user changed; import aborted')
     try {
       setImportStatus('idle')
       setImportMsg('')
-      const text = await file.text()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data = JSON.parse(text) as Record<string, any>
 
-      if (!data.accounts || !data.transactions) {
-        throw new Error('Invalid export format: missing required tables (accounts, transactions)')
-      }
-
-      // Count total rows before starting destructive operations
-      let totalRows = 0
-      for (const table of TABLES) {
-        const rows = data[table]
-        if (rows?.length) {
-          totalRows += rows.length
-        }
-      }
-      if (totalRows > 10000) {
-        setImportStatus('error')
-        setImportMsg(
-          `File contains ${totalRows} rows. Maximum is 10,000. Please reduce the data and try again.`,
-        )
-        return
-      }
-
-      // Validate structure: check each table has arrays
-      for (const table of TABLES) {
-        const rows = data[table]
-        if (rows !== undefined && !Array.isArray(rows)) {
-          throw new Error(`Invalid export format: "${table}" must be an array`)
-        }
-      }
-
-      // Delete all existing rows from each table (parallel)
-      const deleteResults = await Promise.all(
-        TABLES.map((table) =>
-          supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        ),
-      )
-      for (const result of deleteResults) {
-        if (result.error) throw result.error
-      }
-
-      // Import data from each table (parallel)
-      const inserts = TABLES.filter((table) => data[table]?.length).map((table) =>
-        supabase.from(table).insert(data[table]),
-      )
-      if (inserts.length > 0) {
-        const insertResults = await Promise.all(inserts)
-        for (const result of insertResults) {
-          if (result.error) throw result.error
-        }
-      }
+      // One service call: validates the whole payload, then restores it in a
+      // single database transaction (restore_user_data RPC) that rolls back
+      // entirely on any error. Identity is captured once at the start and
+      // re-verified inside the service after every await and before the RPC.
+      const result = await restoreUserData(file)
 
       await Promise.all([
         useAccountsStore.getState().load(),
@@ -138,11 +88,11 @@ export default function Settings() {
         useTransactionsStore.getState().load(),
         useBudgetsStore.getState().load(),
         useInvestmentPlansStore.getState().load(),
+        useRecurringTransactionsStore.getState().load(),
       ])
+      if ((await currentUserId()) !== result.restoredFor) throw abort()
       setImportStatus('success')
-      setImportMsg(
-        `Imported ${data.accounts?.length ?? 0} accounts, ${data.transactions?.length ?? 0} transactions.`,
-      )
+      setImportMsg(`Imported ${result.accounts} accounts, ${result.transactions} transactions.`)
     } catch (e) {
       setImportStatus('error')
       setImportMsg(e instanceof Error ? e.message : 'Failed to import')
@@ -161,7 +111,8 @@ export default function Settings() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Base Currency</h2>
           <p className="text-sm text-muted-foreground">
-            All reports and summaries will use this currency.
+            All reports and summaries will use this currency. Transactions keep the exchange rate
+            they were saved with; totals include only amounts already converted to this currency.
           </p>
           <Select
             value={baseCurrency}
@@ -206,6 +157,11 @@ export default function Settings() {
           </div>
         </div>
 
+        {/* Categories */}
+        <div ref={categoriesRef} id="categories" className="scroll-mt-20">
+          <CategoriesView />
+        </div>
+
         {/* Data Management */}
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Data Management</h2>
@@ -236,7 +192,13 @@ export default function Settings() {
         <div className="rounded-xl border bg-card p-5 space-y-3">
           <h2 className="font-semibold">Account</h2>
           <p className="text-sm text-muted-foreground">{user?.email}</p>
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void signOut().catch((e: Error) => console.error('Sign-out failed:', e.message))
+            }
+          >
             Sign Out
           </Button>
         </div>

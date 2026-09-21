@@ -56,7 +56,7 @@ export default function TopHeader({ className }: { className?: string }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => {
-              signOut()
+              void signOut().catch((e: Error) => console.error('Sign-out failed:', e.message))
             }}
           >
             <LogOut className="size-4" />

@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { Account, AccountType } from '@/types'
+import { formatCurrency } from '@/lib/currency'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'investment', 'credit', 'cash']
@@ -24,7 +25,7 @@ export interface AccountFormData {
   name: string
   type: AccountType
   currency: string
-  balance: string
+  openingBalance: string
   notes: string
 }
 
@@ -35,6 +36,12 @@ interface AccountDialogProps {
   form: AccountFormData
   onFormChange: (form: AccountFormData) => void
   onSave: () => void
+  /**
+   * 20260918000001_input_invariants.sql pins an account's currency while
+   * transactions reference it; the field is disabled and annotated instead of
+   * letting the user hit the database's foreign-key rejection.
+   */
+  currencyLocked?: boolean
 }
 
 export function AccountDialog({
@@ -44,6 +51,7 @@ export function AccountDialog({
   form,
   onFormChange,
   onSave,
+  currencyLocked = false,
 }: AccountDialogProps) {
   return (
     <Dialog
@@ -91,12 +99,13 @@ export function AccountDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label>Currency</Label>
+              <Label htmlFor="acct-currency">Currency</Label>
               <Select
                 value={form.currency}
+                disabled={currencyLocked}
                 onValueChange={(v) => onFormChange({ ...form, currency: v ?? 'USD' })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="acct-currency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -107,19 +116,36 @@ export function AccountDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {currencyLocked && (
+                <p className="text-xs text-muted-foreground">
+                  Currency can&apos;t be changed while transactions reference this account.
+                </p>
+              )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="acct-balance">Balance</Label>
+              <Label htmlFor="acct-balance">Opening balance</Label>
               <Input
                 id="acct-balance"
                 type="number"
                 step="0.01"
-                value={form.balance}
-                onChange={(e) => onFormChange({ ...form, balance: e.target.value })}
+                value={form.openingBalance}
+                onChange={(e) => onFormChange({ ...form, openingBalance: e.target.value })}
                 placeholder="0.00"
               />
             </div>
           </div>
+          {editing && (
+            <div className="grid gap-2">
+              <Label className="text-muted-foreground">Current balance (derived)</Label>
+              <p className="text-sm tabular-nums">
+                {formatCurrency(editing.balance, editing.currency)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                The current balance is the opening balance plus this account&apos;s transactions. To
+                correct it, adjust the opening balance.
+              </p>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

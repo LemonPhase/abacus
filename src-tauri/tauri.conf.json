@@ -20,7 +20,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'sha256-clo7OpZshgb9kYzn+59/7RWwyGQRCtw+bdk1+W0Abmo='; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://*.supabase.co wss://*.supabase.co https://open.er-api.com; worker-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws://localhost:5173 http://localhost:5173 ws://127.0.0.1:54321 http://127.0.0.1:54321 https://*.supabase.co wss://*.supabase.co https://open.er-api.com ipc: http://ipc.localhost; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
     }
   },
   "bundle": {

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { mapKeysToCamel, mapKeysToSnake } from '@/lib/case'
-import { createCrudSlice } from '@/stores/crudStore'
+import { createCrudSlice, type LoadOptions } from '@/stores/crudStore'
 import type { Category, NewCategory, CategoryKind } from '@/types'
 import type { Database } from '@/supabase/database.types'
 
@@ -27,7 +27,11 @@ interface CategoriesState {
   error: string | null
   _unsub: (() => void) | null
   clearError: () => void
-  load: (options?: { limit?: number; offset?: number }) => Promise<void>
+  load: (options?: LoadOptions) => Promise<void>
+  loadMore: () => Promise<void>
+  loadingMore: boolean
+  hasMore: boolean
+  total: number | null
   add: (data: NewCategory) => Promise<Category>
   update: (id: string, data: Partial<NewCategory>) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -38,6 +42,7 @@ interface CategoriesState {
   /** Swap the category's sort_order with its adjacent sibling. */
   reorder: (id: string, direction: 'up' | 'down') => Promise<void>
   unsubscribe: () => void
+  reset: () => void
 }
 
 function getSiblings(state: CategoriesState, cat: Category): Category[] {

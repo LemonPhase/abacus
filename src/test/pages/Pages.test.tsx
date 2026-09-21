@@ -8,7 +8,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import Accounts from '@/pages/Accounts'
-import Categories from '@/pages/Categories'
+import CategoriesView from '@/pages/categories/CategoriesView'
 import Transactions from '@/pages/Transactions'
 import Budgets from '@/pages/Budgets'
 
@@ -25,6 +25,8 @@ function seedAccount() {
     name: 'Test Account',
     type: 'checking',
     currency: 'USD',
+
+    opening_balance: 0,
     balance: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -127,6 +129,7 @@ describe('Accounts Page', () => {
       name: 'Savings',
       type: 'savings',
       currency: 'USD',
+      opening_balance: 5000,
       balance: 5000,
       notes: null,
       created_at: new Date().toISOString(),
@@ -136,20 +139,20 @@ describe('Accounts Page', () => {
     renderWithRouter(<Accounts />)
 
     await waitFor(() => {
-      const editButtons = screen.getAllByRole('button', { name: '' })
-      expect(editButtons.length).toBeGreaterThanOrEqual(2)
+      expect(screen.getByRole('button', { name: 'Edit Savings' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete Savings' })).toBeInTheDocument()
     })
   })
 })
 
-describe('Categories Page', () => {
+describe('Categories View', () => {
   beforeEach(() => {
     getTable('categories').length = 0
     useCategoriesStore.setState({ categories: [], loading: false, error: null, _unsub: null })
   })
 
   it('shows expense and income tabs', async () => {
-    renderWithRouter(<Categories />)
+    renderWithRouter(<CategoriesView />)
     await waitFor(() => {
       expect(screen.getByText('Expenses')).toBeInTheDocument()
       expect(screen.getByText('Income')).toBeInTheDocument()
@@ -157,7 +160,7 @@ describe('Categories Page', () => {
   })
 
   it('has an add category button', async () => {
-    renderWithRouter(<Categories />)
+    renderWithRouter(<CategoriesView />)
     await waitFor(() => {
       expect(screen.getByText('Add Category')).toBeInTheDocument()
     })
@@ -174,7 +177,7 @@ describe('Categories Page', () => {
       updated_at: new Date().toISOString(),
     })
 
-    renderWithRouter(<Categories />)
+    renderWithRouter(<CategoriesView />)
 
     await waitFor(() => {
       expect(screen.getByText('Food')).toBeInTheDocument()
@@ -193,7 +196,7 @@ describe('Categories Page', () => {
       updated_at: new Date().toISOString(),
     })
 
-    renderWithRouter(<Categories />)
+    renderWithRouter(<CategoriesView />)
 
     await waitFor(() => {
       expect(screen.getByText('Income')).toBeInTheDocument()
@@ -320,10 +323,14 @@ describe('Budgets Page', () => {
       name: 'Food Budget',
       amount: 500,
       period: 'monthly',
-      category_ids: ['cat-food'],
       start_date: new Date('2026-01-01').toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    })
+    getTable('budget_categories').push({
+      budget_id: 'budget-test-1',
+      category_id: 'cat-food',
+      user_id: 'user-1',
     })
 
     renderWithRouter(<Budgets />)

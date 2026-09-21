@@ -132,10 +132,24 @@ test.describe('Settings — base currency propagation', () => {
       .click()
     await expect(currencyCard.locator('[data-slot="select-trigger"]')).toContainText('GBP')
 
-    // Go back to reports — values should now use £ prefix.
+    // Reporting-currency change behavior: transactions converted for the old
+    // reporting currency (USD) are excluded from totals until re-saved, and a
+    // notice says so. Switching back to USD restores the identity values.
     await page.goto('/app/reports')
-    await expect(page.getByText('Income', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText(/£3,000/).first()).toBeVisible()
+    await expect(page.getByText(/not yet converted to GBP/)).toBeVisible()
+    await expect(page.getByText(/£0/).first()).toBeVisible()
+
+    await page.goto('/app/settings')
+    const currencyCard2 = page.getByText('Base Currency').locator('..')
+    await currencyCard2.locator('[data-slot="select-trigger"]').click()
+    await page
+      .locator('[data-slot="select-content"][data-open] [data-slot="select-item"]')
+      .filter({ hasText: 'USD' })
+      .click()
+    await expect(currencyCard2.locator('[data-slot="select-trigger"]')).toContainText('USD')
+
+    await page.goto('/app/reports')
+    await expect(page.getByText(/\$3,000/).first()).toBeVisible()
   })
 
   test('theme switcher toggles visual mode', async ({ page }) => {

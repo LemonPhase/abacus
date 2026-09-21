@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 import {
   test,
   publicTest,
@@ -6,6 +8,7 @@ import {
   deleteTestUser,
   deleteUserByEmail,
 } from './fixtures'
+import { fetchRecoveryLink } from './mailpit'
 
 /**
  * Auth flow specs. These run against real GoTrue — sign-in / sign-up / reset
@@ -144,6 +147,50 @@ publicTest.describe('Forgot password', () => {
     await expect(page.getByText(/If an account exists for/)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Back to sign in' })).toBeVisible()
   })
+
+  publicTest(
+    'recovery link redirects to /auth/reset-password and sets a new password',
+    async ({ page }) => {
+      const user = await createTestUser()
+      try {
+        const client = createClient(
+          process.env.SUPABASE_URL!,
+          process.env.SUPABASE_PUBLISHABLE_KEY!,
+          {
+            auth: { autoRefreshToken: false, persistSession: false },
+          },
+        )
+        const { error } = await client.auth.resetPasswordForEmail(user.email, {
+          redirectTo: `http://localhost:${process.env.E2E_PORT ?? '5173'}/auth/reset-password`,
+        })
+        expect(error).toBeNull()
+
+        const link = await fetchRecoveryLink(user.email)
+
+        // The email deep-links into the SPA (/auth/reset-password#access_token=…).
+        // On a static host this only resolves when the deployment serves the app
+        // shell for extensionless paths — the routing config under test (#6).
+        // Resolve GoTrue's verify redirect server-side (node fetch) and navigate
+        // the browser to the SPA deep link it produces: a top-level navigation
+        // to the API port itself is refused on CI runners even though page-level
+        // fetches to the same port succeed.
+        const verify = await fetch(link, { redirect: 'manual' })
+        expect([302, 303]).toContain(verify.status)
+        const deepLink = verify.headers.get('location')
+        expect(deepLink).toBeTruthy()
+        const response = await page.goto(deepLink!)
+        expect(response?.status()).toBe(200)
+        await expect(page).toHaveURL(/\/auth\/reset-password/)
+        await expect(page.locator('input[id="password"]')).toBeVisible()
+
+        await page.locator('input[id="password"]').fill('brand-new-password-456')
+        await page.getByRole('button', { name: 'Set new password' }).click()
+        await expect(page.getByText('Password updated')).toBeVisible()
+      } finally {
+        await deleteTestUser(user.id)
+      }
+    },
+  )
 })
 
 test.describe('Sign out', () => {

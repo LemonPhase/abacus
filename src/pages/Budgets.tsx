@@ -13,7 +13,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Budget, BudgetPeriod } from '@/types'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency, reliableBaseAmount } from '@/lib/currency'
 import { getBudgetStatus, type BudgetStatus } from '@/lib/budget'
 import { BudgetDialog, type BudgetFormData } from '@/pages/budgets/BudgetDialog'
 import { BudgetList } from '@/pages/budgets/BudgetList'
@@ -92,14 +92,17 @@ export default function Budgets() {
           const d = new Date(t.date)
           return d >= start && d <= end
         })
-        .reduce((sum, t) => sum + t.baseAmount, 0)
+        .reduce((sum, t) => {
+          const base = reliableBaseAmount(t, baseCurrency)
+          return base === null ? sum : sum + base
+        }, 0)
 
       const pct = budget.amount > 0 ? (spent / budget.amount) * 100 : 0
       const status = getBudgetStatus(pct)
 
       return { spent, percentage: pct, status }
     },
-    [transactions, currentPeriod],
+    [transactions, currentPeriod, baseCurrency],
   )
 
   function getCategoryName(id: string) {
@@ -201,6 +204,23 @@ export default function Budgets() {
     return { spent: totalSpent, total: totalBudget, percentage: pct }
   }, [budgets, computeProgress])
 
+  // Unconverted transactions touching any budget's period/categories are
+  // skipped in spend calculations — surface the count like Dashboard/Reports.
+  const unconvertedCount = useMemo(() => {
+    const skipped = new Set<string>()
+    for (const b of budgets) {
+      const { start, end } = getPeriodBounds(currentPeriod, b.period)
+      for (const t of transactions) {
+        if (t.type !== 'expense') continue
+        if (!t.categoryId || !b.categoryIds.includes(t.categoryId)) continue
+        const d = new Date(t.date)
+        if (d < start || d > end) continue
+        if (reliableBaseAmount(t, baseCurrency) === null) skipped.add(t.id)
+      }
+    }
+    return skipped.size
+  }, [budgets, transactions, currentPeriod, baseCurrency])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -213,6 +233,14 @@ export default function Budgets() {
           Add Budget
         </Button>
       </div>
+
+      {unconvertedCount > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {unconvertedCount} transaction{unconvertedCount > 1 ? 's' : ''} not yet converted to{' '}
+          {baseCurrency} {unconvertedCount > 1 ? 'are' : 'is'} excluded from budget spend; edit them
+          to convert.
+        </p>
+      )}
 
       {totalBudgetProgress && (
         <div className="rounded-xl border bg-card p-6">
