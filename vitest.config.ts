@@ -9,6 +9,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Hermetic tests: never load the developer's local .env (VITE_APP_URL etc.),
+  // so test expectations can't drift with machine configuration.
+  envDir: path.resolve(__dirname, 'src/test/env'),
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

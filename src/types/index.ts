@@ -152,6 +152,9 @@ export interface UserSettings {
   baseCurrency: string
   theme: ThemeMode
   onboarded: boolean
+  aiApiKey?: string
+  aiModel?: string
+  aiBaseUrl?: string
 }
 
 // balance is derived by the database (opening_balance + ledger effects) —
@@ -196,3 +199,46 @@ export interface RecurringTransaction {
 export type NewRecurringTransaction = Omit<RecurringTransaction, 'id' | 'createdAt' | 'updatedAt'>
 
 export type NewBudget = Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>
+
+// --- Bank statement PDF import (ephemeral, not persisted) ---
+
+export type ExtractedKind = 'purchase' | 'income' | 'transfer' | 'fee' | 'refund' | 'interest'
+
+export interface ExtractedTransaction {
+  date: string // ISO yyyy-mm-dd
+  description: string
+  merchant: string
+  amount: number // always positive
+  direction: 'debit' | 'credit'
+  kind: ExtractedKind
+  pending: boolean
+  confidence: 'high' | 'medium' | 'low'
+  categoryId: string | null
+}
+
+export interface ExtractedStatement {
+  bankName: string
+  accountHint: string
+  periodStart: string
+  periodEnd: string
+  /** ISO code; null = the model didn't return one (fall back to account currency). */
+  currency: string | null
+  /** null = not found in the model response → reconciliation unavailable. */
+  openingBalance: number | null
+  closingBalance: number | null
+  /** Rows dropped during parsing because they were unreadable (JSON-mode models). */
+  skippedCount?: number
+  transactions: ExtractedTransaction[]
+}
+
+export type ReviewFlag = 'pending' | 'duplicate' | 'lowConfidence' | 'uncategorized'
+
+export interface ImportReviewRow {
+  id: string
+  extraction: ExtractedTransaction
+  type: TransactionKind
+  categoryId: string | null
+  counterpartAccountId: string | null // transfers only
+  included: boolean
+  flags: ReviewFlag[]
+}

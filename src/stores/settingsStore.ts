@@ -7,6 +7,8 @@ const defaultSettings: UserSettings = {
   baseCurrency: 'USD',
   theme: 'system',
   onboarded: false,
+  aiBaseUrl: '',
+  aiModel: 'gpt-4o-mini',
 }
 
 function loadSettings(): UserSettings {
@@ -30,6 +32,7 @@ interface SettingsState extends UserSettings {
   setBaseCurrency: (currency: string) => void
   setTheme: (theme: ThemeMode) => void
   setOnboarded: (value: boolean) => void
+  setAiSettings: (patch: Partial<Pick<UserSettings, 'aiApiKey' | 'aiModel' | 'aiBaseUrl'>>) => void
   reset: () => void
 }
 
@@ -59,8 +62,15 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     set({ onboarded: value })
   },
 
+  setAiSettings: (patch) => {
+    const updated = { ...get(), ...patch }
+    saveSettings(updated)
+    set(patch)
+  },
+
   reset: () => {
     saveSettings(defaultSettings)
-    set(defaultSettings)
+    // Explicit undefineds: zustand set() merges, so optional keys would survive otherwise.
+    set({ ...defaultSettings, aiApiKey: undefined })
   },
 }))

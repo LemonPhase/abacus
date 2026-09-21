@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
     "papaparse": "^5.5.3",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router-dom": "^7.15.0",
@@ -73,5 +74,8 @@
     "*.{css,json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "allowScripts": {
+    "supabase@2.98.2": true
   }
 }
