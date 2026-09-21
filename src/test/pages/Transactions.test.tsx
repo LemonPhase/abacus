@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import Transactions from '@/pages/Transactions'
 import { TransactionFilters } from '@/pages/transactions/TransactionFilters'
 import { TransactionDialog } from '@/pages/transactions/TransactionDialog'
@@ -9,13 +9,23 @@ import { CsvImportDialog } from '@/pages/transactions/CsvImportDialog'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Account, Category } from '@/types'
 
-function renderWithRouter(ui: React.ReactElement) {
+function RoutePath() {
+  return <output data-testid="pathname">{useLocation().pathname}</output>
+}
+
+function renderWithRouter(ui: React.ReactElement, route = '/app/transactions') {
   return {
     user: userEvent.setup(),
-    ...render(<MemoryRouter>{ui}</MemoryRouter>),
+    ...render(
+      <MemoryRouter initialEntries={[route]}>
+        {ui}
+        <RoutePath />
+      </MemoryRouter>,
+    ),
   }
 }
 
@@ -46,6 +56,7 @@ beforeEach(() => {
   useAccountsStore.setState({ accounts: [], loading: false, error: null, _unsub: null })
   useCategoriesStore.setState({ categories: [], loading: false, error: null, _unsub: null })
   useTransactionsStore.setState({ transactions: [], loading: false, error: null, _unsub: null })
+  useRecurringTransactionsStore.setState({ items: [], loading: false, error: null, _unsub: null })
 })
 
 describe('Transactions Page', () => {
@@ -65,6 +76,28 @@ describe('Transactions Page', () => {
     await user.click(screen.getByRole('button', { name: 'Import CSV' }))
 
     expect(await screen.findByText('Click to upload a CSV file')).toBeInTheDocument()
+  })
+
+  it('renders the recurring view when the Recurring segment is selected', async () => {
+    const { user } = renderWithRouter(<Transactions />)
+
+    await screen.findByText('Transactions')
+    await user.click(screen.getByRole('tab', { name: 'Recurring' }))
+
+    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/recurring')
+    expect(screen.getByRole('button', { name: 'Add Recurring' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'All' }))
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/transactions')
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('renders the recurring view for the /app/recurring deep link', async () => {
+    renderWithRouter(<Transactions />, '/app/recurring')
+
+    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Recurring' })).toHaveAttribute('aria-selected', 'true')
   })
 })
 

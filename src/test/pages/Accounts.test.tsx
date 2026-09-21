@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import Accounts from '@/pages/Accounts'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { getTable, resetAllTables } from '@/test/supabase-mock'
 import type { Account } from '@/types'
 
@@ -32,10 +33,15 @@ function seedAccount(account: Account) {
   })
 }
 
-function renderPage() {
+function RoutePath() {
+  return <output data-testid="pathname">{useLocation().pathname}</output>
+}
+
+function renderPage(route = '/app/accounts') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[route]}>
       <Accounts />
+      <RoutePath />
     </MemoryRouter>,
   )
 }
@@ -179,5 +185,41 @@ describe('Accounts page — opening balance semantics', () => {
       expect(useAccountsStore.getState().accounts[0]?.balance).toBe(1300)
     })
     expect(useAccountsStore.getState().accounts[0]?.openingBalance).toBe(1300)
+  })
+
+  it('embeds the investment plans view under the Investments segment', async () => {
+    useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
+    const user = userEvent.setup()
+    renderPage()
+
+    // Let the accounts load settle so the tab click isn't racing a re-render.
+    await screen.findByText('No accounts yet')
+
+    await user.click(screen.getByRole('tab', { name: 'Investments' }))
+
+    // The embedded view is lazy-loaded; waitFor rides out the chunk load and
+    // any Suspense retry that could detach the first matching node.
+    await waitFor(() => {
+      expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/investments')
+    expect(screen.getByRole('button', { name: 'Add Investment' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Accounts' }))
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/accounts')
+    expect(screen.getByRole('tab', { name: 'Accounts' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('renders the investments view for the /app/investments deep link', async () => {
+    useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
+    renderPage('/app/investments')
+
+    await waitFor(() => {
+      expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('tab', { name: 'Investments' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   })
 })

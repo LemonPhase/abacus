@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import Investments from '@/pages/Investments'
+import InvestmentsView from '@/pages/investments/InvestmentsView'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
@@ -15,16 +15,15 @@ beforeEach(() => {
   useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
 })
 
-describe('Investments Page', () => {
-  it('renders the page header and action', () => {
-    renderWithRouter(<Investments />)
+describe('Investments View', () => {
+  it('renders the action row', () => {
+    renderWithRouter(<InvestmentsView />)
 
-    expect(screen.getByText('Investments')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add Investment' })).toBeInTheDocument()
   })
 
   it('shows empty state when there are no plans', async () => {
-    renderWithRouter(<Investments />)
+    renderWithRouter(<InvestmentsView />)
 
     await waitFor(() => {
       expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
@@ -37,7 +36,7 @@ describe('Investments Page', () => {
   it('loads investment plans on mount', async () => {
     const loadPlans = vi.spyOn(useInvestmentPlansStore.getState(), 'load').mockResolvedValue()
 
-    renderWithRouter(<Investments />)
+    renderWithRouter(<InvestmentsView />)
 
     await waitFor(() => {
       expect(loadPlans).toHaveBeenCalled()

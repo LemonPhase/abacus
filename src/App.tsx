@@ -17,15 +17,12 @@ import ResetPassword from '@/pages/ResetPassword'
 import Dashboard from '@/pages/Dashboard'
 import Accounts from '@/pages/Accounts'
 import Transactions from '@/pages/Transactions'
-import RecurringTransactions from '@/pages/RecurringTransactions'
 import Budgets from '@/pages/Budgets'
-import Categories from '@/pages/Categories'
 import NotFound from '@/pages/NotFound'
 
 // Lazy-loaded routes — these pages use recharts (~400 KB) or are rarely visited.
 // Splitting them reduces the initial JS bundle significantly.
 const Reports = lazy(() => import('@/pages/Reports'))
-const Investments = lazy(() => import('@/pages/Investments'))
 const Settings = lazy(() => import('@/pages/Settings'))
 
 function PageFallback() {
@@ -79,12 +76,13 @@ export default function App() {
               <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
+              {/* Absorbed pages share a host; each host reads the URL to select its segment. */}
               <Route path="transactions" element={<Transactions />} />
-              <Route path="recurring" element={<RecurringTransactions />} />
+              <Route path="recurring" element={<Transactions />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />
-              <Route path="categories" element={<Categories />} />
-              <Route path="investments" element={<Investments />} />
+              <Route path="categories" element={<Settings />} />
+              <Route path="investments" element={<Accounts />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
