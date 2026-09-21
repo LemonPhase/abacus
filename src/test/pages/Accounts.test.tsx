@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import Accounts from '@/pages/Accounts'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
@@ -33,10 +33,15 @@ function seedAccount(account: Account) {
   })
 }
 
-function renderPage() {
+function RoutePath() {
+  return <output data-testid="pathname">{useLocation().pathname}</output>
+}
+
+function renderPage(route = '/app/accounts') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[route]}>
       <Accounts />
+      <RoutePath />
     </MemoryRouter>,
   )
 }
@@ -197,19 +202,24 @@ describe('Accounts page — opening balance semantics', () => {
     await waitFor(() => {
       expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
     })
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/investments')
     expect(screen.getByRole('button', { name: 'Add Investment' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Accounts' }))
+    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/accounts')
+    expect(screen.getByRole('tab', { name: 'Accounts' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('renders the investments view for the /app/investments deep link', async () => {
     useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
-    render(
-      <MemoryRouter>
-        <Accounts initialTab="investments" />
-      </MemoryRouter>,
-    )
+    renderPage('/app/investments')
 
     await waitFor(() => {
       expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
     })
+    expect(screen.getByRole('tab', { name: 'Investments' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
   })
 })

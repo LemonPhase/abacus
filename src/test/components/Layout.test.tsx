@@ -36,7 +36,12 @@ describe('MobileNav', () => {
   it('highlights the host tab on absorbed routes (recurring → Transactions)', () => {
     renderWithRouter(<MobileNav />, { route: '/app/recurring' })
     expect(screen.getByRole('link', { name: 'Transactions' }).className).toContain('text-primary')
+    expect(screen.getByRole('link', { name: 'Transactions' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
     expect(screen.getByRole('link', { name: 'Home' }).className).not.toContain('text-primary')
+    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
   it('highlights Settings on the absorbed categories route', () => {

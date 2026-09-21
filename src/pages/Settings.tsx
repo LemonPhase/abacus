@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Download, Upload, Sun, Moon, Monitor } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,6 +25,8 @@ import CategoriesView from '@/pages/categories/CategoriesView'
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
 export default function Settings() {
+  const { pathname } = useLocation()
+  const categoriesRef = useRef<HTMLDivElement>(null)
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const theme = useSettingsStore((s) => s.theme)
   const setBaseCurrency = useSettingsStore((s) => s.setBaseCurrency)
@@ -34,6 +37,12 @@ export default function Settings() {
   const [importMsg, setImportMsg] = useState('')
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [exportMsg, setExportMsg] = useState('')
+
+  useEffect(() => {
+    if (pathname === '/app/categories') {
+      categoriesRef.current?.scrollIntoView({ block: 'start' })
+    }
+  }, [pathname])
 
   async function handleExport() {
     try {
@@ -149,7 +158,9 @@ export default function Settings() {
         </div>
 
         {/* Categories */}
-        <CategoriesView />
+        <div ref={categoriesRef} id="categories" className="scroll-mt-20">
+          <CategoriesView />
+        </div>
 
         {/* Data Management */}
         <div className="rounded-xl border bg-card p-5 space-y-3">

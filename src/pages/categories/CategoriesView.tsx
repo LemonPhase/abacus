@@ -196,10 +196,10 @@ export default function CategoriesView() {
     : categories.filter((c) => c.type === form.type && !c.parentId)
 
   return (
-    <div className="rounded-xl border bg-card p-5 space-y-3">
+    <div className="rounded-xl border border-border/30 bg-card p-5 text-card-foreground space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold">Categories</h2>
+          <h2 className="font-semibold tracking-tight">Categories</h2>
           <p className="text-sm text-muted-foreground">
             Organize your income and expense categories.
           </p>

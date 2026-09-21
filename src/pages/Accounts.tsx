@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
 import { AccountDialog, type AccountFormData } from '@/pages/accounts/AccountDialog'
 import { Button } from '@/components/ui/button'
@@ -33,8 +34,6 @@ const TYPE_COLORS: Record<AccountType, string> = {
   cash: 'outline',
 }
 
-type AccountsTab = 'accounts' | 'investments'
-
 // Lazy: the embedded investments view pulls in recharts (~400 KB) — keep it
 // out of the main bundle exactly like the old standalone page route did.
 const InvestmentsView = lazy(() => import('@/pages/investments/InvestmentsView'))
@@ -47,12 +46,11 @@ function ViewFallback() {
   )
 }
 
-/**
- * Host page for accounts and investment plans. `initialTab` deep-links an
- * absorbed segment: /app/investments renders this page with Investments active.
- */
-export default function Accounts({ initialTab = 'accounts' }: { initialTab?: AccountsTab }) {
-  const [tab, setTab] = useState<AccountsTab>(initialTab)
+/** Host page for accounts and investment plans, with the URL selecting the segment. */
+export default function Accounts() {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const tab = pathname === '/app/investments' ? 'investments' : 'accounts'
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const getEmptyForm = (): AccountFormData => ({
     name: '',
@@ -160,7 +158,12 @@ export default function Accounts({ initialTab = 'accounts' }: { initialTab?: Acc
       </div>
 
       {/* Accounts | Investments — investments live here as a segment (mobile IA consolidation) */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as AccountsTab)}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          navigate(value === 'investments' ? '/app/investments' : '/app/accounts')
+        }
+      >
         <TabsList>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
           <TabsTrigger value="investments">Investments</TabsTrigger>

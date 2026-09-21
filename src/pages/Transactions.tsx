@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, Pencil, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,8 +38,6 @@ import { CsvImportDialog, type CsvMappedRow } from '@/pages/transactions/CsvImpo
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import RecurringTransactionsView from '@/pages/recurring/RecurringTransactionsView'
 
-type TransactionTab = 'all' | 'recurring'
-
 function formatDate(d: Date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -67,12 +65,11 @@ const emptyTxForm: TxFormData = {
   toAccountId: '',
 }
 
-/**
- * Host page for all transaction data. `initialTab` deep-links an absorbed
- * segment: /app/recurring renders this page with the Recurring view active.
- */
-export default function Transactions({ initialTab = 'all' }: { initialTab?: TransactionTab }) {
-  const [tab, setTab] = useState<TransactionTab>(initialTab)
+/** Host page for all transactions and recurring schedules, selected by the URL. */
+export default function Transactions() {
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const tab = pathname === '/app/recurring' ? 'recurring' : 'all'
   const transactions = useTransactionsStore((s) => s.transactions)
   const loading = useTransactionsStore((s) => s.loading)
   const loadingMore = useTransactionsStore((s) => s.loadingMore)
@@ -434,7 +431,12 @@ export default function Transactions({ initialTab = 'all' }: { initialTab?: Tran
       </div>
 
       {/* All | Recurring — recurring lives here as a segment (mobile IA consolidation) */}
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TransactionTab)}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) =>
+          navigate(value === 'recurring' ? '/app/recurring' : '/app/transactions')
+        }
+      >
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="recurring">Recurring</TabsTrigger>

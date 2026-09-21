@@ -257,7 +257,7 @@ export default function Dashboard() {
         {/* Reports are absorbed into Home on mobile — desktop has the sidebar link. */}
         <Link
           to="/app/reports"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground md:hidden"
+          className="inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
         >
           <BarChart3 className="size-4" />
           Full reports

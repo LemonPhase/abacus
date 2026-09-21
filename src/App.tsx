@@ -75,22 +75,14 @@ export default function App() {
             >
               <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
-              <Route path="accounts" element={<Accounts key="accounts" />} />
-              {/* Consolidated IA: absorbed pages deep-link into their host page
-                  with the matching segment pre-selected (keys force a remount
-                  so host page state follows the URL). */}
-              <Route path="transactions" element={<Transactions key="tx-all" />} />
-              <Route
-                path="recurring"
-                element={<Transactions key="tx-recurring" initialTab="recurring" />}
-              />
+              <Route path="accounts" element={<Accounts />} />
+              {/* Absorbed pages share a host; each host reads the URL to select its segment. */}
+              <Route path="transactions" element={<Transactions />} />
+              <Route path="recurring" element={<Transactions />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />
               <Route path="categories" element={<Settings />} />
-              <Route
-                path="investments"
-                element={<Accounts key="accounts-investments" initialTab="investments" />}
-              />
+              <Route path="investments" element={<Accounts />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

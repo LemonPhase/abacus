@@ -15,8 +15,9 @@ export default function MobileNav() {
             <Link
               key={to}
               to={to}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 transition-colors duration-200',
+                'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -27,7 +28,10 @@ export default function MobileNav() {
                 )}
               >
                 <Icon
-                  className={cn('size-5 transition-transform duration-200', isActive && 'scale-110')}
+                  className={cn(
+                    'size-5 transition-transform duration-200',
+                    isActive && 'scale-110',
+                  )}
                 />
               </span>
               <span
