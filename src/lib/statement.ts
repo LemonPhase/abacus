@@ -3,8 +3,8 @@ import type {
   ExtractedKind,
   ExtractedStatement,
   ExtractedTransaction,
+  ImportTransaction,
   ImportReviewRow,
-  NewTransaction,
   TransactionKind,
 } from '@/types'
 
@@ -144,7 +144,7 @@ function req(obj: Record<string, unknown>, key: string, where: string): unknown 
 }
 
 /** Strict shape + real calendar validity (no 2025-02-31 rolling into March). */
-function isValidCalendarDate(s: string): boolean {
+export function isValidCalendarDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
   const year = Number(s.slice(0, 4))
   const month = Number(s.slice(5, 7))
@@ -172,17 +172,14 @@ export function parseExtraction(raw: string): ExtractedStatement {
     throw new StatementParseError('bad-type', `too many transactions (${txsRaw.length})`)
   }
 
-  // Lenient JSON-mode endpoints (e.g. DeepSeek json_object) don't enforce the
-  // schema, so repair what is safe, skip-and-count what isn't. One bad row
-  // must not destroy a minute-long extraction.
+  // Lenient JSON-mode endpoints may ignore the schema. Repair safe variants,
+  // but reject unreadable rows so a partial statement is never imported.
   const transactions: ExtractedTransaction[] = []
-  let skippedCount = 0
 
   for (let i = 0; i < txsRaw.length; i++) {
     const t = txsRaw[i]
     if (t === null || typeof t !== 'object' || Array.isArray(t)) {
-      skippedCount++
-      continue
+      throw new StatementParseError('bad-type', `transactions[${i}] must be an object`)
     }
     const tx = t as Record<string, unknown>
 
@@ -193,8 +190,7 @@ export function parseExtraction(raw: string): ExtractedStatement {
     const date = tx.date
     const dateOk = typeof date === 'string' && isValidCalendarDate(date)
     if (!dateOk || !(amount > 0)) {
-      skippedCount++
-      continue
+      throw new StatementParseError('bad-type', `transactions[${i}] needs a valid date and amount`)
     }
 
     // Direction/kind are cross-repairable; if neither is usable the row is unreadable.
@@ -213,8 +209,7 @@ export function parseExtraction(raw: string): ExtractedStatement {
       kind = direction === 'debit' ? 'purchase' : 'income'
     }
     if (!direction || !kind) {
-      skippedCount++
-      continue
+      throw new StatementParseError('bad-type', `transactions[${i}] needs a direction and kind`)
     }
 
     // Confidence is a triage signal only — an unusable value means "assume worst".
@@ -264,7 +259,6 @@ export function parseExtraction(raw: string): ExtractedStatement {
       typeof openingBalance === 'number' && Number.isFinite(openingBalance) ? openingBalance : null,
     closingBalance:
       typeof closingBalance === 'number' && Number.isFinite(closingBalance) ? closingBalance : null,
-    skippedCount,
     transactions,
   }
 }
@@ -294,12 +288,12 @@ export function merchantKey(row: ExtractedTransaction): string {
 export function buildReviewRows(
   extraction: ExtractedStatement,
   categories: Category[],
-  makeId: () => string = () => crypto.randomUUID(),
+  accountCurrency?: string,
 ): ImportReviewRow[] {
   const categoryIds = new Set(categories.map((c) => c.id))
   const seen = new Set<string>()
 
-  return extraction.transactions.map((tx) => {
+  return extraction.transactions.map((tx, index) => {
     const flags: ImportReviewRow['flags'] = []
     let included = true
 
@@ -319,6 +313,15 @@ export function buildReviewRows(
     if (tx.confidence === 'low') flags.push('lowConfidence')
 
     const type = deriveType(tx.kind)
+    if (
+      type === 'transfer' &&
+      extraction.currency &&
+      accountCurrency &&
+      extraction.currency !== accountCurrency
+    ) {
+      flags.push('fxTransfer')
+      included = false
+    }
     // Keep the caller's category only if it exists and matches the row type.
     const wantedType = type === 'income' ? 'income' : 'expense'
     const category =
@@ -329,7 +332,7 @@ export function buildReviewRows(
     if (type !== 'transfer' && !category) flags.push('uncategorized')
 
     return {
-      id: makeId(),
+      id: `row-${index}`,
       extraction: tx,
       type,
       categoryId: category?.id ?? null,
@@ -372,37 +375,24 @@ export function reconcileBalance(
   }
 }
 
-export interface PlannedTransfer {
-  /** Review row that produced this transfer — keys the idempotency-key memo. */
-  rowId: string
-  fromAccountId: string
-  toAccountId: string
-  amount: number
-  currency: string
-  date: Date
-  description?: string
-  categoryId: string | null
-}
-
 export interface ImportPlan {
-  /** Plain income/expense rows -> transactionsStore.bulkAdd (single atomic insert). */
-  transactions: NewTransaction[]
-  /** Transfers -> transactionsStore.createTransfer (atomic RPC pair with idempotency). */
-  transfers: PlannedTransfer[]
+  /** Every row, including both legs of each transfer, is one atomic write. */
+  transactions: ImportTransaction[]
 }
 
 /**
- * Splits confirmed review rows into the two write paths. Pure: no id generation —
- * transfer legs (and their shared transfer_id) are created by the create_transfer RPC.
+ * Builds one retry-safe batch. The caller supplies UUIDs so this lib function
+ * stays pure; the same plan must be reused for each retry.
  */
 export function planImport(
   rows: ImportReviewRow[],
   accounts: { id: string; currency: string }[],
   accountId: string,
   statementCurrency: string,
+  makeId: () => string,
 ): ImportPlan {
-  const transactions: NewTransaction[] = []
-  const transfers: PlannedTransfer[] = []
+  const transactions: ImportTransaction[] = []
+  const source = accounts.find((a) => a.id === accountId)
 
   for (const row of rows) {
     if (!row.included) continue
@@ -411,24 +401,48 @@ export function planImport(
 
     if (row.type === 'transfer') {
       const counterpart = accounts.find((a) => a.id === row.counterpartAccountId)
-      // Same-currency on both sides is enforced in review (confirm disabled otherwise);
-      // skip defensively if it still slipped through (spec pre-excludes FX transfers).
-      if (!counterpart || counterpart.currency !== statementCurrency) continue
+      if (
+        !source ||
+        source.currency !== statementCurrency ||
+        !counterpart ||
+        counterpart.currency !== statementCurrency
+      ) {
+        throw new Error('Transfer requires two accounts in the statement currency')
+      }
 
-      transfers.push({
-        rowId: row.id,
-        // Direction decides which side loses the money: debit = out of the
-        // statement account, credit = into it.
-        fromAccountId: row.extraction.direction === 'debit' ? accountId : counterpart.id,
-        toAccountId: row.extraction.direction === 'debit' ? counterpart.id : accountId,
-        amount: row.extraction.amount,
-        currency: statementCurrency,
-        date,
-        description,
-        categoryId: row.categoryId,
-      })
+      const transferId = makeId()
+      const outId = makeId()
+      const inId = makeId()
+      const debit = row.extraction.direction === 'debit'
+      transactions.push(
+        {
+          id: outId,
+          accountId: debit ? accountId : counterpart.id,
+          type: 'transfer',
+          amount: -row.extraction.amount,
+          currency: statementCurrency,
+          date,
+          description,
+          categoryId: row.categoryId,
+          transferId,
+          correlativeId: inId,
+        },
+        {
+          id: inId,
+          accountId: debit ? counterpart.id : accountId,
+          type: 'transfer',
+          amount: row.extraction.amount,
+          currency: statementCurrency,
+          date,
+          description,
+          categoryId: row.categoryId,
+          transferId,
+          correlativeId: outId,
+        },
+      )
     } else {
       transactions.push({
+        id: makeId(),
         accountId,
         type: row.type,
         amount: row.extraction.amount,
@@ -440,5 +454,5 @@ export function planImport(
     }
   }
 
-  return { transactions, transfers }
+  return { transactions }
 }

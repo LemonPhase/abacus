@@ -78,15 +78,13 @@ describe('deriveType', () => {
   })
 })
 
-describe('buildReviewRows id injection', () => {
-  it('uses the injected id factory', () => {
-    let n = 0
+describe('buildReviewRows ids', () => {
+  it('assigns stable in-session row IDs without randomness', () => {
     const rows = buildReviewRows(
       makeStatement({ transactions: [makeTx(), makeTx({ merchant: 'OTHER' })] }),
       categories,
-      () => `id-${++n}`,
     )
-    expect(rows.map((r) => r.id)).toEqual(['id-1', 'id-2'])
+    expect(rows.map((r) => r.id)).toEqual(['row-0', 'row-1'])
   })
 })
 
@@ -225,16 +223,19 @@ describe('reconcileBalance', () => {
 })
 
 describe('planImport', () => {
+  let nextId = 0
+  const makeId = () => `id-${++nextId}`
+
   function reviewRow(overrides: Partial<ImportReviewRow>): ImportReviewRow {
     const [row] = buildReviewRows(makeStatement({ transactions: [makeTx()] }), categories)
     return { ...row, ...overrides }
   }
 
   it('builds a plain expense row with statement currency and positive amount', () => {
-    const plan = planImport([reviewRow({ categoryId: 'cat-g' })], accounts, 'acc-1', 'USD')
-    expect(plan.transfers).toHaveLength(0)
+    const plan = planImport([reviewRow({ categoryId: 'cat-g' })], accounts, 'acc-1', 'USD', makeId)
     expect(plan.transactions).toHaveLength(1)
     expect(plan.transactions[0]).toMatchObject({
+      id: expect.any(String),
       accountId: 'acc-1',
       type: 'expense',
       amount: 30,
@@ -256,15 +257,18 @@ describe('planImport', () => {
       accounts,
       'acc-1',
       'USD',
+      makeId,
     )
-    expect(plan.transactions).toHaveLength(0)
-    expect(plan.transfers).toHaveLength(1)
-    expect(plan.transfers[0]).toMatchObject({
-      fromAccountId: 'acc-1',
-      toAccountId: 'acc-2',
-      amount: 40,
+    expect(plan.transactions).toHaveLength(2)
+    expect(plan.transactions[0]).toMatchObject({
+      accountId: 'acc-1',
+      amount: -40,
       currency: 'USD',
     })
+    expect(plan.transactions[1]).toMatchObject({ accountId: 'acc-2', amount: 40 })
+    expect(plan.transactions[0].transferId).toBe(plan.transactions[1].transferId)
+    expect(plan.transactions[0].correlativeId).toBe(plan.transactions[1].id)
+    expect(plan.transactions[1].correlativeId).toBe(plan.transactions[0].id)
   })
 
   it('plans a credit transfer with the statement account as destination', () => {
@@ -285,36 +289,27 @@ describe('planImport', () => {
       accounts,
       'acc-1',
       'USD',
+      makeId,
     )
-    expect(plan.transfers[0]).toMatchObject({
-      fromAccountId: 'acc-2',
-      toAccountId: 'acc-1',
-      amount: 40,
-    })
+    expect(plan.transactions[0]).toMatchObject({ accountId: 'acc-2', amount: -40 })
+    expect(plan.transactions[1]).toMatchObject({ accountId: 'acc-1', amount: 40 })
   })
 
-  it('skips transfers without a counterpart or with an FX mismatch', () => {
-    const plan = planImport(
-      [
-        reviewRow({ type: 'transfer', counterpartAccountId: null }),
-        reviewRow({
-          type: 'transfer',
-          extraction: makeTx({ kind: 'transfer', amount: 10 }),
-          counterpartAccountId: 'acc-3', // EUR — FX transfer
-        }),
-      ],
-      accounts,
-      'acc-1',
-      'USD',
-    )
-    expect(plan.transactions).toHaveLength(0)
-    expect(plan.transfers).toHaveLength(0)
+  it('rejects an included transfer without a valid same-currency counterpart', () => {
+    expect(() =>
+      planImport(
+        [reviewRow({ type: 'transfer', counterpartAccountId: 'acc-3' })],
+        accounts,
+        'acc-1',
+        'USD',
+        makeId,
+      ),
+    ).toThrow(/statement currency/)
   })
 
   it('skips excluded rows', () => {
-    const plan = planImport([reviewRow({ included: false })], accounts, 'acc-1', 'USD')
+    const plan = planImport([reviewRow({ included: false })], accounts, 'acc-1', 'USD', makeId)
     expect(plan.transactions).toHaveLength(0)
-    expect(plan.transfers).toHaveLength(0)
   })
 })
 
@@ -386,24 +381,33 @@ describe('parseExtraction', () => {
     expect(() => parseExtraction(JSON.stringify(rest))).toThrow(/missing-field/)
   })
 
-  it('skips unreadable rows and reports the count instead of failing', () => {
-    const parsed = parseExtraction(
-      JSON.stringify({
-        ...valid,
-        transactions: [
-          { ...valid.transactions[0], amount: '4.5' }, // not a number
-          { ...valid.transactions[0], date: '2025-13-45' }, // implausible date
-          { ...valid.transactions[0], date: '2025-02-31' }, // impossible calendar date
-          { ...valid.transactions[0], direction: 'sideways' }, // repaired via kind: purchase → debit
-          { date: 'nope', amount: 1, direction: 'debit', kind: 'purchase' },
-          'garbage',
-        ],
-      }),
-    )
-    expect(parsed.skippedCount).toBe(5)
-    expect(parsed.transactions).toHaveLength(1)
-    expect(parsed.transactions[0]).toMatchObject({ direction: 'debit', kind: 'purchase' })
-    expect(parsed.transactions[0]).toMatchObject({ direction: 'debit', kind: 'purchase' })
+  it('rejects unreadable rows so they cannot disappear from review', () => {
+    expect(() =>
+      parseExtraction(
+        JSON.stringify({
+          ...valid,
+          transactions: [
+            { ...valid.transactions[0], amount: '4.5' }, // not a number
+            { ...valid.transactions[0], date: '2025-13-45' }, // implausible date
+            { ...valid.transactions[0], date: '2025-02-31' }, // impossible calendar date
+            { ...valid.transactions[0], direction: 'sideways' }, // repaired via kind: purchase → debit
+            { date: 'nope', amount: 1, direction: 'debit', kind: 'purchase' },
+            'garbage',
+          ],
+        }),
+      ),
+    ).toThrow(StatementParseError)
+  })
+
+  it('rejects an unreadable transaction instead of silently omitting it', () => {
+    expect(() =>
+      parseExtraction(
+        JSON.stringify({
+          ...valid,
+          transactions: [{ ...valid.transactions[0], amount: 'unreadable' }],
+        }),
+      ),
+    ).toThrow(StatementParseError)
   })
 
   it('repairs salvageable rows from lenient JSON-mode models', () => {
@@ -422,7 +426,6 @@ describe('parseExtraction', () => {
         ],
       }),
     )
-    expect(parsed.skippedCount).toBe(0)
     expect(parsed.transactions).toHaveLength(4)
     expect(parsed.transactions[0].confidence).toBe('low')
     expect(parsed.transactions[1].amount).toBe(4.5)

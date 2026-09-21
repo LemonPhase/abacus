@@ -22,6 +22,7 @@ const FLAG_LABELS: Record<ReviewFlag, string> = {
   duplicate: 'Duplicate',
   lowConfidence: 'Low confidence',
   uncategorized: 'Needs category',
+  fxTransfer: 'FX transfer — excluded',
 }
 
 interface ReviewStepProps {
@@ -33,8 +34,8 @@ interface ReviewStepProps {
   sourceAccountCurrency: string
   reconcile: ReconcileResult | null
   truncated?: boolean
-  skippedCount?: number
   confirming?: boolean
+  locked?: boolean
   confirmError?: string | null
   confirmDisabled: boolean
   onUpdateRow: (id: string, patch: Partial<ImportReviewRow>) => void
@@ -69,8 +70,8 @@ export function ReviewStep({
   sourceAccountCurrency,
   reconcile,
   truncated = false,
-  skippedCount = 0,
   confirming = false,
+  locked = false,
   confirmError = null,
   confirmDisabled,
   onUpdateRow,
@@ -102,8 +103,8 @@ export function ReviewStep({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Review Statement</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight">Review Statement</h1>
+          <p className="text-muted-foreground tabular-nums">
             {statement.bankName ? `${statement.bankName} · ` : ''}
             {statement.accountHint ? `${statement.accountHint} · ` : ''}
             {statement.periodStart ? `${statement.periodStart} to ${statement.periodEnd} · ` : ''}
@@ -114,24 +115,18 @@ export function ReviewStep({
           <Button variant="ghost" onClick={onBack}>
             Back to Transactions
           </Button>
-          <Button variant="ghost" onClick={onDiscard}>
-            <Trash2 className="size-4" />
-            Discard
-          </Button>
+          {!locked && (
+            <Button variant="ghost" onClick={onDiscard}>
+              <Trash2 className="size-4" />
+              Discard
+            </Button>
+          )}
         </div>
       </div>
 
-      {(truncated || skippedCount > 0) && (
+      {truncated && (
         <div className="rounded-xl border border-cinnabar/30 bg-cinnabar/5 p-4 text-sm">
-          {truncated && (
-            <p>Statement text was truncated at the size limit — later pages may be missing.</p>
-          )}
-          {skippedCount > 0 && (
-            <p className={truncated ? 'mt-1' : undefined}>
-              {skippedCount} unreadable {skippedCount === 1 ? 'row was' : 'rows were'} skipped while
-              parsing — check the balance banner below.
-            </p>
-          )}
+          <p>Statement text was truncated at the size limit — later pages may be missing.</p>
         </div>
       )}
 
@@ -140,6 +135,13 @@ export function ReviewStep({
           Statement currency ({statement.currency}) differs from the account currency (
           {sourceAccountCurrency}). Rows will be recorded in {statement.currency}.
         </div>
+      )}
+
+      {locked && (
+        <p className="rounded-xl border border-border/30 bg-card p-card text-sm text-muted-foreground">
+          Import was attempted. The review is locked because the request may have committed. Retry
+          uses the same transaction IDs, so it cannot add the rows twice.
+        </p>
       )}
 
       {!balancesKnown && (
@@ -182,6 +184,7 @@ export function ReviewStep({
                 </span>
                 {hasCategoryRows && (
                   <Select
+                    disabled={locked}
                     value={NONE}
                     onValueChange={(v: string | null) =>
                       onApplyCategoryToGroup(group.key, v === NONE ? '' : (v ?? ''))
@@ -217,6 +220,7 @@ export function ReviewStep({
                     variant="ghost"
                     size="sm"
                     onClick={() => onToggleGroup(group.key, true)}
+                    disabled={locked}
                     aria-label={`Include all ${group.label}`}
                   >
                     <Plus className="size-3.5" />
@@ -226,6 +230,7 @@ export function ReviewStep({
                     variant="ghost"
                     size="sm"
                     onClick={() => onToggleGroup(group.key, false)}
+                    disabled={locked}
                     aria-label={`Exclude all ${group.label}`}
                   >
                     <Trash2 className="size-3.5" />
@@ -239,17 +244,20 @@ export function ReviewStep({
                   <div key={row.id} className="flex flex-wrap items-center gap-2 px-4 py-2">
                     <Checkbox
                       checked={row.included}
+                      disabled={locked || row.flags.includes('fxTransfer')}
                       onCheckedChange={(v) => onUpdateRow(row.id, { included: v === true })}
                       aria-label={`Include ${group.label} ${row.extraction.date}`}
                     />
                     <Input
                       type="date"
+                      disabled={locked}
                       value={row.extraction.date}
                       onChange={(e) => updateExtraction(row, { date: e.target.value })}
                       className="h-7 w-36 text-xs tabular-nums"
                       aria-label="Date"
                     />
                     <Input
+                      disabled={locked}
                       value={row.extraction.description}
                       onChange={(e) => updateExtraction(row, { description: e.target.value })}
                       className="h-7 min-w-40 flex-1 text-xs"
@@ -262,6 +270,7 @@ export function ReviewStep({
                     </span>
                     <Input
                       type="number"
+                      disabled={locked}
                       step="0.01"
                       min="0"
                       value={row.extraction.amount}
@@ -276,6 +285,7 @@ export function ReviewStep({
                     </Badge>
                     {row.type !== 'transfer' && (
                       <Select
+                        disabled={locked}
                         value={row.categoryId ?? NONE}
                         onValueChange={(v: string | null) =>
                           onSetRowCategory(row, v === NONE ? '' : (v ?? ''))
@@ -308,6 +318,7 @@ export function ReviewStep({
                     )}
                     {row.type === 'transfer' && (
                       <Select
+                        disabled={locked || row.flags.includes('fxTransfer')}
                         value={row.counterpartAccountId ?? NONE}
                         onValueChange={(v: string | null) => {
                           if (v && v !== NONE) onSetCounterpart(row.id, v)
@@ -357,7 +368,9 @@ export function ReviewStep({
         <Button onClick={onConfirm} disabled={confirmDisabled || confirming || includedCount === 0}>
           {confirming
             ? 'Adding…'
-            : `Add ${includedCount} transaction${includedCount === 1 ? '' : 's'}`}
+            : locked
+              ? 'Retry import'
+              : `Add ${includedCount} transaction${includedCount === 1 ? '' : 's'}`}
         </Button>
       </div>
     </div>

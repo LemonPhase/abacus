@@ -37,6 +37,11 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { getTable } from '@/test/supabase-mock'
 import type { ExtractedStatement } from '@/types'
 
+const realStoreActions = {
+  bulkAdd: useTransactionsStore.getState().bulkAdd,
+  createTransfer: useTransactionsStore.getState().createTransfer,
+}
+
 vi.mocked(extractPdfText).mockResolvedValue({ text: 'STATEMENT TEXT', pages: 1, truncated: false })
 
 const statementFixture: ExtractedStatement = {
@@ -102,12 +107,19 @@ async function uploadAndProcess(user: ReturnType<typeof userEvent.setup>) {
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks()
   localStorage.clear()
   useSettingsStore.getState().reset()
   useSettingsStore.setState({ aiApiKey: 'sk-test' })
   useAccountsStore.setState({ accounts: [], loading: false, error: null, _unsub: null })
   useCategoriesStore.setState({ categories: [], loading: false, error: null, _unsub: null })
-  useTransactionsStore.setState({ transactions: [], loading: false, error: null, _unsub: null })
+  useTransactionsStore.setState({
+    transactions: [],
+    loading: false,
+    error: null,
+    _unsub: null,
+    ...realStoreActions,
+  })
   getTable('accounts').push(
     { id: 'acc-1', name: 'Checking', type: 'checking', currency: 'USD', balance: 100 },
     { id: 'acc-2', name: 'Savings', type: 'savings', currency: 'USD', balance: 0 },
@@ -196,8 +208,11 @@ describe('StatementImport', () => {
     })
   })
 
-  it('imports transfers through the create_transfer RPC with direction-aware legs', async () => {
-    const bulkSpy = vi.spyOn(useTransactionsStore.getState(), 'bulkAdd').mockResolvedValue([])
+  it('submits plain rows and linked transfer legs in one batch', async () => {
+    const originalBulkAdd = realStoreActions.bulkAdd
+    const bulkSpy = vi
+      .spyOn(useTransactionsStore.getState(), 'bulkAdd')
+      .mockImplementation((...args) => originalBulkAdd(...args))
     const transferSpy = vi
       .spyOn(useTransactionsStore.getState(), 'createTransfer')
       .mockResolvedValue([])
@@ -215,14 +230,56 @@ describe('StatementImport', () => {
     // 1 expense + 2 transfer legs
     await user.click(screen.getByRole('button', { name: 'Add 3 transactions' }))
 
-    expect(bulkSpy.mock.calls[0][0]).toHaveLength(1) // only the expense row
-    expect(transferSpy).toHaveBeenCalledTimes(1)
-    expect(transferSpy.mock.calls[0][0]).toMatchObject({
-      fromAccountId: 'acc-1',
-      toAccountId: 'acc-2',
-      amount: 40,
-      convertedAmount: 40,
+    expect(bulkSpy).toHaveBeenCalledTimes(1)
+    expect(bulkSpy.mock.calls[0][0]).toHaveLength(3)
+    const transfers = bulkSpy.mock.calls[0][0].filter((row) => row.type === 'transfer')
+    expect(transfers).toHaveLength(2)
+    expect(transfers[0].transferId).toBeTruthy()
+    expect(transfers[0].transferId).toBe(transfers[1].transferId)
+    expect(transferSpy).not.toHaveBeenCalled()
+    const persisted = getTable('transactions')
+    expect(persisted).toHaveLength(3)
+    const persistedTransfers = persisted.filter((row) => row.type === 'transfer')
+    expect(persistedTransfers[0].correlative_id).toBe(persistedTransfers[1].id)
+    expect(persistedTransfers[1].correlative_id).toBe(persistedTransfers[0].id)
+  })
+
+  it('retries a committed batch without duplicating rows after its response is lost', async () => {
+    const originalBulkAdd = realStoreActions.bulkAdd
+    const bulkSpy = vi.spyOn(useTransactionsStore.getState(), 'bulkAdd')
+    bulkSpy.mockImplementationOnce(async (...args) => {
+      await originalBulkAdd(...args)
+      throw new Error('response lost')
     })
+    bulkSpy.mockImplementation((...args) => originalBulkAdd(...args))
+    vi.mocked(extractStatement).mockResolvedValue({
+      ...structuredClone(statementFixture),
+      transactions: [statementFixture.transactions[0]],
+    })
+
+    const user = userEvent.setup()
+    renderPage()
+    await uploadAndProcess(user)
+    await user.click(await screen.findByRole('button', { name: 'Add 1 transaction' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('response lost')
+    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Retry import' }))
+    expect(await screen.findByText('Added 1 transaction')).toBeInTheDocument()
+    expect(getTable('transactions')).toHaveLength(1)
+  })
+
+  it('pre-excludes FX transfers so other statement rows can be imported', async () => {
+    vi.mocked(extractStatement).mockResolvedValue({
+      ...structuredClone(statementFixture),
+      currency: 'EUR',
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await uploadAndProcess(user)
+
+    expect(await screen.findByRole('checkbox', { name: /Include TRANSFER/ })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Add 1 transaction' })).toBeEnabled()
   })
 
   it('surfaces confirm failures and stays on review', async () => {

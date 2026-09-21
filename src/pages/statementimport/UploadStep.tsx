@@ -63,7 +63,7 @@ export function UploadStep({
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Import Statement PDF</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Import Statement PDF</h1>
         <p className="text-muted-foreground">
           Upload a bank statement PDF, review the extracted transactions, then import them.
         </p>

@@ -184,7 +184,7 @@ export default function Settings() {
         </div>
 
         {/* AI Extraction */}
-        <div className="rounded-xl border bg-card p-5 space-y-3">
+        <div className="bg-card text-card-foreground rounded-xl border border-border/30 p-card space-y-3">
           <h2 className="font-semibold flex items-center gap-2">
             <Sparkles className="size-4" />
             AI Extraction

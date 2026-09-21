@@ -454,7 +454,10 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       return item
     }
 
-    const internalBulkAdd = async (data: Record<string, unknown>[]): Promise<T[]> => {
+    const internalBulkAdd = async (
+      data: Record<string, unknown>[],
+      options?: { idempotent?: boolean },
+    ): Promise<T[]> => {
       if (data.length === 0) return []
       const token = generation
       set({ error: null })
@@ -465,16 +468,21 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       const insertData = session?.user?.id
         ? data.map((d) => ('user_id' in d ? d : { ...d, user_id: session.user.id }))
         : data
+      // The caller supplies stable primary keys for retry-safe imports. An
+      // ignored conflict means an earlier attempt committed but lost its reply.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: inserted, error } = await (supabase.from as any)(table)
-        .insert(insertData)
-        .select()
+      const query = (supabase.from as any)(table)
+      const { data: inserted, error } = await (
+        options?.idempotent
+          ? query.upsert(insertData, { onConflict: 'id', ignoreDuplicates: true })
+          : query.insert(insertData)
+      ).select()
       if (isStale(token)) throw new Error('Session changed; stale response discarded')
       if (error) {
         set({ error: error.message, loading: false })
         throw error
       }
-      const rows = inserted as Record<string, unknown>[]
+      const rows = (inserted ?? []) as Record<string, unknown>[]
       const items = rows.filter((row) => matchesFilters(row, lastFilters)).map(mapRow)
       if (pendingEvents) {
         // Same mid-load handling as internalAdd, per row.

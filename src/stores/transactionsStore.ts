@@ -96,7 +96,7 @@ interface TransactionsState {
   hasMore: boolean
   total: number | null
   add: (data: NewTransaction) => Promise<Transaction>
-  bulkAdd: (data: NewTransaction[]) => Promise<Transaction[]>
+  bulkAdd: (data: NewTransaction[], options?: { idempotent?: boolean }) => Promise<Transaction[]>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>
   remove: (id: string) => Promise<void>
   createTransfer: (input: TransferCreateInput) => Promise<Transaction[]>
@@ -170,7 +170,10 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
       }
       return _add(mapKeysToSnake(payload) as Database['public']['Tables']['transactions']['Insert'])
     },
-    bulkAdd: async (data) => {
+    bulkAdd: async (data, options) => {
+      if (options?.idempotent && data.some((row) => !('id' in row))) {
+        throw new Error('Retry-safe bulk insert requires stable row IDs')
+      }
       const reporting = useSettingsStore.getState().baseCurrency
       // One quote lookup per distinct currency per batch, so importing many
       // historical rows doesn't fire one request per row. Memoize the promise
@@ -224,6 +227,7 @@ export const useTransactionsStore = create<TransactionsState>()((set, get) => {
         payloads.map((p) =>
           mapKeysToSnake(p),
         ) as Database['public']['Tables']['transactions']['Insert'][],
+        options,
       )
     },
     update: async (id, data) => {

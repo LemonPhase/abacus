@@ -21,18 +21,18 @@ User uploads a bank statement PDF for one account → app extracts text client-s
 
 Pure client-side. No new tables, no edge functions, no schema changes. New dep: `pdfjs-dist` only (no LLM SDK — plain `fetch`).
 
-Extraction chain: `pdfjs-dist` text (lazy-imported, off main bundle) → `lib/statement.ts` builds prompt + JSON schema → `services/llm.ts` chat completion with structured output → `parseExtraction` validates → `buildReviewRows` derives flags → review UI → `rowsToTransactions` → `bulkAdd`.
+Extraction chain: `services/pdfExtract.ts` uses lazy-imported `pdfjs-dist` → `lib/statement.ts` builds prompt + JSON schema → `services/llm.ts` chat completion with structured output → `parseExtraction` validates every row → `buildReviewRows` derives flags → review UI → `planImport` builds one batch with stable IDs → idempotent `bulkAdd`.
 
 "Full-screen flow" = dedicated route page inside the standard app shell (sidebar stays, consistent with fixed-sidebar layout rule), reachable from a Transactions header button. Browser back works naturally.
 
 ## Key existing code to reuse
 
 - `src/lib/csv.ts` — parsing precedent for `lib` purity and per-row parse helpers
-- `src/pages/Transactions.tsx` — transfer-pair mechanics (L260–330): outgoing `amount: -amount`, incoming `+amount` (converted), paired via `correlativeId`
-- `src/stores/transactionsStore.ts` `bulkAdd(NewTransaction[])` — sets `baseAmount=amount`, `baseCurrency=currency` automatically
+- `src/pages/Transactions.tsx` — transfer-pair mechanics: outgoing `amount: -amount`, incoming `+amount`, paired by shared `transferId` and mutual `correlativeId`
+- `src/stores/transactionsStore.ts` `bulkAdd(NewTransaction[], { idempotent: true })` — computes reporting-currency fields and writes the batch in one statement
 - `src/stores/settingsStore.ts` — localStorage settings pattern to extend
 - `src/pages/transactions/CsvImportDialog.tsx` — dumb-component wizard pattern (state lives in page)
-- Migration fact: `transactions.correlative_id uuid` has **no FK** (initial_schema.sql L129) → pre-generate `crypto.randomUUID()` for both legs, single `bulkAdd` call
+- Migration fact: `transactions.transfer_id` tags both legs; `correlative_id` points to the other leg's ID. Client-generated row IDs make a single `bulkAdd` call retry-safe.
 
 ## File changes
 
@@ -59,12 +59,12 @@ export interface ExtractedStatement {
   accountHint: string
   periodStart: string
   periodEnd: string
-  currency: string
-  openingBalance: number
-  closingBalance: number
+  currency: string | null // null if the model cannot identify it
+  openingBalance: number | null
+  closingBalance: number | null
   transactions: ExtractedTransaction[]
 }
-export type ReviewFlag = 'pending' | 'duplicate' | 'lowConfidence' | 'uncategorized'
+export type ReviewFlag = 'pending' | 'duplicate' | 'lowConfidence' | 'uncategorized' | 'fxTransfer'
 export interface ImportReviewRow {
   id: string
   extraction: ExtractedTransaction
@@ -81,7 +81,7 @@ export interface ImportReviewRow {
 - Defaults: `aiModel: 'gpt-4o-mini'`, `aiBaseUrl: ''` (empty = official OpenAI).
 - New setter `setAiSettings(patch)` following the existing save-then-set pattern.
 
-### 3. `src/lib/pdfExtract.ts` (new, pure)
+### 3. `src/services/pdfExtract.ts` (new, side effects)
 
 - `extractPdfText(file: File): Promise<{ text: string; pages: number }>` — dynamic `import('pdfjs-dist')` so the lib never touches the main bundle; worker via `import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'` + `GlobalWorkerOptions.workerSrc`.
 - Constants `MAX_PDF_PAGES = 40`, `MAX_STATEMENT_CHARS = 60_000` (truncate text past cap, flag truncation in return value).
@@ -91,19 +91,20 @@ export interface ImportReviewRow {
 
 - `buildExtractionMessages(text, categories, accountName, accountCurrency): { system, user }` — rules embedded: emit the JSON schema exactly; `categoryId` must be one of the provided `{id, name, type}` list or null (respect category `type`: income cats only for credit rows); amounts absolute; `direction` debit = money out; classify `kind`; normalize merchant (strip card numbers, dates, ref codes); ISO dates; `pending` only for pending/authorization rows; statement metadata incl. opening/closing balance and currency.
 - `EXTRACTION_RESPONSE_FORMAT` — `response_format: { type: 'json_schema', json_schema: { name: 'statement', strict: true, schema } }`.
-- `parseExtraction(raw: string): ExtractedStatement` — JSON.parse + field-by-field coercion/validation; throws `StatementParseError` with a reason enum (invalid json / missing field / bad types).
+- `parseExtraction(raw: string): ExtractedStatement` — JSON.parse + safe field repair; throws `StatementParseError` if any transaction remains unreadable, so no line silently disappears. The LLM service retries one malformed extraction.
 - `normalizeMerchant(desc: string): string`.
 - `deriveType(kind, direction): TransactionKind` — purchase/fee → expense; income/refund/interest → income; transfer → transfer (direction decides which leg).
-- `buildReviewRows(extraction, categories): ImportReviewRow[]`:
+- `buildReviewRows(extraction, categories, accountCurrency): ImportReviewRow[]`:
   - `pending` → flag + `included: false`
   - within-upload duplicate (same date + |amount| + normalizedMerchant) → all but first flagged `duplicate` + excluded
   - `confidence === 'low'` → `lowConfidence` flag ("needs attention")
   - income/expense row with null category → `uncategorized` flag (blocks confirm while included)
+  - transfer whose statement and source-account currencies differ → `fxTransfer` flag + excluded; it cannot be re-included in v1
 - `reconcileBalance(rows, opening, closing)` → `{ expected, actual, diff, ok }` — `actual` = opening + Σ signed amounts of included non-pending rows; `ok` = |diff| < 0.01. Excluded rows are the usual mismatch cause — banner says so.
-- `rowsToTransactions(rows, accounts, accountId, statementCurrency): NewTransaction[]` —
-  - expense/income: `{ accountId, type, amount: abs, currency: statementCurrency, date, categoryId, description }`
-  - included transfer with same-currency counterpart: two rows sharing `correlativeId = crypto.randomUUID()` — outgoing `{ accountId, amount: -abs }`, incoming `{ accountId: counterpart, amount: +abs }`; skip + keep row flagged if counterpart missing or currency mismatch
-  - category null only allowed on transfer rows
+- `planImport(rows, accounts, accountId, statementCurrency, makeId): ImportPlan` —
+  - expense/income: one row with a client-generated stable ID, positive amount and statement currency
+  - same-currency transfer: outgoing and incoming rows with signed amounts, a shared `transferId`, and mutual `correlativeId` values pointing to the other leg's ID
+  - rejects an included transfer with an invalid counterpart rather than silently omitting it
 
 ### 5. `src/services/llm.ts` (new — side effects only)
 
@@ -116,8 +117,8 @@ export interface ImportReviewRow {
 Owns all state (dumb children pattern): `step: 'setup' | 'processing' | 'review' | 'done'`, file, accountId, extraction, review rows + edit callbacks, error.
 
 - setup → "Process" runs: `extractPdfText` → `extractStatement` → `buildReviewRows` → review. Typed errors render triage copy (no text layer / too many pages / password-protected); everything else generic + Retry.
-- `beforeunload` warning while processing/review; explicit "Back to Transactions" + "Discard" controls.
-- Confirm: `rowsToTransactions` → `bulkAdd` (one call) → `loadAccounts()` (server trigger keeps balances) → `done`. Done step → navigate back to `/app/transactions`.
+- `beforeunload` warning while processing/review; "Discard" is available before the first commit attempt.
+- Confirm: freeze one `planImport` result → one idempotent `bulkAdd` call → best-effort `loadAccounts()` (server trigger keeps balances) → `done`. If the response is lost, review stays locked and Retry resends the same IDs; Discard is hidden because the commit status is uncertain.
 
 ### 7. `src/pages/statementimport/` (new — dumb components, relative imports)
 
@@ -135,18 +136,18 @@ Owns all state (dumb children pattern): `step: 'setup' | 'processing' | 'review'
 
 ### 9. Tests (required by AGENTS.md — new store/service/logic coverage)
 
-- `src/test/lib/statement.test.ts` — `deriveType`, `normalizeMerchant`, `buildReviewRows` (pending/duplicate/low-confidence/uncategorized), `reconcileBalance`, `rowsToTransactions` (pair signs, shared `correlativeId`, currency, transfer-category nullability), `buildExtractionMessages` (category ids + currency present), `parseExtraction` (valid / invalid JSON / bad fields).
+- `src/test/lib/statement.test.ts` — `deriveType`, `normalizeMerchant`, `buildReviewRows` (pending/duplicate/low-confidence/uncategorized/FX), `reconcileBalance`, `planImport` (pair signs, shared `transferId`, mutual `correlativeId`), `buildExtractionMessages`, `parseExtraction` (valid / invalid JSON / unreadable row).
 - `src/test/services/llm.test.ts` — mocked `fetch`: success parse; 401/429 mapping; json_schema → json_object fallback; malformed response.
 - `src/test/stores/settings.test.ts` — AI defaults + `setAiSettings` persistence.
-- `src/test/pages/statementimport/StatementImport.test.tsx` — gate without key; mocked happy path (mock `pdfExtract` + `llm`) → review renders groups/flags → confirm calls `bulkAdd` with expected payloads; triage error path.
+- `src/test/pages/statementimport/StatementImport.test.tsx` — gate without key; mocked extraction → review renders groups/flags; linked-transfer batch, lost-response retry, FX pre-exclusion, and triage paths.
 - Check `src/test/pages/Transactions.test.tsx` still passes after the header button change.
 
 ## Insert mechanics (exact)
 
-1. One `bulkAdd(rows)` call; `bulkAdd` fills `baseAmount`/`baseCurrency`.
-2. Transfer pairs: both legs carry a pre-generated shared `correlativeId` — safe because the column has no FK.
-3. Row currency = statement currency even when ≠ account currency (banner warns); `bulkAdd` sets baseAmount = amount (same as CSV import — no FX at import, consistent).
-4. Balances update server-side via `maintain_account_balance` trigger; page calls `loadAccounts()` after insert.
+1. One `bulkAdd(rows, { idempotent: true })` call sends all plain rows and transfer legs. It uses `ON CONFLICT (id) DO NOTHING`; one Postgres statement is atomic, and retrying the same IDs cannot duplicate rows.
+2. Transfer pairs carry a shared `transferId`; each `correlativeId` points to the other leg's ID.
+3. Plain rows retain statement currency even when it differs from the selected account (banner warns). FX transfers are pre-excluded. `bulkAdd` computes reporting-currency provenance using the existing store path.
+4. Balances update server-side via `maintain_account_balance`; the page refreshes accounts after insert, then displays Done even if that refresh fails.
 
 ## Verification
 
@@ -156,7 +157,7 @@ Owns all state (dumb children pattern): `step: 'setup' | 'processing' | 'review'
    - Batch-fix a merchant's category; edit a row; exclude a pending row; import → verify rows on Transactions, balances correct
    - Transfer row → pick counterpart (different account, same currency) → verify both linked legs appear and both account balances moved
    - Triage: password-protected or scanned PDF → specific error copy; wrong API key → auth error
-   - Mid-review reload → unload warning; discard leaves no new rows
+   - Mid-review reload → unload warning; pre-confirm discard leaves no new rows. After an uncertain response, retry keeps the same IDs and cannot duplicate rows.
 
 ## Non-goals (hooks left open)
 

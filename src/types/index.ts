@@ -173,6 +173,8 @@ export type NewTransaction = Omit<
   | 'createdAt'
   | 'updatedAt'
 >
+/** Stable client-generated ID for a retry-safe statement import batch. */
+export type ImportTransaction = NewTransaction & { id: string }
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
 
 export type RecurringTransactionKind = 'income' | 'expense'
@@ -226,12 +228,10 @@ export interface ExtractedStatement {
   /** null = not found in the model response → reconciliation unavailable. */
   openingBalance: number | null
   closingBalance: number | null
-  /** Rows dropped during parsing because they were unreadable (JSON-mode models). */
-  skippedCount?: number
   transactions: ExtractedTransaction[]
 }
 
-export type ReviewFlag = 'pending' | 'duplicate' | 'lowConfidence' | 'uncategorized'
+export type ReviewFlag = 'pending' | 'duplicate' | 'lowConfidence' | 'uncategorized' | 'fxTransfer'
 
 export interface ImportReviewRow {
   id: string

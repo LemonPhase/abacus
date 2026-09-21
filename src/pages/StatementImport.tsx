@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { extractPdfText } from '@/services/pdfExtract'
 import {
   buildReviewRows,
+  isValidCalendarDate,
   merchantKey,
   normalizeMerchant,
   planImport,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/statement'
 import { extractStatement } from '@/services/llm'
 import type { ExtractedStatement, ImportReviewRow, ReviewFlag } from '@/types'
+import type { ImportPlan } from '@/lib/statement'
 import { UploadStep } from '@/pages/statementimport/UploadStep'
 import { ProcessingStep } from '@/pages/statementimport/ProcessingStep'
 import { ReviewStep } from '@/pages/statementimport/ReviewStep'
@@ -39,7 +41,6 @@ export default function StatementImport() {
   const categories = useCategoriesStore((s) => s.categories)
   const loadCategories = useCategoriesStore((s) => s.load)
   const bulkAdd = useTransactionsStore((s) => s.bulkAdd)
-  const createTransfer = useTransactionsStore((s) => s.createTransfer)
   const aiApiKey = useSettingsStore((s) => s.aiApiKey)
   const aiModel = useSettingsStore((s) => s.aiModel)
   const aiBaseUrl = useSettingsStore((s) => s.aiBaseUrl)
@@ -55,10 +56,10 @@ export default function StatementImport() {
   const [truncated, setTruncated] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
-  // Tracks what the current confirm attempt has already persisted, so a retry
-  // after a mid-flow failure never inserts the same rows twice.
-  const confirmProgress = useRef({ plainInserted: false, transfersDone: new Set<string>() })
-  const transferKeys = useRef(new Map<string, string>())
+  // Freeze one batch with stable IDs across retries, including when the server
+  // commits but its response is lost.
+  const importPlan = useRef<ImportPlan | null>(null)
+  const [commitAttempted, setCommitAttempted] = useState(false)
 
   const [addedCount, setAddedCount] = useState(0)
   const [reconcile, setReconcile] = useState<ReconcileResult | null>(null)
@@ -123,7 +124,7 @@ export default function StatementImport() {
     return rows.some((r) => {
       if (!r.included) return false
       // Dates/amounts are user-editable; invalid ones would fail the insert.
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(r.extraction.date)) return true
+      if (!isValidCalendarDate(r.extraction.date)) return true
       if (!(r.extraction.amount > 0)) return true
       if (r.type !== 'transfer') return r.flags.includes('uncategorized')
       // Spec pre-excludes FX transfers: both sides must be in statement currency.
@@ -189,7 +190,7 @@ export default function StatementImport() {
         account,
       )
       setStatement(extraction)
-      setRows(buildReviewRows(extraction, categories))
+      setRows(buildReviewRows(extraction, categories, account.currency))
       setStep('review')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -201,38 +202,15 @@ export default function StatementImport() {
     if (!statement || confirming || !account) return
     setConfirming(true)
     setConfirmError(null)
-    const { transactions: plain, transfers } = planImport(
-      rows,
-      accounts,
-      accountId,
-      statementCurrency,
-    )
     try {
-      // Each phase records progress before the next; retries reuse idempotency
-      // keys (and skip finished phases), so no failure path can double-insert.
-      if (!confirmProgress.current.plainInserted && plain.length > 0) {
-        await bulkAdd(plain)
-        confirmProgress.current.plainInserted = true
-      }
-      for (const t of transfers) {
-        if (confirmProgress.current.transfersDone.has(t.rowId)) continue
-        let key = transferKeys.current.get(t.rowId)
-        if (!key) {
-          key = crypto.randomUUID()
-          transferKeys.current.set(t.rowId, key)
-        }
-        await createTransfer({
-          idempotencyKey: key,
-          fromAccountId: t.fromAccountId,
-          toAccountId: t.toAccountId,
-          amount: t.amount,
-          convertedAmount: t.amount,
-          categoryId: t.categoryId,
-          date: t.date,
-          description: t.description,
-        })
-        confirmProgress.current.transfersDone.add(t.rowId)
-      }
+      const plan =
+        importPlan.current ??
+        planImport(rows, accounts, accountId, statementCurrency, () => crypto.randomUUID())
+      importPlan.current = plan
+      setCommitAttempted(true)
+      // One database statement inserts every row or none. Stable primary keys
+      // make a retry safe if a successful response never reaches the browser.
+      await bulkAdd(plan.transactions, { idempotent: true })
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : 'Failed to add transactions')
       setConfirming(false)
@@ -245,7 +223,7 @@ export default function StatementImport() {
     } catch {
       // Balances refresh on next store load.
     }
-    setAddedCount(plain.length + transfers.length * 2)
+    setAddedCount(importPlan.current?.transactions.length ?? 0)
     setReconcile(reconcileResult)
     setStep('done')
     setConfirming(false)
@@ -259,8 +237,8 @@ export default function StatementImport() {
     setTruncated(false)
     setConfirmError(null)
     setError(null)
-    confirmProgress.current = { plainInserted: false, transfersDone: new Set() }
-    transferKeys.current.clear()
+    importPlan.current = null
+    setCommitAttempted(false)
   }
 
   if (step === 'processing') {
@@ -278,13 +256,17 @@ export default function StatementImport() {
         sourceAccountCurrency={account.currency}
         reconcile={reconcileResult}
         truncated={truncated}
-        skippedCount={statement.skippedCount ?? 0}
         confirming={confirming}
+        locked={commitAttempted}
         confirmError={confirmError}
         confirmDisabled={confirmDisabled}
         onUpdateRow={patchRow}
         onToggleGroup={(key, included) =>
-          setRows((prev) => prev.map((r) => (groupKeyOf(r) === key ? { ...r, included } : r)))
+          setRows((prev) =>
+            prev.map((r) =>
+              groupKeyOf(r) === key && !r.flags.includes('fxTransfer') ? { ...r, included } : r,
+            ),
+          )
         }
         onSetRowCategory={setRowCategory}
         onApplyCategoryToGroup={applyCategoryToGroup}
