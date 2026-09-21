@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import RecurringTransactions from '@/pages/RecurringTransactions'
+import RecurringTransactionsView from '@/pages/recurring/RecurringTransactionsView'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
@@ -13,7 +13,7 @@ function renderPage() {
     user: userEvent.setup(),
     ...render(
       <MemoryRouter>
-        <RecurringTransactions />
+        <RecurringTransactionsView />
       </MemoryRouter>,
     ),
   }
@@ -49,7 +49,7 @@ function seedCategory() {
   })
 }
 
-describe('RecurringTransactions page', () => {
+describe('RecurringTransactionsView', () => {
   beforeEach(() => {
     resetAllTables()
     useRecurringTransactionsStore.setState({

@@ -19,6 +19,7 @@ import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsSto
 import { useAuth } from '@/auth/auth'
 import { restoreUserData, currentUserId } from '@/services/restore'
 import { exportAllData } from '@/services/export'
+import CategoriesView from '@/pages/categories/CategoriesView'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
@@ -146,6 +147,9 @@ export default function Settings() {
             ))}
           </div>
         </div>
+
+        {/* Categories */}
+        <CategoriesView />
 
         {/* Data Management */}
         <div className="rounded-xl border bg-card p-5 space-y-3">

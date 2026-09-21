@@ -45,7 +45,11 @@ const emptyForm: RecurringFormData = {
   isActive: true,
 }
 
-export default function RecurringTransactions() {
+/**
+ * Recurring-transactions feature without the page header, so it can render
+ * both inside the Transactions page (Recurring segment) and standalone.
+ */
+export default function RecurringTransactionsView() {
   const items = useRecurringTransactionsStore((s) => s.items)
   const loading = useRecurringTransactionsStore((s) => s.loading)
   const loadItems = useRecurringTransactionsStore((s) => s.load)
@@ -180,13 +184,7 @@ export default function RecurringTransactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Recurring</h1>
-          <p className="text-muted-foreground">
-            Schedule bills and income that repeat automatically.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={openAdd}>
           <Plus className="size-4" />
           Add Recurring

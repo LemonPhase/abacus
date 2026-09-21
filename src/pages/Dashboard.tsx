@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BarChart,
   Bar,
@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { ChartTooltip } from '@/components/charts/ChartTooltip'
 import { BudgetGauge } from '@/components/budgets/BudgetGauge'
-import { Loader2, TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
+import { BarChart3, Loader2, TrendingDown, TrendingUp, Wallet, PiggyBank } from 'lucide-react'
 import { getBudgetColors, getBudgetStatus } from '@/lib/budget'
 import { convertCurrency } from '@/services/exchange'
 import {
@@ -249,9 +249,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Your financial overview at a glance.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Your financial overview at a glance.</p>
+        </div>
+        {/* Reports are absorbed into Home on mobile — desktop has the sidebar link. */}
+        <Link
+          to="/app/reports"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors duration-200 hover:text-foreground md:hidden"
+        >
+          <BarChart3 className="size-4" />
+          Full reports
+        </Link>
       </div>
 
       {isLoading ? (

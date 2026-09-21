@@ -6,6 +6,7 @@ import Accounts from '@/pages/Accounts'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { getTable, resetAllTables } from '@/test/supabase-mock'
 import type { Account } from '@/types'
 
@@ -179,5 +180,36 @@ describe('Accounts page — opening balance semantics', () => {
       expect(useAccountsStore.getState().accounts[0]?.balance).toBe(1300)
     })
     expect(useAccountsStore.getState().accounts[0]?.openingBalance).toBe(1300)
+  })
+
+  it('embeds the investment plans view under the Investments segment', async () => {
+    useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
+    const user = userEvent.setup()
+    renderPage()
+
+    // Let the accounts load settle so the tab click isn't racing a re-render.
+    await screen.findByText('No accounts yet')
+
+    await user.click(screen.getByRole('tab', { name: 'Investments' }))
+
+    // The embedded view is lazy-loaded; waitFor rides out the chunk load and
+    // any Suspense retry that could detach the first matching node.
+    await waitFor(() => {
+      expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Add Investment' })).toBeInTheDocument()
+  })
+
+  it('renders the investments view for the /app/investments deep link', async () => {
+    useInvestmentPlansStore.setState({ plans: [], loading: false, error: null, _unsub: null })
+    render(
+      <MemoryRouter>
+        <Accounts initialTab="investments" />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
+    })
   })
 })

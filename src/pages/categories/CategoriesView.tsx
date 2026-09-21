@@ -107,7 +107,11 @@ function CategoryList({ type, categories, onEdit, onDelete }: CategoryListProps)
   )
 }
 
-export default function Categories() {
+/**
+ * Category management as a self-contained Settings-style card, so it renders
+ * inside the Settings page (mobile IA consolidation) and standalone.
+ */
+export default function CategoriesView() {
   const categories = useCategoriesStore((s) => s.categories)
   const loading = useCategoriesStore((s) => s.loading)
   const load = useCategoriesStore((s) => s.load)
@@ -192,11 +196,13 @@ export default function Categories() {
     : categories.filter((c) => c.type === form.type && !c.parentId)
 
   return (
-    <div className="space-y-6">
+    <div className="rounded-xl border bg-card p-5 space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-          <p className="text-muted-foreground">Organize your income and expense categories.</p>
+          <h2 className="font-semibold">Categories</h2>
+          <p className="text-sm text-muted-foreground">
+            Organize your income and expense categories.
+          </p>
         </div>
         <Button onClick={() => openAdd(activeTab as CategoryKind)}>
           <Plus className="size-4" />

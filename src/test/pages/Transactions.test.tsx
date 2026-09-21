@@ -9,6 +9,7 @@ import { CsvImportDialog } from '@/pages/transactions/CsvImportDialog'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
+import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import type { Account, Category } from '@/types'
 
@@ -46,6 +47,7 @@ beforeEach(() => {
   useAccountsStore.setState({ accounts: [], loading: false, error: null, _unsub: null })
   useCategoriesStore.setState({ categories: [], loading: false, error: null, _unsub: null })
   useTransactionsStore.setState({ transactions: [], loading: false, error: null, _unsub: null })
+  useRecurringTransactionsStore.setState({ items: [], loading: false, error: null, _unsub: null })
 })
 
 describe('Transactions Page', () => {
@@ -65,6 +67,22 @@ describe('Transactions Page', () => {
     await user.click(screen.getByRole('button', { name: 'Import CSV' }))
 
     expect(await screen.findByText('Click to upload a CSV file')).toBeInTheDocument()
+  })
+
+  it('renders the recurring view when the Recurring segment is selected', async () => {
+    const { user } = renderWithRouter(<Transactions />)
+
+    await screen.findByText('Transactions')
+    await user.click(screen.getByRole('tab', { name: 'Recurring' }))
+
+    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Recurring' })).toBeInTheDocument()
+  })
+
+  it('renders the recurring view for the /app/recurring deep link', async () => {
+    renderWithRouter(<Transactions initialTab="recurring" />)
+
+    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
   })
 })
 

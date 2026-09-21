@@ -35,6 +35,10 @@ import {
   type TransactionFiltersValue,
 } from '@/pages/transactions/TransactionFilters'
 import { CsvImportDialog, type CsvMappedRow } from '@/pages/transactions/CsvImportDialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import RecurringTransactionsView from '@/pages/recurring/RecurringTransactionsView'
+
+type TransactionTab = 'all' | 'recurring'
 
 function formatDate(d: Date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -63,7 +67,12 @@ const emptyTxForm: TxFormData = {
   toAccountId: '',
 }
 
-export default function Transactions() {
+/**
+ * Host page for all transaction data. `initialTab` deep-links an absorbed
+ * segment: /app/recurring renders this page with the Recurring view active.
+ */
+export default function Transactions({ initialTab = 'all' }: { initialTab?: TransactionTab }) {
+  const [tab, setTab] = useState<TransactionTab>(initialTab)
   const transactions = useTransactionsStore((s) => s.transactions)
   const loading = useTransactionsStore((s) => s.loading)
   const loadingMore = useTransactionsStore((s) => s.loadingMore)
@@ -404,21 +413,37 @@ export default function Transactions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-          <p className="text-muted-foreground">Track your income and expenses.</p>
+          <p className="text-muted-foreground">
+            {tab === 'all'
+              ? 'Track your income and expenses.'
+              : 'Schedule bills and income that repeat automatically.'}
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setCsvDialogOpen(true)}>
-            <Upload className="size-4" />
-            Import CSV
-          </Button>
-          <Button onClick={openAdd}>
-            <Plus className="size-4" />
-            Add Transaction
-          </Button>
-        </div>
+        {tab === 'all' && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setCsvDialogOpen(true)}>
+              <Upload className="size-4" />
+              Import CSV
+            </Button>
+            <Button onClick={openAdd}>
+              <Plus className="size-4" />
+              Add Transaction
+            </Button>
+          </div>
+        )}
       </div>
 
-      {loading ? (
+      {/* All | Recurring — recurring lives here as a segment (mobile IA consolidation) */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TransactionTab)}>
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="recurring">Recurring</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {tab === 'recurring' ? (
+        <RecurringTransactionsView />
+      ) : loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>
