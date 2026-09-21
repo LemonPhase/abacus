@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, Upload, Sun, Moon, Monitor } from 'lucide-react'
+import { Download, Upload, Sun, Moon, Monitor, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAccountsStore } from '@/stores/accountsStore'
 import { useCategoriesStore } from '@/stores/categoriesStore'
@@ -19,6 +20,7 @@ import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsSto
 import { useAuth } from '@/auth/auth'
 import { restoreUserData, currentUserId } from '@/services/restore'
 import { exportAllData } from '@/services/export'
+import { testAiConnection } from '@/services/llm'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 
@@ -27,12 +29,46 @@ export default function Settings() {
   const theme = useSettingsStore((s) => s.theme)
   const setBaseCurrency = useSettingsStore((s) => s.setBaseCurrency)
   const setTheme = useSettingsStore((s) => s.setTheme)
+  const setAiSettings = useSettingsStore((s) => s.setAiSettings)
+  const aiKey = useSettingsStore((s) => s.aiApiKey ?? '')
+  const aiModelSetting = useSettingsStore((s) => s.aiModel ?? 'gpt-4o-mini')
+  const aiBaseUrlSetting = useSettingsStore((s) => s.aiBaseUrl ?? '')
+  const [aiKeyDraft, setAiKeyDraft] = useState(aiKey)
+  const [aiModelDraft, setAiModelDraft] = useState(aiModelSetting)
+  const [aiBaseUrlDraft, setAiBaseUrlDraft] = useState(aiBaseUrlSetting)
+  const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const [aiTestMsg, setAiTestMsg] = useState('')
   const { user, signOut } = useAuth()
   const [importDialog, setImportDialog] = useState(false)
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [importMsg, setImportMsg] = useState('')
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [exportMsg, setExportMsg] = useState('')
+
+  function saveAi() {
+    setAiSettings({
+      aiApiKey: aiKeyDraft.trim() || undefined,
+      aiModel: aiModelDraft.trim() || 'gpt-4o-mini',
+      aiBaseUrl: aiBaseUrlDraft.trim(),
+    })
+  }
+
+  async function handleTestAi() {
+    saveAi()
+    setAiTestStatus('testing')
+    setAiTestMsg('')
+    const err = await testAiConnection({
+      aiApiKey: aiKeyDraft.trim(),
+      aiModel: aiModelDraft.trim() || 'gpt-4o-mini',
+      aiBaseUrl: aiBaseUrlDraft.trim(),
+    })
+    if (err) {
+      setAiTestStatus('fail')
+      setAiTestMsg(err)
+    } else {
+      setAiTestStatus('ok')
+    }
+  }
 
   async function handleExport() {
     try {
@@ -144,6 +180,66 @@ export default function Settings() {
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </Button>
             ))}
+          </div>
+        </div>
+
+        {/* AI Extraction */}
+        <div className="bg-card text-card-foreground rounded-xl border border-border/30 p-card space-y-3">
+          <h2 className="font-semibold flex items-center gap-2">
+            <Sparkles className="size-4" />
+            AI Extraction
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            OpenAI-compatible key used to extract bank statement PDFs. Stored locally on this
+            device.
+          </p>
+          <div className="grid gap-2">
+            <label className="grid gap-1">
+              <span className="text-sm">API key</span>
+              <Input
+                type="password"
+                value={aiKeyDraft}
+                onChange={(e) => setAiKeyDraft(e.target.value)}
+                onBlur={saveAi}
+                placeholder="sk-..."
+                data-testid="ai-api-key"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-sm">Model</span>
+              <Input
+                value={aiModelDraft}
+                onChange={(e) => setAiModelDraft(e.target.value)}
+                onBlur={saveAi}
+                placeholder="gpt-4o-mini"
+                data-testid="ai-model"
+              />
+            </label>
+            <label className="grid gap-1">
+              <span className="text-sm">Base URL</span>
+              <Input
+                value={aiBaseUrlDraft}
+                onChange={(e) => setAiBaseUrlDraft(e.target.value)}
+                onBlur={saveAi}
+                placeholder="https://api.openai.com/v1"
+                data-testid="ai-base-url"
+              />
+              <span className="text-xs text-muted-foreground">
+                Your API key is sent to this endpoint.
+              </span>
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTestAi}
+              disabled={aiTestStatus === 'testing'}
+            >
+              {aiTestStatus === 'testing' ? 'Testing…' : 'Test connection'}
+            </Button>
+            {aiTestStatus === 'ok' && <span className="text-xs text-primary">Connection OK</span>}
+            {aiTestStatus === 'fail' && <span className="text-xs text-cinnabar">{aiTestMsg}</span>}
           </div>
         </div>
 

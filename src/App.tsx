@@ -27,6 +27,7 @@ import NotFound from '@/pages/NotFound'
 const Reports = lazy(() => import('@/pages/Reports'))
 const Investments = lazy(() => import('@/pages/Investments'))
 const Settings = lazy(() => import('@/pages/Settings'))
+const StatementImport = lazy(() => import('@/pages/StatementImport'))
 
 function PageFallback() {
   return (
@@ -80,6 +81,7 @@ export default function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
               <Route path="transactions" element={<Transactions />} />
+              <Route path="transactions/import" element={<StatementImport />} />
               <Route path="recurring" element={<RecurringTransactions />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />

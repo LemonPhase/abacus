@@ -134,6 +134,7 @@ function createBuilder(tableName: string): any {
   let _rangeFrom = -1
   let _rangeTo = -1
   let _countRequested = false
+  let _ignoreDuplicateIds = false
 
   function applyFilters(
     rows: Record<string, unknown>[],
@@ -181,11 +182,17 @@ function createBuilder(tableName: string): any {
     return builder
   })
 
-  builder.upsert = vi.fn((data: Record<string, unknown> | Record<string, unknown>[]) => {
-    _action = 'insert'
-    _payload = data
-    return builder
-  })
+  builder.upsert = vi.fn(
+    (
+      data: Record<string, unknown> | Record<string, unknown>[],
+      opts?: { onConflict?: string; ignoreDuplicates?: boolean },
+    ) => {
+      _action = 'insert'
+      _payload = data
+      _ignoreDuplicateIds = opts?.onConflict === 'id' && opts.ignoreDuplicates === true
+      return builder
+    },
+  )
 
   builder.update = vi.fn((data: Record<string, unknown>) => {
     _action = 'update'
@@ -295,16 +302,18 @@ function createBuilder(tableName: string): any {
           }
         }
 
-        const inserted = toInsert.map((d) => {
-          const row = newRow(d as Record<string, unknown>)
-          if (tableName === 'accounts') {
-            // New account: balance is derived, no transactions can exist yet.
-            row.balance = (row.opening_balance as number) ?? 0
-          }
-          rows.push(row)
-          if (tableName === 'transactions') applyInsertBalanceEffect(row)
-          return row
-        })
+        const inserted = toInsert
+          .filter((d) => !_ignoreDuplicateIds || !rows.some((row) => row.id === d.id))
+          .map((d) => {
+            const row = newRow(d as Record<string, unknown>)
+            if (tableName === 'accounts') {
+              // New account: balance is derived, no transactions can exist yet.
+              row.balance = (row.opening_balance as number) ?? 0
+            }
+            rows.push(row)
+            if (tableName === 'transactions') applyInsertBalanceEffect(row)
+            return row
+          })
 
         if (_returning) {
           if (_single) {

@@ -19,6 +19,9 @@
   --radius-3xl: 1.25rem;
   --radius-4xl: 9999px;
 
+  /* Card inset from DESIGN.md; used by the p-card utility. */
+  --spacing-card: 1.25rem;
+
   /* Color mappings — semantic names preserved, values updated */
   --color-background: var(--background);
   --color-foreground: var(--foreground);

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Loader2, Plus, Pencil, Trash2, Upload } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Loader2, Plus, Pencil, Trash2, Upload, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -125,6 +125,7 @@ export default function Transactions() {
 
   // Auto-open add dialog when arriving via FAB (?add=true)
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   useEffect(() => {
     if (searchParams.get('add') === 'true' && !loading) {
       openAdd()
@@ -407,6 +408,10 @@ export default function Transactions() {
           <p className="text-muted-foreground">Track your income and expenses.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => navigate('/app/transactions/import')}>
+            <FileText className="size-4" />
+            Import Statement
+          </Button>
           <Button variant="outline" onClick={() => setCsvDialogOpen(true)}>
             <Upload className="size-4" />
             Import CSV
