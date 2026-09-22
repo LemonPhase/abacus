@@ -156,6 +156,9 @@ cspTest.describe('CSP: app behavior under vercel.json headers', () => {
         expect([302, 303]).toContain(verify.status)
         const deepLink = verify.headers.get('location')!
         expect(deepLink).toBeTruthy()
+        // If GoTrue throttles or rejects the verify flow it redirects to the site
+        // root instead of the SPA deep link — fail with a clear message here.
+        expect(deepLink).toContain('/auth/reset-password')
         await cspPage.goto(deepLink.replace(/^https?:\/\/[^/]+/, headersOrigin))
         await expect(cspPage).toHaveURL(/\/auth\/reset-password/)
         await cspPage.locator('input[id="password"]').fill('brand-new-password-456')
