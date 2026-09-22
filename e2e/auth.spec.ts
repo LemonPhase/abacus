@@ -161,7 +161,10 @@ publicTest.describe('Forgot password', () => {
           },
         )
         const { error } = await client.auth.resetPasswordForEmail(user.email, {
-          redirectTo: `http://localhost:${process.env.E2E_PORT ?? '5173'}/auth/reset-password`,
+          // Canonical allowlisted origin (see supabase/config.toml) — the actual
+          // origin is patched onto the verify redirect below so the suite works
+          // on any E2E_PORT.
+          redirectTo: 'http://localhost:5173/auth/reset-password',
         })
         expect(error).toBeNull()
 
@@ -178,7 +181,11 @@ publicTest.describe('Forgot password', () => {
         expect([302, 303]).toContain(verify.status)
         const deepLink = verify.headers.get('location')
         expect(deepLink).toBeTruthy()
-        const response = await page.goto(deepLink!)
+        // If GoTrue throttles or rejects the verify flow it redirects to the site
+        // root instead of the SPA deep link — fail with a clear message here.
+        expect(deepLink).toContain('/auth/reset-password')
+        const e2eOrigin = `http://localhost:${process.env.E2E_PORT ?? '5173'}`
+        const response = await page.goto(deepLink!.replace(/^https?:\/\/[^/]+/, e2eOrigin))
         expect(response?.status()).toBe(200)
         await expect(page).toHaveURL(/\/auth\/reset-password/)
         await expect(page.locator('input[id="password"]')).toBeVisible()
