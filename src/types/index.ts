@@ -23,6 +23,7 @@ export interface Category {
   parentId?: string
   color: string
   icon?: string
+  sortOrder: number
   createdAt: Date
   updatedAt: Date
 }
@@ -157,7 +158,7 @@ export interface UserSettings {
 // balance is derived by the database (opening_balance + ledger effects) —
 // clients create/correct accounts via openingBalance only.
 export type NewAccount = Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'balance'>
-export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
+export type NewCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt' | 'sortOrder'>
 // base fields are derived at write time from amount/currency/date (see transactionsStore)
 export type NewTransaction = Omit<
   Transaction,

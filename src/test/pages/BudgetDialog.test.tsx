@@ -25,6 +25,7 @@ function makeCategory(overrides: Partial<Category> = {}): Category {
     name: 'Groceries',
     type: 'expense',
     color: '#ff0000',
+    sortOrder: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

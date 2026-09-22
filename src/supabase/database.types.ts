@@ -147,6 +147,7 @@ export type Database = {
           id: string
           name: string
           parent_id: string | null
+          sort_order: number
           type: string
           updated_at: string
           user_id: string
@@ -158,6 +159,7 @@ export type Database = {
           id?: string
           name: string
           parent_id?: string | null
+          sort_order?: number
           type: string
           updated_at?: string
           user_id: string
@@ -169,6 +171,7 @@ export type Database = {
           id?: string
           name?: string
           parent_id?: string | null
+          sort_order?: number
           type?: string
           updated_at?: string
           user_id?: string
