@@ -2,6 +2,8 @@
 
 A local-first personal finance manager built with React + TypeScript + Tauri.
 
+**Live app:** [abacus.jackzxq.dev](https://abacus.jackzxq.dev)
+
 ## Features
 
 - **Dashboard** — overview of accounts, balances, and recent transactions
@@ -19,7 +21,7 @@ A local-first personal finance manager built with React + TypeScript + Tauri.
 
 - React 19, React Router v7, TypeScript 6
 - Tailwind CSS v4, shadcn/ui (base-nova), lucide-react
-- Supabase for cloud sync & auth
+- Supabase for cloud sync &amp; auth
 - Zustand for state management
 - Recharts for data visualization
 - Tauri v2 for desktop builds
