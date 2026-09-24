@@ -32,3 +32,6 @@ test-results/
 
 # Supabase SQL snippets (personal scratchpad queries from the dashboard)
 supabase/snippets/
+
+# Verification proof artifacts (local runs, never committed)
+.cursor/skills/verify-abacus/evidence/
