@@ -51,7 +51,7 @@ Risks, follow-ups, breaking changes — or omit this section.
 - Keep each section short; if a section doesn't apply (other than What/Why/Testing), omit it.
 - `What`, `Why`, and `Testing` are required. `Testing` must name the actual commands or steps run, not just "tests pass".
 - PR title: plain capitalised title (e.g. "Add recurring transaction skip action"). No prefixes — no `feat:`, `fix:`, `chore:`, etc. — and no issue numbers in the title.
-- For user-facing changes, run the `verify-abacus` skill (`.agents/skills/verify-abacus/`) and attach its evidence (screenshots/aria dumps) under `Screenshots`.
+- For user-facing changes, run the `verify-abacus` skill (`.agents/skills/verify-abacus/`) and attach its evidence (screenshots/aria dumps) under `Screenshots`. Upload screenshots with `gh pr create --attach './path/to/img.png#Alt text'` (also works on `gh pr edit` / `gh pr comment`).
 
 ## Architecture
 
