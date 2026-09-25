@@ -69,10 +69,20 @@ export function InvestmentList({
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="icon-xs" onClick={() => onEdit(plan)}>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Edit investment plan"
+                      onClick={() => onEdit(plan)}
+                    >
                       <Pencil className="size-3" />
                     </Button>
-                    <Button variant="ghost" size="icon-xs" onClick={() => onDelete(plan)}>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Delete investment plan"
+                      onClick={() => onDelete(plan)}
+                    >
                       <Trash2 className="size-3" />
                     </Button>
                   </div>

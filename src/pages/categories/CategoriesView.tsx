@@ -79,10 +79,20 @@ function CategoryItem({
           >
             <ChevronDown className="size-3" />
           </Button>
-          <Button variant="ghost" size="icon-xs" onClick={() => onEdit(cat)}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Edit category"
+            onClick={() => onEdit(cat)}
+          >
             <Pencil className="size-3" />
           </Button>
-          <Button variant="ghost" size="icon-xs" onClick={() => onDelete(cat)}>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Delete category"
+            onClick={() => onDelete(cat)}
+          >
             <Trash2 className="size-3" />
           </Button>
         </div>
