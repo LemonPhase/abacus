@@ -13,10 +13,10 @@ const STATUS_MAP: Record<BudgetStatus, BudgetStatusColors> = {
 }
 
 export function getBudgetStatus(percentage: number): BudgetStatus {
+  if (percentage > 100) return 'over'
   if (percentage < 50) return 'good'
   if (percentage < 80) return 'warning'
-  if (percentage < 100) return 'danger'
-  return 'over'
+  return 'danger'
 }
 
 export function getBudgetColors(status: BudgetStatus): BudgetStatusColors {

@@ -118,7 +118,7 @@ describe('BudgetList', () => {
     expect(screen.queryByText('Over budget!')).not.toBeInTheDocument()
   })
 
-  it('shows "X left" when percentage < 100', () => {
+  it('shows "X left" when spend is under the budget amount', () => {
     const budget = makeBudget({ amount: 500 })
     renderList({
       budgets: [budget],
