@@ -68,7 +68,7 @@ describe('Accounts page — opening balance semantics', () => {
     renderPage()
 
     await user.click(await screen.findByRole('button', { name: /add account/i }))
-    await user.type(await screen.findByLabelText('Name'), 'Cash Wallet')
+    await user.type(await screen.findByLabelText(/Name/), 'Cash Wallet')
     await user.type(screen.getByLabelText('Opening balance'), '250')
     await user.click(screen.getByRole('button', { name: 'Add Account' }))
 

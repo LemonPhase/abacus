@@ -104,7 +104,7 @@ describe('BudgetDialog', () => {
 
   it('renders name input', () => {
     renderDialog()
-    expect(screen.getByLabelText('Name')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Name/)).toBeInTheDocument()
   })
 
   it('renders period select', () => {
@@ -115,7 +115,21 @@ describe('BudgetDialog', () => {
 
   it('renders amount input', () => {
     renderDialog()
-    expect(screen.getByLabelText('Amount')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Amount/)).toBeInTheDocument()
+  })
+
+  it('marks the submit-gated fields as required and the rest as optional', () => {
+    renderDialog()
+    const labelText = (name: string) =>
+      screen.getByText(new RegExp(`^${name}`), { selector: 'label' }).textContent ?? ''
+
+    expect(labelText('Name')).toContain('*')
+    expect(labelText('Amount')).toContain('*')
+    expect(labelText('Categories')).toContain('*')
+    expect(labelText('Period')).not.toContain('*')
+    expect(labelText('Start Date')).not.toContain('*')
+    expect(screen.getByLabelText(/Name/)).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByLabelText(/Amount/)).toHaveAttribute('aria-required', 'true')
   })
 
   it('renders start date input', () => {

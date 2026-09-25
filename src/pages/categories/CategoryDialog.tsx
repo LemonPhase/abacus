@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { ICON_MAP, ICON_NAMES } from '@/lib/icons'
 import { CATEGORY_PICKER_COLORS as COLORS } from '@/lib/chartColors'
+import { RequiredMark } from '@/components/RequiredMark'
 import type { Category, CategoryKind } from '@/types'
 
 export interface CategoryFormData {
@@ -60,9 +61,12 @@ export function CategoryDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="cat-name">Name</Label>
+            <Label htmlFor="cat-name">
+              Name <RequiredMark />
+            </Label>
             <Input
               id="cat-name"
+              aria-required="true"
               value={form.name}
               onChange={(e) => onFormChange({ ...form, name: e.target.value })}
               placeholder="e.g. Groceries"

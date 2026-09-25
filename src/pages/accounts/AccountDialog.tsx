@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import type { Account, AccountType } from '@/types'
 import { formatCurrency } from '@/lib/currency'
+import { RequiredMark } from '@/components/RequiredMark'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'CHF', 'INR', 'BRL']
 const ACCOUNT_TYPES: AccountType[] = ['checking', 'savings', 'investment', 'credit', 'cash']
@@ -67,9 +68,12 @@ export function AccountDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="acct-name">Name</Label>
+            <Label htmlFor="acct-name">
+              Name <RequiredMark />
+            </Label>
             <Input
               id="acct-name"
+              aria-required="true"
               value={form.name}
               onChange={(e) => onFormChange({ ...form, name: e.target.value })}
               placeholder="e.g. Main Checking"

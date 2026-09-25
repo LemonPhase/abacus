@@ -18,6 +18,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import type { Account, Category, RecurringFrequency, RecurringTransactionKind } from '@/types'
 import type { RecurringTransaction } from '@/types'
+import { RequiredMark } from '@/components/RequiredMark'
 
 export interface RecurringFormData {
   accountId: string
@@ -103,13 +104,15 @@ export function RecurringDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Account</Label>
+            <Label>
+              Account <RequiredMark />
+            </Label>
             <Select
               value={form.accountId}
               onValueChange={(v) => onFormChange({ ...form, accountId: v ?? '' })}
               items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-required="true">
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
@@ -122,13 +125,15 @@ export function RecurringDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Category</Label>
+            <Label>
+              Category <RequiredMark />
+            </Label>
             <Select
               value={form.categoryId}
               onValueChange={(v) => onFormChange({ ...form, categoryId: v ?? '' })}
               items={filteredCategories.map((c) => ({ value: c.id, label: c.name }))}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-required="true">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -142,9 +147,12 @@ export function RecurringDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="rc-amount">Amount</Label>
+              <Label htmlFor="rc-amount">
+                Amount <RequiredMark />
+              </Label>
               <Input
                 id="rc-amount"
+                aria-required="true"
                 type="number"
                 step="0.01"
                 min="0"
@@ -193,9 +201,12 @@ export function RecurringDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="rc-interval">Every</Label>
+              <Label htmlFor="rc-interval">
+                Every <RequiredMark />
+              </Label>
               <Input
                 id="rc-interval"
+                aria-required="true"
                 type="number"
                 min="1"
                 max="365"
