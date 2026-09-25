@@ -167,9 +167,18 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
     return (getter() as Record<string, T[]>)[collectionKey] ?? []
   }
 
-  function totalBump(state: Record<string, unknown>, delta: number) {
+  /**
+   * Count deltas on realtime/optimistic mutations: `total` tracks rows
+   * matching the active filters, `grandTotal` tracks every row (the unfiltered
+   * denominator the count line displays).
+   */
+  function countBump(state: Record<string, unknown>, delta: number, counted = true) {
+    const patch: Record<string, unknown> = {}
     const total = state.total as number | null
-    return total !== null ? { total: total + delta } : {}
+    if (counted && total !== null) patch.total = total + delta
+    const grandTotal = state.grandTotal as number | null
+    if (grandTotal !== null) patch.grandTotal = grandTotal + delta
+    return patch
   }
 
   function handleRealtime(set: SetFn, payload: RealtimePayload) {
@@ -179,10 +188,10 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       const counted = matchesFilters(payload.old, lastFilters)
       set((state: Record<string, unknown>) => {
         const list = getItems(() => state)
-        if (!list.some((i) => i.id === id)) return counted ? totalBump(state, -1) : state
+        if (!list.some((i) => i.id === id)) return countBump(state, -1, counted)
         return {
           [collectionKey]: list.filter((item) => item.id !== id),
-          ...(counted ? totalBump(state, -1) : {}),
+          ...countBump(state, -1, counted),
         }
       })
       return
@@ -196,6 +205,9 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         set((state: Record<string, unknown>) => ({
           [collectionKey]: getItems(() => state).filter((item) => item.id !== id),
         }))
+      } else if (payload.eventType === 'INSERT') {
+        // A row outside the query still exists — counts toward grandTotal only.
+        set((state: Record<string, unknown>) => countBump(state, 1, false))
       }
       return
     }
@@ -212,11 +224,11 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         // paging). It still exists, so it counts toward `total`.
         const last = list[list.length - 1]
         if ((state.hasMore as boolean) && last && compareItems(item, last) > 0) {
-          return payload.eventType === 'INSERT' ? totalBump(state, 1) : state
+          return payload.eventType === 'INSERT' ? countBump(state, 1) : state
         }
         return {
           [collectionKey]: insertSorted(list, item, compareItems),
-          ...(payload.eventType === 'INSERT' ? totalBump(state, 1) : {}),
+          ...(payload.eventType === 'INSERT' ? countBump(state, 1) : {}),
         }
       }
       // Last write wins: replace in place. If the update moves the row
@@ -337,6 +349,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       try {
         let rows: Record<string, unknown>[] = []
         let total: number | null = null
+        let grandTotal: number | null = null
         let hasMore = false
 
         if (limit === undefined) {
@@ -363,6 +376,17 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
           rows = res.data ?? []
           total = res.count
           hasMore = rows.length === limit
+          if (activeFilters.length === 0) {
+            grandTotal = res.count
+          } else {
+            // The page count is the filtered total; the count line shows the
+            // unfiltered grand total too — one head-count query supplies it.
+            const head: PageResult = await supabase
+              .from(table)
+              .select('*', { count: 'exact', head: true })
+            if (failOrStale(head)) return
+            grandTotal = head.count
+          }
         }
 
         set((state: Record<string, unknown>) => {
@@ -376,7 +400,14 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
           } else {
             items = rows.map(mapRow)
           }
-          return { [collectionKey]: items, loading: false, loadingMore: false, hasMore, total }
+          return {
+            [collectionKey]: items,
+            loading: false,
+            loadingMore: false,
+            hasMore,
+            total,
+            grandTotal,
+          }
         })
         // Snapshot published — apply everything that happened mid-load.
         flushEvents()
@@ -423,6 +454,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       const item = mapRow(inserted as Record<string, unknown>)
       // Optimistic insert only lands in the collection when it matches the
       // active filters (in paged mode a reload fetches it under the right page).
+      // Rows outside the query are counted by their realtime echo (grandTotal).
       if (!matchesFilters(inserted as Record<string, unknown>, lastFilters)) return item
       if (pendingEvents) {
         // Mid-load: a live optimistic insert would be wiped by the snapshot
@@ -444,11 +476,11 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         // remaining, a row sorting beyond the loaded window is left for
         // loadMore() — applying it here would corrupt the offset paging.
         if ((state.hasMore as boolean) && last && compareItems(item, last) > 0) {
-          return totalBump(state, 1)
+          return countBump(state, 1)
         }
         return {
           [collectionKey]: insertSorted(list, item, compareItems),
-          ...totalBump(state, 1),
+          ...countBump(state, 1),
         }
       })
       return item
@@ -502,7 +534,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         }
         return {
           [collectionKey]: newList,
-          ...totalBump(state, newCount),
+          ...countBump(state, newCount),
         }
       })
       return items
@@ -583,6 +615,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
         loadingMore: false,
         hasMore: false,
         total: null,
+        grandTotal: null,
         error: null,
       })
     }
@@ -592,6 +625,7 @@ export function createCrudSlice<T extends { id: string }>(config: CrudConfig<T>)
       loadingMore: false,
       hasMore: false,
       total: null,
+      grandTotal: null,
       error: null,
       _unsub: null,
       clearError: () => set({ error: null }),
