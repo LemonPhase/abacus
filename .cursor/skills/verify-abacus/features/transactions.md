@@ -1,0 +1,45 @@
+# Transactions
+
+Transactions records income, expenses, and transfers with multi-currency
+amounts, filterable by account/category/type/date, paginated 50 at a time. The
+Recurring segment shares the host and manages recurring transaction rules.
+
+## Sub-features
+
+- `tx-create` adds a transaction and the account balance updates.
+- `tx-edit` changes an existing transaction.
+- `tx-delete` removes a transaction and the balance reverts.
+- `tx-filter` narrows by type/account/category/date without losing rows.
+- `tx-pagination` loads 50 rows at a time with an accurate count line.
+- `tx-recurring` is the Recurring segment at its own entry point.
+
+## How to get to it (user POV)
+
+- Sidebar `Transactions` → `/app/transactions`.
+- Sidebar `Recurring` → `/app/recurring` (same host, selected segment).
+- The filter bar above the table (selects and date inputs).
+- `Load more` button below the table.
+
+## Driving it with Playwright
+
+Preconditions:
+
+- Doctor reports `OK`. `test` user seeded with rows via `userSupabase` using the insert shapes in `../_seed-recipes.md` (NOT NULLs: `type`, `currency`, `base_amount`, `base_currency`, `date`; seed account balances via `opening_balance`) with distinctive descriptions (e.g. `March salary`, `Whole Foods`).
+
+- **Create.** Choose `Add Transaction` via `page.getByRole('button', { name: 'Add Transaction' }).first()` — the accessible name is shared by the page button, the floating FAB, and the dialog submit (the FAB is always labelled `Add Transaction`, on every page). The dialog labels its fields Type / Account / Category / Amount / Date / Description. Selects in order: `page.locator('[data-slot="dialog-content"] [data-slot="select-trigger"]').nth(0|1|2)` = Type / Account / Category; pick items under `[data-slot="select-content"][data-open]`. The submit stays `disabled` until Account is picked and (for non-transfer) Category is picked — despite `category_id` being nullable in the schema (see Gotchas). Fill Amount / Date / Description via `getByLabel(...)`, submit `Add Transaction` scoped under `[data-slot="dialog-content"]`. The row appears in the table. Screenshot `tx-create__app-transactions__created.png` + ARIA snapshot.
+- **Edit.** Row Pencil opens `Edit Transaction` with the same fields; submit `Save`. Delete confirm dialog is titled `Delete Transaction`.
+- **List.** Run `await page.goto('/app/transactions')`. Seeded descriptions are visible. Screenshot `tx-<id>-list.png` + ARIA snapshot.
+- **Filter.** In `page.locator('.flex.flex-wrap.items-end.gap-3.rounded-xl.border.bg-card')` click `[data-slot="select-trigger"]` nth(2), pick an item under `[data-slot="select-content"][data-open]`. Matching rows stay visible, others (`Whole Foods`) are gone. Clear the filter by picking its `All …` item (`All` / `All accounts` / `All categories`) and assert every row returns. Screenshot `tx-filter__app-transactions__filtered.png`.
+- **Date filter.** Fill `filterBar.locator('input[type="date"]')` first with `2024-03-01`. Only rows on/after that date remain.
+- **Pagination.** Seed ≥105 rows (see `../_seed-recipes.md`): `Showing 50 of 105 transactions` is visible; run `await page.getByRole('button', { name: 'Load more' }).click()` → `Showing 100 of 105`, a second click → `Showing 105 of 105 transactions`, table `tbody tr` count grows 50→100→105. Screenshot `tx-pagination__app-transactions__page2.png`.
+- **Side effect (create/edit/delete).** Read back via `userSupabase.from('transactions').select()` and `userSupabase.from('accounts').select('balance')` — the `maintain_account_balance` trigger must reflect the mutation in the balance.
+
+## Gotchas
+
+- Filter select indexes (`nth(2)`) are part of the stable handle set but re-check the filter bar order if the UI changed.
+- Assert balances via `userSupabase` read-back; the visible table alone does not prove the trigger fired.
+- `/app/recurring` renders this host — it is a separate entry point and needs its own drive (see `e2e/recurring.spec.ts` for the current recipe).
+- The floating FAB is always labelled `Add Transaction` regardless of page — name-based clicks on `Add Transaction` hit 2+ elements; use `.first()` for the page button and scope dialog submits.
+- The submit is gated on Account + Amount + (Category unless type is transfer; plus a destination Account for transfers) even though `category_id` is nullable in the schema and category-less rows render `—`. Seed a category before driving mutations; the Category requirement itself is a known app issue.
+- The count line under filters reads `Showing 2 of 2` (filtered total) while pagination's `of N` is the unfiltered total — known app inconsistency; assert counts against your seed, not the phrase.
+- `/app/transactions` shows an `All | Recurring` tablist; it and `/app/recurring` are the same segment. Drive recurring at `/app/recurring` per `e2e/recurring.spec.ts`.
