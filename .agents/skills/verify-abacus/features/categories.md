@@ -38,10 +38,10 @@ Preconditions:
 ## Gotchas
 
 - The dialog submit shares its name (`Add Category`) with the page opener — always scope it under `[data-slot="dialog-content"]`. Editing submits `Save`.
-- Move up/down expose `Move <name> up` / `Move <name> down` labels, but Edit and Delete are bare icon buttons — use position (nth(2) = edit, last = delete), scoped to the row matched by text.
+- Move up/down expose `Move <name> up` / `Move <name> down`, and Edit / Delete expose `Edit category` / `Delete category` (not per-row names) — scope to the row matched by text first; position (nth(2) = edit, last = delete) also works.
 - The `Parent Category` select renders only when a root category of the same type exists; its first item is `None (root category)`.
 - Changing Type in the dialog resets the parent and only offers parents of the newly chosen type.
 - Color swatches and icon-grid buttons are bare/named-by-title buttons — pick by `title` (icons) or position (colors), or skip (a default color is preselected).
 - `Add Category` creates into the currently active tab's type, and the tab switches to the saved type after save.
 - Reordering persists immediately (the swap is written to the DB) but the list does NOT re-sort in place — reload or navigate away and back to observe the new order. A click with no reload looks like a no-op (product gap, reported 2026-09-25).
-- The submit is disabled until the name is non-empty — there is no error message, don't wait for one.
+- The submit is disabled until the name is non-empty (the `Name` field carries a `*` marker and `aria-required`) — there is no error message, don't wait for one.
