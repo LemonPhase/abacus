@@ -129,6 +129,9 @@ describe('RecurringTransactionsView', () => {
       expect(screen.getByText('Netflix')).toBeInTheDocument()
     })
     expect(screen.getByText(/Monthly/)).toBeInTheDocument()
+    // not due until 2099 — no Apply action, but named row actions exist
+    expect(screen.queryByLabelText(/Apply now/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Edit Netflix')).toBeInTheDocument()
   })
 
   it('shows paused label for inactive items', async () => {
@@ -185,7 +188,7 @@ describe('RecurringTransactionsView', () => {
     await waitFor(() => {
       expect(screen.getByText('Rent')).toBeInTheDocument()
     })
-    expect(screen.getByLabelText('Apply now')).toBeInTheDocument()
+    expect(screen.getByLabelText('Apply now Rent')).toBeInTheDocument()
     expect(screen.getByLabelText('Edit Rent')).toBeInTheDocument()
     expect(screen.getByLabelText('Delete Rent')).toBeInTheDocument()
   })
