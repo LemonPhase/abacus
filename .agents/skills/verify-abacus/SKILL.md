@@ -44,7 +44,7 @@ present, and the app port either answering or free. Exit `0` = worth driving,
 `1` = fix the reported line first. Invocation is exactly:
 
 ```bash
-.cursor/skills/verify-abacus/scripts/doctor.sh [port]   # default port 5173
+.agents/skills/verify-abacus/scripts/doctor.sh [port]   # default port 5173
 ```
 
 ## Drive
@@ -102,7 +102,7 @@ Stable handles used across the app (prefer these over DOM position):
 
 ## Evidence
 
-Write artifacts to `.cursor/skills/verify-abacus/evidence/<slice>/` (create it
+Write artifacts to `.agents/skills/verify-abacus/evidence/<slice>/` (create it
 first; pass it to the spec as `VERIFY_EVIDENCE`). Name every artifact
 `<feature>__<route>__<state>.<ext>` — e.g.
 `tx-create__app-transactions__created.png` — where `state` is what you just

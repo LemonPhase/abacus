@@ -34,4 +34,4 @@ test-results/
 supabase/snippets/
 
 # Verification proof artifacts (local runs, never committed)
-.cursor/skills/verify-abacus/evidence/
+.agents/skills/verify-abacus/evidence/

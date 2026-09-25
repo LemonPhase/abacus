@@ -18,6 +18,41 @@
 - **E2E tests**: `npm run test:e2e` (Playwright, chromium only). Requires dev server at localhost:5173 — config auto-starts it but `reuseExistingServer: true` means it uses an already-running server when available. E2E tests live in `e2e/` and are excluded from vitest (`vitest.config.ts` `exclude: ["e2e/**"]`).
 - **Coverage**: `npx vitest run --coverage` (vitest/coverage-v8).
 
+## Pull requests
+
+Every PR description (human- or agent-written) must use this template:
+
+```md
+## What
+
+One or two sentences describing the change.
+
+## Why
+
+The problem or motivation. Link the issue if one exists.
+
+## How
+
+Key implementation decisions. Call out anything non-obvious.
+
+## Testing
+
+How it was verified (e.g. `npm test`, `npm run build`, manual steps).
+
+## Screenshots (optional)
+
+Before/after images for visual changes.
+
+## Anything else
+
+Risks, follow-ups, breaking changes — or omit this section.
+```
+
+- Keep each section short; if a section doesn't apply (other than What/Why/Testing), omit it.
+- `What`, `Why`, and `Testing` are required. `Testing` must name the actual commands or steps run, not just "tests pass".
+- PR title: plain capitalised title (e.g. "Add recurring transaction skip action"). No prefixes — no `feat:`, `fix:`, `chore:`, etc. — and no issue numbers in the title.
+- For user-facing changes, run the `verify-abacus` skill (`.agents/skills/verify-abacus/`) and attach its evidence (screenshots/aria dumps) under `Screenshots`.
+
 ## Architecture
 
 - **React 19 + React Router v7** SPA. 13 page components in `src/pages/` (9 app pages: Accounts, Budgets, Categories, Dashboard, Investments, RecurringTransactions, Reports, Settings, Transactions; 2 auth pages: Auth, ResetPassword; plus Landing, NotFound).
@@ -105,6 +140,7 @@ src/test/
 - Store tests use the real Zustand stores with mocked Supabase (no DB needed).
 - `jsdom` environment — `window.matchMedia` and `ResizeObserver` are mocked globally in `setup.ts`.
 - Before marking work complete, verify: `npm test` and `npm run build` both pass.
+- PRs must follow the template in [Pull requests](#pull-requests).
 - If you refactored existing code, run the related test files to confirm nothing regressed:
   `npx vitest run src/test/<domain>/<file>.test.ts`
 

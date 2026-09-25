@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read-only health check for the abacus verification harness.
-# Usage: .cursor/skills/verify-abacus/scripts/doctor.sh [port]   (default 5173)
+# Usage: .agents/skills/verify-abacus/scripts/doctor.sh [port]   (default 5173)
 set -u
 cd "$(dirname "$0")/../../../.." || exit 1
 PORT="${1:-5173}"
