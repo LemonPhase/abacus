@@ -55,7 +55,5 @@ handles, required state, commands, and observable proof.
 - [Transactions](./transactions.md) — transaction CRUD, filters, pagination, and the standalone Recurring page.
 - [Budgets](./budgets.md) — budget CRUD with amount and period.
 - [Dashboard and Reports](./dashboard-reports.md) — net worth, income/expense cards, charts, category breakdown.
-
-Not yet mapped (drive from the pages directly until they get a file):
-Categories (`/app/categories`), Settings incl. CSV export and base currency
-(`/app/settings`).
+- [Categories](./categories.md) — category CRUD, subcategories, and reordering.
+- [Settings](./settings.md) — base currency, theme, JSON export/import, sign-out.
