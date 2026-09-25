@@ -74,7 +74,7 @@ export default function Transactions() {
   const loading = useTransactionsStore((s) => s.loading)
   const loadingMore = useTransactionsStore((s) => s.loadingMore)
   const hasMore = useTransactionsStore((s) => s.hasMore)
-  const total = useTransactionsStore((s) => s.total)
+  const grandTotal = useTransactionsStore((s) => s.grandTotal)
   const loadTx = useTransactionsStore((s) => s.load)
   const loadMoreTx = useTransactionsStore((s) => s.loadMore)
   const add = useTransactionsStore((s) => s.add)
@@ -210,7 +210,7 @@ export default function Transactions() {
     setSaveError(null)
     try {
       const amount = parseFloat(form.amount) || 0
-      if (!form.accountId || (!form.categoryId && form.type !== 'transfer') || !amount) return
+      if (!form.accountId || !amount) return
 
       const account = accounts.find((a) => a.id === form.accountId)
       const currency = account?.currency ?? baseCurrency
@@ -291,7 +291,7 @@ export default function Transactions() {
         } else {
           await update(editing, {
             accountId: form.accountId,
-            categoryId: form.categoryId,
+            categoryId: form.categoryId || null,
             type: form.type,
             amount,
             currency,
@@ -302,7 +302,7 @@ export default function Transactions() {
       } else {
         await add({
           accountId: form.accountId,
-          categoryId: form.categoryId,
+          categoryId: form.categoryId || null,
           type: form.type,
           amount,
           currency,
@@ -529,12 +529,18 @@ export default function Transactions() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-0.5">
-                            <Button variant="ghost" size="icon-xs" onClick={() => openEdit(tx)}>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label="Edit transaction"
+                              onClick={() => openEdit(tx)}
+                            >
                               <Pencil className="size-3" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon-xs"
+                              aria-label="Delete transaction"
                               onClick={() => setDeleteTarget(tx.id)}
                             >
                               <Trash2 className="size-3" />
@@ -546,9 +552,9 @@ export default function Transactions() {
                   </TableBody>
                 </Table>
               </div>
-              {total !== null && (
+              {grandTotal !== null && (
                 <p className="text-xs text-muted-foreground mt-3 px-1 tabular-nums">
-                  Showing {transactions.length} of {total} transactions
+                  Showing {transactions.length} of {grandTotal} transactions
                 </p>
               )}
               {hasMore && (
