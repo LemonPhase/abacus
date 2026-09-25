@@ -31,7 +31,7 @@ describe('Dashboard Page', () => {
   it('renders the main sections', async () => {
     renderWithRouter(<Dashboard />)
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Home')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByText('Net Worth')).toBeInTheDocument()
       expect(screen.getByText('Income')).toBeInTheDocument()

@@ -251,7 +251,7 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Home</h1>
           <p className="mt-1 text-sm text-muted-foreground">Your financial overview at a glance.</p>
         </div>
         {/* Reports are absorbed into Home on mobile — desktop has the sidebar link. */}

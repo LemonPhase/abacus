@@ -52,11 +52,7 @@ const emptyForm: InvestmentFormData = {
   notes: '',
 }
 
-/**
- * Investment-plans feature without the page header, so it can render embedded
- * in the Accounts page (Investments segment) and standalone.
- */
-export default function InvestmentsView() {
+export default function Investments() {
   const plans = useInvestmentPlansStore((s) => s.plans)
   const loading = useInvestmentPlansStore((s) => s.loading)
   const load = useInvestmentPlansStore((s) => s.load)
@@ -171,7 +167,13 @@ export default function InvestmentsView() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Investments</h1>
+          <p className="text-muted-foreground">
+            Plan and project your investment growth over time.
+          </p>
+        </div>
         <Button onClick={openAdd}>
           <Plus className="size-4" />
           Add Investment

@@ -1,51 +1,65 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-
 import Sidebar from '@/components/layout/Sidebar'
 import MobileNav from '@/components/layout/MobileNav'
+import MobileMoreLink from '@/components/layout/MobileMoreLink'
 
-function renderWithRouter(ui: React.ReactElement, { route = '/' } = {}) {
+function renderWithRouter(ui: React.ReactElement, route = '/app/dashboard') {
   return render(<MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>)
 }
 
 describe('Sidebar', () => {
-  it('renders brand name and all nav links', () => {
-    renderWithRouter(<Sidebar />)
+  it('exposes every page with its own active link', () => {
+    renderWithRouter(<Sidebar />, '/app/investments')
     expect(screen.getByText('Abacus')).toBeInTheDocument()
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Accounts')).toBeInTheDocument()
-    expect(screen.getByText('Transactions')).toBeInTheDocument()
-    expect(screen.getByText('Recurring')).toBeInTheDocument()
-    expect(screen.getByText('Budgets')).toBeInTheDocument()
-    expect(screen.getByText('Reports')).toBeInTheDocument()
-    expect(screen.getByText('Settings')).toBeInTheDocument()
-  })
-})
-
-describe('MobileNav', () => {
-  it('renders the five consolidated tabs with visible labels', () => {
-    renderWithRouter(<MobileNav />, { route: '/app/dashboard' })
-    const labels = ['Home', 'Transactions', 'Budgets', 'Accounts', 'Settings']
-    for (const label of labels) {
-      expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
-    }
-    expect(screen.getAllByRole('link')).toHaveLength(5)
-  })
-
-  it('highlights the host tab on absorbed routes (recurring → Transactions)', () => {
-    renderWithRouter(<MobileNav />, { route: '/app/recurring' })
-    expect(screen.getByRole('link', { name: 'Transactions' }).className).toContain('text-primary')
-    expect(screen.getByRole('link', { name: 'Transactions' })).toHaveAttribute(
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Home',
+      'Transactions',
+      'Budgets',
+      'Accounts',
+      'Reports',
+      'Recurring',
+      'Investments',
+      'Categories',
+      'Settings',
+    ])
+    expect(screen.getByRole('link', { name: 'Investments' })).toHaveAttribute(
       'aria-current',
       'page',
     )
-    expect(screen.getByRole('link', { name: 'Home' }).className).not.toContain('text-primary')
-    expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: 'Accounts' })).not.toHaveAttribute('aria-current')
+  })
+})
+
+describe('Mobile navigation', () => {
+  it('renders five labeled tabs', () => {
+    renderWithRouter(<MobileNav />)
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual([
+      'Home',
+      'Transactions',
+      'Budgets',
+      'Accounts',
+      'More',
+    ])
   })
 
-  it('highlights Settings on the absorbed categories route', () => {
-    renderWithRouter(<MobileNav />, { route: '/app/categories' })
-    expect(screen.getByRole('link', { name: 'Settings' }).className).toContain('text-primary')
+  it.each(['reports', 'recurring', 'investments', 'categories', 'settings', 'more'])(
+    'selects More at /app/%s',
+    (route) => {
+      renderWithRouter(<MobileNav />, `/app/${route}`)
+      expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('link', { name: 'Home' })).not.toHaveAttribute('aria-current')
+    },
+  )
+
+  it('provides an explicit return link on a secondary page', () => {
+    renderWithRouter(<MobileMoreLink />, '/app/categories/')
+    expect(screen.getByRole('link', { name: 'More' })).toHaveAttribute('href', '/app/more')
+  })
+
+  it('does not show the return link on primary pages', () => {
+    renderWithRouter(<MobileMoreLink />, '/app/accounts')
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 })

@@ -1,54 +1,61 @@
-import type { LucideIcon } from 'lucide-react'
-import {
-  LayoutDashboard,
-  Landmark,
-  ArrowLeftRight,
-  CalendarClock,
-  Target,
-  BarChart3,
-  Settings,
-  Tags,
-  TrendingUp,
-} from 'lucide-react'
-
-export type NavLinkConfig = {
+type Destination = {
   to: string
   label: string
-  icon: LucideIcon
+  icon:
+    | 'home'
+    | 'transactions'
+    | 'budgets'
+    | 'accounts'
+    | 'reports'
+    | 'recurring'
+    | 'investments'
+    | 'categories'
+    | 'settings'
+  mobile: 'primary' | 'more'
+  desktop: 'main' | 'footer'
 }
 
-export const NAV_LINKS: NavLinkConfig[] = [
-  { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/app/accounts', label: 'Accounts', icon: Landmark },
-  { to: '/app/transactions', label: 'Transactions', icon: ArrowLeftRight },
-  { to: '/app/recurring', label: 'Recurring', icon: CalendarClock },
-  { to: '/app/budgets', label: 'Budgets', icon: Target },
-  { to: '/app/reports', label: 'Reports', icon: BarChart3 },
-  { to: '/app/categories', label: 'Categories', icon: Tags },
-  { to: '/app/investments', label: 'Investments', icon: TrendingUp },
-  { to: '/app/settings', label: 'Settings', icon: Settings },
-]
-
-export type MobileNavLinkConfig = NavLinkConfig & {
-  /** Extra path prefixes that should mark this tab active (absorbed subpages). */
-  activeOn?: string[]
-}
-
-/**
- * Consolidated five-tab mobile bar (industry 3–5 ceiling). Absorbed pages
- * deep-link into their host route, which pre-selects the matching segment:
- * recurring → Transactions, categories → Settings, investments → Accounts,
- * reports → Dashboard.
- */
-export const MOBILE_NAV_LINKS: MobileNavLinkConfig[] = [
-  { to: '/app/dashboard', label: 'Home', icon: LayoutDashboard, activeOn: ['/app/reports'] },
+export const NAV_LINKS = [
+  { to: '/app/dashboard', label: 'Home', icon: 'home', mobile: 'primary', desktop: 'main' },
   {
     to: '/app/transactions',
     label: 'Transactions',
-    icon: ArrowLeftRight,
-    activeOn: ['/app/recurring'],
+    icon: 'transactions',
+    mobile: 'primary',
+    desktop: 'main',
   },
-  { to: '/app/budgets', label: 'Budgets', icon: Target },
-  { to: '/app/accounts', label: 'Accounts', icon: Landmark, activeOn: ['/app/investments'] },
-  { to: '/app/settings', label: 'Settings', icon: Settings, activeOn: ['/app/categories'] },
+  { to: '/app/budgets', label: 'Budgets', icon: 'budgets', mobile: 'primary', desktop: 'main' },
+  { to: '/app/accounts', label: 'Accounts', icon: 'accounts', mobile: 'primary', desktop: 'main' },
+  { to: '/app/reports', label: 'Reports', icon: 'reports', mobile: 'more', desktop: 'main' },
+  { to: '/app/recurring', label: 'Recurring', icon: 'recurring', mobile: 'more', desktop: 'main' },
+  {
+    to: '/app/investments',
+    label: 'Investments',
+    icon: 'investments',
+    mobile: 'more',
+    desktop: 'main',
+  },
+  {
+    to: '/app/categories',
+    label: 'Categories',
+    icon: 'categories',
+    mobile: 'more',
+    desktop: 'main',
+  },
+  { to: '/app/settings', label: 'Settings', icon: 'settings', mobile: 'more', desktop: 'footer' },
+] satisfies Destination[]
+
+export const MORE_LINKS = NAV_LINKS.filter((link) => link.mobile === 'more')
+export const MORE_LINK = { to: '/app/more', label: 'More', icon: 'more' } as const
+export const MOBILE_NAV_LINKS = [
+  ...NAV_LINKS.filter((link) => link.mobile === 'primary'),
+  MORE_LINK,
 ]
+
+export function isMoreDestination(pathname: string) {
+  return MORE_LINKS.some((link) => link.to === pathname.replace(/\/+$/, ''))
+}
+
+export function isMobileNavActive(to: string, pathname: string) {
+  return to === pathname.replace(/\/+$/, '') || (to === MORE_LINK.to && isMoreDestination(pathname))
+}

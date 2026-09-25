@@ -49,7 +49,7 @@ publicTest.describe('Public pages', () => {
   publicTest('not found page renders for unknown public routes', async ({ page }) => {
     await page.goto('/non-existent-route')
     await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Go to dashboard' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Go to Home' })).toBeVisible()
   })
 })
 
@@ -57,7 +57,7 @@ test.describe('App pages (authenticated)', () => {
   test('dashboard page survives direct navigation and refresh', async ({ page }) => {
     const response = await page.goto('/app/dashboard')
     expect(response?.status()).toBe(200)
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Home')
     await expect(page.getByText('Net Worth')).toBeVisible()
     await expect(page.getByText('Income', { exact: true })).toBeVisible()
     await expect(page.getByText('Expenses', { exact: true })).toBeVisible()
@@ -70,7 +70,7 @@ test.describe('App pages (authenticated)', () => {
 
     const refreshResponse = await page.reload()
     expect(refreshResponse?.status()).toBe(200)
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Home')
   })
 
   test('sidebar navigation links work for all pages', async ({ page }) => {
@@ -79,17 +79,19 @@ test.describe('App pages (authenticated)', () => {
     const navLinks = [
       { label: 'Accounts', heading: 'Accounts' },
       { label: 'Transactions', heading: 'Transactions' },
-      // Consolidated IA: absorbed pages deep-link into their host page.
-      { label: 'Recurring', heading: 'Transactions' },
+      { label: 'Recurring', heading: 'Recurring' },
       { label: 'Budgets', heading: 'Budgets' },
       { label: 'Reports', heading: 'Reports' },
-      { label: 'Categories', heading: 'Settings' },
-      { label: 'Investments', heading: 'Accounts' },
+      { label: 'Categories', heading: 'Categories' },
+      { label: 'Investments', heading: 'Investments' },
       { label: 'Settings', heading: 'Settings' },
     ]
 
     for (const { label, heading } of navLinks) {
-      await page.getByRole('link', { name: label, exact: true }).click()
+      await page
+        .getByRole('navigation', { name: 'Desktop navigation' })
+        .getByRole('link', { name: label, exact: true })
+        .click()
       await expect(page.getByRole('heading', { level: 1 })).toContainText(heading)
     }
   })
@@ -111,40 +113,48 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByRole('button', { name: 'Add Transaction' }).first()).toBeVisible()
   })
 
-  test('recurring route shows the Transactions recurring segment', async ({ page }) => {
+  test('secondary pages support mobile navigation, refresh, Back, and desktop resizing', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 })
+    await page.goto('/app/dashboard')
+    const mobile = page.getByRole('navigation', { name: 'Mobile navigation' })
+    await expect(mobile.getByRole('link')).toHaveText([
+      'Home',
+      'Transactions',
+      'Budgets',
+      'Accounts',
+      'More',
+    ])
+    await mobile.getByRole('link', { name: 'More' }).click()
+    for (const label of ['Reports', 'Recurring', 'Investments', 'Categories', 'Settings']) {
+      await page
+        .getByRole('navigation', { name: 'More destinations' })
+        .getByRole('link', { name: label })
+        .click()
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(label)
+      await expect(mobile.getByRole('link', { name: 'More' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      )
+      await page.reload()
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(label)
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await expect(
+        page
+          .getByRole('navigation', { name: 'Desktop navigation' })
+          .getByRole('link', { name: label, exact: true }),
+      ).toHaveAttribute('aria-current', 'page')
+      await page.setViewportSize({ width: 320, height: 568 })
+      await page.goBack()
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('More')
+    }
     await page.goto('/app/recurring')
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Transactions')
-    await expect(page.getByRole('tab', { name: 'Recurring' })).toBeVisible()
-    await expect(page.getByText('No recurring transactions')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Add Recurring' })).toBeVisible()
-  })
-
-  test('segment tabs keep the URL and selected view in sync', async ({ page }) => {
-    await page.goto('/app/transactions')
-    await page.getByRole('tab', { name: 'Recurring' }).click()
-    await expect(page).toHaveURL(/\/app\/recurring$/)
-    await page.reload()
-    await expect(page.getByRole('tab', { name: 'Recurring' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
-
-    await page.getByRole('tab', { name: 'All' }).click()
-    await expect(page).toHaveURL(/\/app\/transactions$/)
-    await page.goBack()
-    await expect(page.getByRole('tab', { name: 'Recurring' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
-
-    await page.goto('/app/accounts')
-    await page.getByRole('tab', { name: 'Investments' }).click()
-    await expect(page).toHaveURL(/\/app\/investments$/)
-    await page.reload()
-    await expect(page.getByRole('tab', { name: 'Investments' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await page.getByRole('main').getByRole('link', { name: 'More', exact: true }).click()
+    await expect(page).toHaveURL(/\/app\/more$/)
+    await page.getByRole('button', { name: 'Add Transaction', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page).toHaveURL(/\/app\/transactions/)
   })
 
   test('budgets page shows empty state', async ({ page }) => {
@@ -161,10 +171,10 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByText('No data for this period')).toBeVisible()
   })
 
-  test('categories route shows the Settings categories section', async ({ page }) => {
+  test('categories route opens its own page', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 640 })
     await page.goto('/app/categories')
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Settings')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Categories')
     await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Expenses' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Income' })).toBeVisible()
@@ -177,9 +187,9 @@ test.describe('App pages (authenticated)', () => {
     expect(categoriesTop).toBeLessThan(200)
   })
 
-  test('investments route shows the Accounts investments segment', async ({ page }) => {
+  test('investments route opens its own page', async ({ page }) => {
     await page.goto('/app/investments')
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Accounts')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Investments')
     await expect(page.getByText('No investment plans yet')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add Investment' })).toBeVisible()
   })
@@ -189,7 +199,7 @@ test.describe('App pages (authenticated)', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Settings')
     await expect(page.getByText('Base Currency')).toBeVisible()
     await expect(page.getByText('Theme')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Categories' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Categories' })).toHaveCount(0)
     await expect(page.getByText('Data Management')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible()
     await expect(page.getByText('About Abacus')).toBeVisible()

@@ -8,7 +8,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useBudgetsStore } from '@/stores/budgetsStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import Accounts from '@/pages/Accounts'
-import CategoriesView from '@/pages/categories/CategoriesView'
+import Categories from '@/pages/Categories'
 import Transactions from '@/pages/Transactions'
 import Budgets from '@/pages/Budgets'
 
@@ -152,7 +152,7 @@ describe('Categories View', () => {
   })
 
   it('shows expense and income tabs', async () => {
-    renderWithRouter(<CategoriesView />)
+    renderWithRouter(<Categories />)
     await waitFor(() => {
       expect(screen.getByText('Expenses')).toBeInTheDocument()
       expect(screen.getByText('Income')).toBeInTheDocument()
@@ -160,7 +160,7 @@ describe('Categories View', () => {
   })
 
   it('has an add category button', async () => {
-    renderWithRouter(<CategoriesView />)
+    renderWithRouter(<Categories />)
     await waitFor(() => {
       expect(screen.getByText('Add Category')).toBeInTheDocument()
     })
@@ -177,7 +177,7 @@ describe('Categories View', () => {
       updated_at: new Date().toISOString(),
     })
 
-    renderWithRouter(<CategoriesView />)
+    renderWithRouter(<Categories />)
 
     await waitFor(() => {
       expect(screen.getByText('Food')).toBeInTheDocument()
@@ -196,7 +196,7 @@ describe('Categories View', () => {
       updated_at: new Date().toISOString(),
     })
 
-    renderWithRouter(<CategoriesView />)
+    renderWithRouter(<Categories />)
 
     await waitFor(() => {
       expect(screen.getByText('Income')).toBeInTheDocument()
@@ -233,7 +233,7 @@ describe('Categories View', () => {
       },
     )
 
-    renderWithRouter(<CategoriesView />)
+    renderWithRouter(<Categories />)
 
     await waitFor(() => {
       expect(screen.getByText('Food')).toBeInTheDocument()

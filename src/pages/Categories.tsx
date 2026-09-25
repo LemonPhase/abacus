@@ -50,7 +50,7 @@ function CategoryItem({
   return (
     <div>
       <div
-        className="flex items-center justify-between rounded-lg py-2 px-3 hover:bg-muted/50"
+        className="flex flex-wrap items-center justify-between gap-4 rounded-lg py-2 px-3 hover:bg-muted/50"
         style={{ paddingLeft: `${12 + level * 20}px` }}
       >
         <div className="flex items-center gap-3">
@@ -156,11 +156,7 @@ function CategoryList({
   )
 }
 
-/**
- * Category management as a self-contained Settings-style card, so it renders
- * inside the Settings page (mobile IA consolidation) and standalone.
- */
-export default function CategoriesView() {
+export default function Categories() {
   const categories = useCategoriesStore((s) => s.categories)
   const loading = useCategoriesStore((s) => s.loading)
   const load = useCategoriesStore((s) => s.load)
@@ -262,10 +258,10 @@ export default function CategoriesView() {
     : categories.filter((c) => c.type === form.type && !c.parentId)
 
   return (
-    <div className="rounded-xl border border-border/30 bg-card p-5 text-card-foreground space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="font-semibold tracking-tight">Categories</h2>
+          <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
           <p className="text-sm text-muted-foreground">
             Organize your income and expense categories.
           </p>
