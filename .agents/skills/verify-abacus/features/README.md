@@ -25,7 +25,7 @@ feature file as the recipe. Harness: the repo's Playwright suite (`e2e/`).
 
 - Capture the user action and the resulting state, not only the final screen.
 - UI proof includes an ARIA snapshot and a screenshot with the page identity (heading/nav) visible.
-- Mutation proof includes a read-only second view of the stored value (`userSupabase` select, or Mailpit for emails).
+- Mutation proof includes a read-only second view of the stored value (`userSupabase` select, or Mailpit for emails) — poll it; optimistic updates and dialog closes race the read-back.
 - Record the feature ID and entry route in every artifact filename using the `<feature>__<route>__<state>` template from the SKILL.md Evidence section.
 - Report an unreachable path with the attempted command and the unmet precondition.
 - Do not report a skipped entry point as verified through a different path (e.g. `/app/investments` is its own entry point, separate from `/app/accounts`).
