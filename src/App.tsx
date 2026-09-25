@@ -6,6 +6,8 @@ import { AuthProvider, AuthGuard } from '@/auth/auth'
 import ThemeProvider from '@/components/providers/ThemeProvider'
 import Sidebar from '@/components/layout/Sidebar'
 import MobileNav from '@/components/layout/MobileNav'
+import MobileMoreLink from '@/components/layout/MobileMoreLink'
+import More from '@/pages/More'
 import TopHeader from '@/components/layout/TopHeader'
 import FAB from '@/components/layout/FAB'
 import GlobalErrorBanner from '@/components/layout/GlobalErrorBanner'
@@ -22,6 +24,9 @@ import NotFound from '@/pages/NotFound'
 
 // Lazy-loaded routes — these pages use recharts (~400 KB) or are rarely visited.
 // Splitting them reduces the initial JS bundle significantly.
+const Investments = lazy(() => import('@/pages/Investments'))
+const RecurringTransactions = lazy(() => import('@/pages/RecurringTransactions'))
+const Categories = lazy(() => import('@/pages/Categories'))
 const Reports = lazy(() => import('@/pages/Reports'))
 const Settings = lazy(() => import('@/pages/Settings'))
 
@@ -43,6 +48,7 @@ function AppLayout() {
         <main className="flex-1 pb-20 md:pb-0">
           <div className="container mx-auto p-4 md:p-6 max-w-[1400px]">
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-200 ease-out">
+              <MobileMoreLink />
               <Suspense fallback={<PageFallback />}>
                 <Outlet />
               </Suspense>
@@ -76,13 +82,13 @@ export default function App() {
               <Route index element={<Navigate to="/app/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="accounts" element={<Accounts />} />
-              {/* Absorbed pages share a host; each host reads the URL to select its segment. */}
               <Route path="transactions" element={<Transactions />} />
-              <Route path="recurring" element={<Transactions />} />
+              <Route path="recurring" element={<RecurringTransactions />} />
               <Route path="budgets" element={<Budgets />} />
               <Route path="reports" element={<Reports />} />
-              <Route path="categories" element={<Settings />} />
-              <Route path="investments" element={<Accounts />} />
+              <Route path="categories" element={<Categories />} />
+              <Route path="investments" element={<Investments />} />
+              <Route path="more" element={<More />} />
               <Route path="settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>

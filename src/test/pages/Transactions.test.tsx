@@ -107,26 +107,18 @@ describe('Transactions Page', () => {
     expect(await screen.findByText('Click to upload a CSV file')).toBeInTheDocument()
   })
 
-  it('renders the recurring view when the Recurring segment is selected', async () => {
-    const { user } = renderWithRouter(<Transactions />)
-
+  it('links to recurring schedules and category management', async () => {
+    renderWithRouter(<Transactions />)
     await screen.findByText('Transactions')
-    await user.click(screen.getByRole('tab', { name: 'Recurring' }))
-
-    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
-    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/recurring')
-    expect(screen.getByRole('button', { name: 'Add Recurring' })).toBeInTheDocument()
-
-    await user.click(screen.getByRole('tab', { name: 'All' }))
-    expect(screen.getByTestId('pathname')).toHaveTextContent('/app/transactions')
-    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
-  })
-
-  it('renders the recurring view for the /app/recurring deep link', async () => {
-    renderWithRouter(<Transactions />, '/app/recurring')
-
-    expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Recurring' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('link', { name: 'Manage recurring transactions' })).toHaveAttribute(
+      'href',
+      '/app/recurring',
+    )
+    expect(screen.getByRole('link', { name: 'Manage categories' })).toHaveAttribute(
+      'href',
+      '/app/categories',
+    )
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument()
   })
 
   it('count line shows displayed rows of the unfiltered grand total', async () => {

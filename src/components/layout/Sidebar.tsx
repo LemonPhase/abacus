@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 
 import { NAV_LINKS } from '@/lib/navigation'
+import { NAV_ICONS } from './navigationIcons'
 import { cn } from '@/lib/utils'
 
 export default function Sidebar() {
@@ -20,25 +21,32 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 px-3 py-2">
-        {NAV_LINKS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/app/dashboard'}
-            className={({ isActive }) =>
-              cn(
-                'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
-              )
-            }
-          >
-            <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
-            {label}
-          </NavLink>
-        ))}
+      <nav
+        aria-label="Desktop navigation"
+        className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2"
+      >
+        {NAV_LINKS.map(({ to, label, icon, desktop }) => {
+          const Icon = NAV_ICONS[icon]
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/app/dashboard'}
+              className={({ isActive }) =>
+                cn(
+                  desktop === 'footer' && 'mt-auto border-t border-sidebar-border',
+                  'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200',
+                  isActive
+                    ? 'bg-sidebar-accent text-sidebar-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                )
+              }
+            >
+              <Icon className="size-4 shrink-0 transition-transform duration-200 group-hover:scale-110" />
+              {label}
+            </NavLink>
+          )
+        })}
       </nav>
     </aside>
   )

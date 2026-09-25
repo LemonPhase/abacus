@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import InvestmentsView from '@/pages/investments/InvestmentsView'
+import Investments from '@/pages/Investments'
 import { useInvestmentPlansStore } from '@/stores/investmentPlansStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
@@ -17,13 +17,13 @@ beforeEach(() => {
 
 describe('Investments View', () => {
   it('renders the action row', () => {
-    renderWithRouter(<InvestmentsView />)
+    renderWithRouter(<Investments />)
 
     expect(screen.getByRole('button', { name: 'Add Investment' })).toBeInTheDocument()
   })
 
   it('shows empty state when there are no plans', async () => {
-    renderWithRouter(<InvestmentsView />)
+    renderWithRouter(<Investments />)
 
     await waitFor(() => {
       expect(screen.getByText('No investment plans yet')).toBeInTheDocument()
@@ -36,7 +36,7 @@ describe('Investments View', () => {
   it('loads investment plans on mount', async () => {
     const loadPlans = vi.spyOn(useInvestmentPlansStore.getState(), 'load').mockResolvedValue()
 
-    renderWithRouter(<InvestmentsView />)
+    renderWithRouter(<Investments />)
 
     await waitFor(() => {
       expect(loadPlans).toHaveBeenCalled()

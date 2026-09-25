@@ -12,7 +12,7 @@ export default function NotFound() {
         The page you're looking for doesn't exist.
       </p>
       <Link to="/app/dashboard" className={cn(buttonVariants(), 'mt-6')}>
-        Go to dashboard
+        Go to Home
       </Link>
     </div>
   )

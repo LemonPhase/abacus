@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Loader2, Plus, Pencil, Trash2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,8 +35,6 @@ import {
   type TransactionFiltersValue,
 } from '@/pages/transactions/TransactionFilters'
 import { CsvImportDialog, type CsvMappedRow } from '@/pages/transactions/CsvImportDialog'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import RecurringTransactionsView from '@/pages/recurring/RecurringTransactionsView'
 
 function formatDate(d: Date) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -65,11 +63,7 @@ const emptyTxForm: TxFormData = {
   toAccountId: '',
 }
 
-/** Host page for all transactions and recurring schedules, selected by the URL. */
 export default function Transactions() {
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const tab = pathname === '/app/recurring' ? 'recurring' : 'all'
   const transactions = useTransactionsStore((s) => s.transactions)
   const loading = useTransactionsStore((s) => s.loading)
   const loadingMore = useTransactionsStore((s) => s.loadingMore)
@@ -407,45 +401,40 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
-          <p className="text-muted-foreground">
-            {tab === 'all'
-              ? 'Track your income and expenses.'
-              : 'Schedule bills and income that repeat automatically.'}
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+          <p className="text-muted-foreground">Track your income and expenses.</p>
         </div>
-        {tab === 'all' && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setCsvDialogOpen(true)}>
-              <Upload className="size-4" />
-              Import CSV
-            </Button>
-            <Button onClick={openAdd}>
-              <Plus className="size-4" />
-              Add Transaction
-            </Button>
-          </div>
-        )}
+
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCsvDialogOpen(true)}>
+            <Upload className="size-4" />
+            Import CSV
+          </Button>
+          <Button onClick={openAdd}>
+            <Plus className="size-4" />
+            Add Transaction
+          </Button>
+        </div>
       </div>
 
-      {/* All | Recurring — recurring lives here as a segment (mobile IA consolidation) */}
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          navigate(value === 'recurring' ? '/app/recurring' : '/app/transactions')
-        }
-      >
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="recurring">Recurring</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap gap-x-4">
+        <Link
+          to="/app/recurring"
+          className="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+        >
+          Manage recurring transactions
+        </Link>
+        <Link
+          to="/app/categories"
+          className="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
+        >
+          Manage categories
+        </Link>
+      </div>
 
-      {tab === 'recurring' ? (
-        <RecurringTransactionsView />
-      ) : loading ? (
+      {loading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="size-6 animate-spin text-muted-foreground" />
         </div>

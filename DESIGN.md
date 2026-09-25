@@ -358,11 +358,11 @@ A sticky 64px header bar at the top of the content area. Contains a search input
 
 ### Sidebar
 
-A fixed 14rem sidebar with the brand mark, "Abacus" wordmark, "Wealth Management" subtitle, and eight navigation links. Active links receive a warm accent background highlight. Inactive links use muted foreground text with hover highlighting. The sidebar uses warm paper background with a warm outline-variant right border.
+A fixed 14rem sidebar with the brand mark, "Abacus" wordmark, "Wealth Management" subtitle, and nine navigation links. Home, Transactions, Budgets, Accounts, Reports, Recurring, Investments, and Categories appear in that order. Settings is separated at the bottom. Active links receive a warm accent background highlight. Inactive links use muted foreground text with hover highlighting. The sidebar uses warm paper background with a warm outline-variant right border.
 
 ### Mobile Navigation
 
-A fixed bottom bar (64px) visible only on mobile. Eight navigation links with icons and labels. Active link uses primary text with a subtle background indicator. Background uses glass-effect blur over the card surface.
+A fixed bottom bar (64px) visible only on mobile. Five navigation links with icons and labels: Home, Transactions, Budgets, Accounts, and More. More opens a page of labeled rows for Reports, Recurring, Investments, Categories, and Settings. These destinations retain their own titles, content, and URLs at every screen size. More stays active on secondary destinations, which include an explicit mobile link back to More. Page tabs are reserved for views within the same task. Active link uses primary text with a subtle background indicator. Background uses glass-effect blur over the card surface.
 
 ### Floating Action Button (FAB)
 

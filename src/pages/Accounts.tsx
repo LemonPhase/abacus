@@ -1,10 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react'
 import { AccountDialog, type AccountFormData } from '@/pages/accounts/AccountDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
   DialogContent,
@@ -34,10 +33,6 @@ const TYPE_COLORS: Record<AccountType, string> = {
   cash: 'outline',
 }
 
-// Lazy: the embedded investments view pulls in recharts (~400 KB) — keep it
-// out of the main bundle exactly like the old standalone page route did.
-const InvestmentsView = lazy(() => import('@/pages/investments/InvestmentsView'))
-
 function ViewFallback() {
   return (
     <div className="flex justify-center py-12">
@@ -46,11 +41,7 @@ function ViewFallback() {
   )
 }
 
-/** Host page for accounts and investment plans, with the URL selecting the segment. */
 export default function Accounts() {
-  const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const tab = pathname === '/app/investments' ? 'investments' : 'accounts'
   const baseCurrency = useSettingsStore((s) => s.baseCurrency)
   const getEmptyForm = (): AccountFormData => ({
     name: '',
@@ -140,41 +131,26 @@ export default function Accounts() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Accounts</h1>
-          <p className="text-muted-foreground">
-            {tab === 'accounts'
-              ? 'Manage your financial accounts.'
-              : 'Plan and project your investment growth over time.'}
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
+          <p className="text-muted-foreground">Manage your financial accounts.</p>
         </div>
-        {tab === 'accounts' && (
-          <Button onClick={openAdd}>
-            <Plus className="size-4" />
-            Add Account
-          </Button>
-        )}
+
+        <Button onClick={openAdd}>
+          <Plus className="size-4" />
+          Add Account
+        </Button>
       </div>
 
-      {/* Accounts | Investments — investments live here as a segment (mobile IA consolidation) */}
-      <Tabs
-        value={tab}
-        onValueChange={(value) =>
-          navigate(value === 'investments' ? '/app/investments' : '/app/accounts')
-        }
+      <Link
+        to="/app/investments"
+        className="inline-flex min-h-11 items-center text-sm underline underline-offset-4"
       >
-        <TabsList>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
-          <TabsTrigger value="investments">Investments</TabsTrigger>
-        </TabsList>
-      </Tabs>
+        View investments
+      </Link>
 
-      {tab === 'investments' ? (
-        <Suspense fallback={<ViewFallback />}>
-          <InvestmentsView />
-        </Suspense>
-      ) : loading ? (
+      {loading ? (
         <ViewFallback />
       ) : accounts.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center text-muted-foreground">

@@ -18,17 +18,17 @@ feature file as the recipe. Harness: the repo's Playwright suite (`e2e/`).
 - Prefer ARIA roles and accessible names; fall back to the stable handles listed in the SKILL.md (dialog `data-slot`, input ids, row locators).
 - Treat every command as literal. Keep quoted names, labels, and routes unchanged. When a recipe contradicts the live app, adapt to the app AND report the drift as a skill issue — never patch the app to match the recipe.
 - Run all UI actions through the throwaway spec `e2e/verify-scratch-<slice>.spec.ts` (see SKILL.md Drive). Seed and read DB state only through `userSupabase`, using [\_seed-recipes.md](./_seed-recipes.md) for insert shapes.
-- Reports and Settings are lazy-loaded: wait for the `h1` heading, not just the URL.
+- Reports, Settings, Investments, Recurring, and Categories are lazy-loaded: wait for the `h1` heading, not just the URL.
 - Clean up fixtures after a mutation (the `test` fixture does this via user deletion). Never remove proof artifacts.
 
 ## Proof and skip reporting
 
 - Capture the user action and the resulting state, not only the final screen.
 - UI proof includes an ARIA snapshot and a screenshot with the page identity (heading/nav) visible.
-- Mutation proof includes a read-only second view of the stored value (`userSupabase` select, or Mailpit for emails).
+- Mutation proof includes a read-only second view of the stored value (`userSupabase` select, or Mailpit for emails) — poll it; optimistic updates and dialog closes race the read-back.
 - Record the feature ID and entry route in every artifact filename using the `<feature>__<route>__<state>` template from the SKILL.md Evidence section.
 - Report an unreachable path with the attempted command and the unmet precondition.
-- Do not report a skipped entry point as verified through a different path (e.g. `/app/investments` is its own entry point even though it shares the Accounts host).
+- Do not report a skipped entry point as verified through a different path (e.g. `/app/investments` is its own entry point, separate from `/app/accounts`).
 
 ## Feature entry contract
 
@@ -50,11 +50,10 @@ handles, required state, commands, and observable proof.
 ## Features
 
 - [Auth](./auth.md) — sign in, sign up, sign out, password reset, AuthGuard redirects.
-- [Accounts](./accounts.md) — account CRUD and the Investments segment sharing the Accounts host.
-- [Transactions](./transactions.md) — transaction CRUD, filters, pagination, and the Recurring segment.
+- [Navigation](./navigation.md) — desktop sidebar, mobile tab bar, the More page, and the Add Transaction FAB.
+- [Accounts](./accounts.md) — account CRUD and the standalone Investments page.
+- [Transactions](./transactions.md) — transaction CRUD, filters, pagination, and the standalone Recurring page.
 - [Budgets](./budgets.md) — budget CRUD with amount and period.
 - [Dashboard and Reports](./dashboard-reports.md) — net worth, income/expense cards, charts, category breakdown.
-
-Not yet mapped (drive from the pages directly until they get a file):
-Categories (Settings host, `/app/categories`), Settings incl. CSV export and
-base currency (`/app/settings`).
+- [Categories](./categories.md) — category CRUD, subcategories, and reordering.
+- [Settings](./settings.md) — base currency, theme, JSON export/import, sign-out.

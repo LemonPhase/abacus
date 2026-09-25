@@ -91,7 +91,7 @@ export default function ResetPassword() {
           </CardDescription>
           <CardFooter className="pt-2">
             <Button className="w-full" onClick={() => navigate('/app/dashboard')}>
-              Go to dashboard
+              Go to Home
             </Button>
           </CardFooter>
         </Card>

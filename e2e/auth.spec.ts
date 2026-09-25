@@ -55,7 +55,7 @@ publicTest.describe('Sign in', () => {
       await page.getByRole('button', { name: 'Sign In' }).click()
 
       await expect(page).toHaveURL(/\/app\/dashboard$/)
-      await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
+      await expect(page.getByRole('heading', { level: 1 })).toContainText('Home')
     } finally {
       await deleteTestUser(user.id)
     }
@@ -101,7 +101,7 @@ publicTest.describe('Sign up', () => {
       await page.getByRole('button', { name: 'Sign Up' }).click()
 
       await expect(page).toHaveURL(/\/app\/dashboard$/)
-      await expect(page.getByRole('heading', { level: 1 })).toContainText('Dashboard')
+      await expect(page.getByRole('heading', { level: 1 })).toContainText('Home')
     } finally {
       await deleteUserByEmail(email)
     }

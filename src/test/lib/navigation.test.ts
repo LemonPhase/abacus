@@ -1,44 +1,56 @@
 import { describe, it, expect } from 'vitest'
+import { NAV_LINKS, MOBILE_NAV_LINKS, MORE_LINKS, isMobileNavActive } from '@/lib/navigation'
 
-import { NAV_LINKS, MOBILE_NAV_LINKS } from '@/lib/navigation'
-
-describe('navigation config', () => {
-  it('desktop sidebar keeps the nine flat destinations', () => {
-    expect(NAV_LINKS.map((l) => l.to)).toEqual([
-      '/app/dashboard',
-      '/app/accounts',
-      '/app/transactions',
-      '/app/recurring',
-      '/app/budgets',
-      '/app/reports',
-      '/app/categories',
-      '/app/investments',
-      '/app/settings',
-    ])
-  })
-
-  it('mobile shows exactly the five approved tabs in order', () => {
-    expect(MOBILE_NAV_LINKS.map((l) => l.label)).toEqual([
+describe('navigation destinations', () => {
+  it('orders desktop destinations with Settings in the footer', () => {
+    expect(NAV_LINKS.map((link) => link.label)).toEqual([
       'Home',
       'Transactions',
       'Budgets',
       'Accounts',
+      'Reports',
+      'Recurring',
+      'Investments',
+      'Categories',
       'Settings',
     ])
-    expect(MOBILE_NAV_LINKS.map((l) => l.to)).toEqual([
-      '/app/dashboard',
-      '/app/transactions',
-      '/app/budgets',
-      '/app/accounts',
+    expect(NAV_LINKS.filter((link) => link.desktop === 'footer').map((link) => link.to)).toEqual([
       '/app/settings',
     ])
   })
 
-  it('maps absorbed routes to their host tab for active state', () => {
-    const byTo = new Map(MOBILE_NAV_LINKS.map((l) => [l.to, l]))
-    expect(byTo.get('/app/dashboard')?.activeOn).toContain('/app/reports')
-    expect(byTo.get('/app/transactions')?.activeOn).toContain('/app/recurring')
-    expect(byTo.get('/app/accounts')?.activeOn).toContain('/app/investments')
-    expect(byTo.get('/app/settings')?.activeOn).toContain('/app/categories')
+  it('shows four primary mobile destinations and More', () => {
+    expect(MOBILE_NAV_LINKS.map((link) => link.label)).toEqual([
+      'Home',
+      'Transactions',
+      'Budgets',
+      'Accounts',
+      'More',
+    ])
+    expect(MORE_LINKS.map((link) => link.label)).toEqual([
+      'Reports',
+      'Recurring',
+      'Investments',
+      'Categories',
+      'Settings',
+    ])
+  })
+
+  it.each([
+    '/app/reports',
+    '/app/recurring',
+    '/app/investments',
+    '/app/investments/',
+    '/app/categories',
+    '/app/settings',
+    '/app/more',
+  ])('selects only More for %s', (path) => {
+    expect(
+      MOBILE_NAV_LINKS.filter((link) => isMobileNavActive(link.to, path)).map((link) => link.label),
+    ).toEqual(['More'])
+  })
+
+  it('does not claim unknown routes by prefix', () => {
+    expect(isMobileNavActive('/app/more', '/app/reports-unknown')).toBe(false)
   })
 })

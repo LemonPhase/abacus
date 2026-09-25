@@ -13,8 +13,8 @@ or delete budgets in place. Budgets render as **cards**, not table rows.
 
 ## How to get to it (user POV)
 
-- Sidebar `Budgets` → `/app/budgets`.
-- The `Add Budget` button on the page (or the FAB on mobile).
+- Sidebar `Budgets` → `/app/budgets` (desktop sidebar, mobile bar tab).
+- The `Add Budget` button on the page. (The FAB is `Add Transaction` on every page — see [navigation](./navigation.md).)
 
 ## Driving it with Playwright
 
@@ -22,9 +22,9 @@ Preconditions:
 
 - Doctor reports `OK`. `test` user with at least one **expense** category seeded via `userSupabase` (see `../_seed-recipes.md`) so the dialog's category checkbox list is non-empty.
 
-The dialog (`[data-slot="dialog-content"]`, title `Add Budget` / `Edit Budget`) contains, in order: `input#budget-name`, a Period select (`Monthly` / `Yearly`), `input#budget-amount` (number) and `input#budget-date` (date, Start Date), then a **Categories checkbox list** (one checkbox per expense category, label text = category name). When creating with existing budgets present, a `Subtract from existing budget` checkbox and a select (placeholder `Select a budget...`) appear at the bottom — that select picks the _source budget to subtract from_, it is NOT the category picker.
+- The dialog (`[data-slot="dialog-content"]`, title `Add Budget` / `Edit Budget`) contains, in order: `input#budget-name`, a Period select (`Monthly` / `Yearly`), `input#budget-amount` (number) and `input#budget-date` (date, Start Date), then a **Categories checkbox list** (one checkbox per expense category, label text = category name). Required fields (`Name`, `Amount`, `Categories`) carry a `*` marker (aria-hidden); `Name` and `Amount` also expose `aria-required` — the `Categories` checkbox group has the marker only, no `aria-required`. When creating with existing budgets present, a `Subtract from existing budget` checkbox appears at the bottom; its source-budget select renders only once the checkbox is checked, preselecting the first existing budget (the `Select a budget...` placeholder never shows on this path — assert the trigger shows the budget's name). That select picks the _source budget to subtract from_, it is NOT the category picker.
 
-Budget cards: locate the card via its title heading, then the two icon buttons inside (first = edit Pencil, last = delete Trash2):
+Budget cards: locate the card via its title heading, then the two icon buttons inside — `Edit budget` (Pencil) and `Delete budget` (Trash2) — or by position (first/last):
 
 ```ts
 const card = page
@@ -42,9 +42,9 @@ const card = page
 ## Gotchas
 
 - Budgets are cards, not rows — there is no `<tr>` on `/app/budgets`. Never use the table row recipe here.
-- A budget needs **at least one category**: the form shows `Select at least one category.` and submit stays blocked without one. Check a category checkbox.
-- The `Select a budget...` placeholder belongs to the optional "Subtract from existing budget" source picker — ignore it for category selection.
+- A budget needs **at least one category**: once name and amount are filled with none checked the form shows `Select at least one category.`, and submit stays blocked without one. Check a category checkbox.
+- The `Select a budget...` placeholder belongs to the optional "Subtract from existing budget" source picker — ignore it for category selection (and don't wait for it: see the subtract-select note above).
 - The category list only contains **expense** categories; income categories never appear.
 - Budget bars animate (`transition-all duration-500`) — assert computed colors only after they settle, or you will read mid-transition values and report a false bug.
 - Edge copy: at exactly 0 remaining the summary reads `Over budget by $0` (known app issue) — assert the numbers, not that phrase.
-- The icon buttons on cards have no accessible names (bare `button` in the ARIA tree) — position (first/last) is the only stable handle until the app adds labels.
+- The card icon buttons expose `Edit budget` / `Delete budget` (not per-row names) — scope to the card first; position (first/last) also works.
