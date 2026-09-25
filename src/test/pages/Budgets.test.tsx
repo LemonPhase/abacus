@@ -117,3 +117,31 @@ describe('Budgets page — unconverted currency notice', () => {
     })
   })
 })
+
+describe('Budgets page — total budget usage copy', () => {
+  it('shows neutral copy when spend exactly equals the budget', async () => {
+    useBudgetsStore.setState({ budgets: [budgetFixture] })
+    useTransactionsStore.setState({
+      transactions: [
+        txnFixture({ id: 't1', amount: 120, baseAmount: 120 }),
+        txnFixture({ id: 't2', amount: 80, baseAmount: 80 }),
+      ],
+    })
+
+    renderWithRouter(<Budgets />)
+
+    expect(await screen.findByText('$0 remaining across all budgets')).toBeInTheDocument()
+    expect(screen.queryByText(/Over budget by/)).not.toBeInTheDocument()
+  })
+
+  it('keeps the over-budget copy when spend exceeds the budget', async () => {
+    useBudgetsStore.setState({ budgets: [budgetFixture] })
+    useTransactionsStore.setState({
+      transactions: [txnFixture({ id: 't1', amount: 250, baseAmount: 250 })],
+    })
+
+    renderWithRouter(<Budgets />)
+
+    expect(await screen.findByText('Over budget by $50')).toBeInTheDocument()
+  })
+})
