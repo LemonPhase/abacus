@@ -103,11 +103,19 @@ describe('BudgetList', () => {
     expect(screen.getByText('42% used')).toBeInTheDocument()
   })
 
-  it('shows "Over budget!" when percentage >= 100', () => {
+  it('shows "Over budget!" only when spend exceeds the budget amount', () => {
+    renderList({
+      computeProgress: vi.fn().mockReturnValue(makeProgress({ percentage: 110, spent: 550 })),
+    })
+    expect(screen.getByText('Over budget!')).toBeInTheDocument()
+  })
+
+  it('shows neutral copy at exact break-even', () => {
     renderList({
       computeProgress: vi.fn().mockReturnValue(makeProgress({ percentage: 100, spent: 500 })),
     })
-    expect(screen.getByText('Over budget!')).toBeInTheDocument()
+    expect(screen.getByText(`${formatCurrency(0, 'USD')} left`)).toBeInTheDocument()
+    expect(screen.queryByText('Over budget!')).not.toBeInTheDocument()
   })
 
   it('shows "X left" when percentage < 100', () => {

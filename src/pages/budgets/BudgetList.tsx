@@ -84,7 +84,7 @@ export function BudgetList({
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{progress.percentage.toFixed(0)}% used</span>
                 <span>
-                  {progress.percentage >= 100
+                  {progress.spent > budget.amount
                     ? 'Over budget!'
                     : `${formatCurrency(budget.amount - progress.spent, baseCurrency)} left`}
                 </span>
