@@ -159,6 +159,37 @@ describe('RecurringTransactionsView', () => {
     })
   })
 
+  it('exposes accessible names on row action buttons', async () => {
+    seedAccount()
+    getTable('recurring_transactions').push({
+      id: 'rt-1',
+      user_id: 'mock-user-id',
+      account_id: 'acc-1',
+      category_id: null,
+      type: 'expense',
+      amount: 50,
+      currency: 'USD',
+      description: 'Rent',
+      frequency: 'monthly',
+      interval_value: 1,
+      day_of_month: 1,
+      start_date: '2024-01-01',
+      end_date: null,
+      next_date: '2020-01-01',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Rent')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('Apply now')).toBeInTheDocument()
+    expect(screen.getByLabelText('Edit Rent')).toBeInTheDocument()
+    expect(screen.getByLabelText('Delete Rent')).toBeInTheDocument()
+  })
+
   it('shows Due now label for past-due items', async () => {
     seedAccount()
     getTable('recurring_transactions').push({

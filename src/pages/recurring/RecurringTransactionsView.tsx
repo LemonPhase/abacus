@@ -278,6 +278,7 @@ export default function RecurringTransactionsView() {
                             variant="ghost"
                             size="icon-xs"
                             title="Apply now"
+                            aria-label="Apply now"
                             onClick={() => setApplyTarget(item)}
                           >
                             <Play className="size-3" />
@@ -287,6 +288,7 @@ export default function RecurringTransactionsView() {
                           variant="ghost"
                           size="icon-xs"
                           title="Edit"
+                          aria-label={`Edit ${item.description ?? 'recurring transaction'}`}
                           onClick={() => openEdit(item)}
                         >
                           <Pencil className="size-3" />
@@ -295,6 +297,7 @@ export default function RecurringTransactionsView() {
                           variant="ghost"
                           size="icon-xs"
                           title="Delete"
+                          aria-label={`Delete ${item.description ?? 'recurring transaction'}`}
                           onClick={() => setDeleteTarget(item)}
                         >
                           <Trash2 className="size-3" />
