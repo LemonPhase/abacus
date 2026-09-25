@@ -466,8 +466,9 @@ export default function Dashboard() {
                   )}
                   <div className="space-y-3">
                     {budgetRows.slice(0, 4).map((b) => {
-                      const pct = b.amount > 0 ? Math.min((b.spent / b.amount) * 100, 100) : 0
-                      const colors = getBudgetColors(getBudgetStatus(pct))
+                      const rawPct = b.amount > 0 ? (b.spent / b.amount) * 100 : 0
+                      const colors = getBudgetColors(getBudgetStatus(rawPct))
+                      const pct = Math.min(rawPct, 100)
                       return (
                         <div key={b.id}>
                           <div className="flex items-center justify-between mb-1">

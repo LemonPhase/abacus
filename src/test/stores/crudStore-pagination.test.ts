@@ -87,6 +87,7 @@ describe('crudStore pagination', () => {
     expect(state.transactions).toHaveLength(50)
     expect(state.hasMore).toBe(true)
     expect(state.total).toBe(1200)
+    expect(state.grandTotal).toBe(1200)
   })
 
   it('loadMore appends pages without duplicates across tied dates', async () => {
@@ -125,6 +126,8 @@ describe('crudStore pagination', () => {
       true,
     )
     expect(useTransactionsStore.getState().total).toBe(600)
+    // The count line needs both: filtered total and the unfiltered grand total.
+    expect(useTransactionsStore.getState().grandTotal).toBe(1200)
 
     await store.loadMore()
     expect(useTransactionsStore.getState().transactions.every((t) => t.type === 'income')).toBe(

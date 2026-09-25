@@ -140,17 +140,17 @@ describe('RecurringDialog', () => {
 
   it('renders account select', () => {
     renderDialog()
-    expect(screen.getByText('Account')).toBeInTheDocument()
+    expect(screen.getByText(/^Account/, { selector: 'label' })).toBeInTheDocument()
   })
 
   it('renders category select', () => {
     renderDialog()
-    expect(screen.getByText('Category')).toBeInTheDocument()
+    expect(screen.getByText(/^Category/, { selector: 'label' })).toBeInTheDocument()
   })
 
   it('renders amount input', () => {
     renderDialog()
-    expect(screen.getByLabelText('Amount')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Amount/)).toBeInTheDocument()
   })
 
   it('renders description input', () => {
@@ -165,7 +165,21 @@ describe('RecurringDialog', () => {
 
   it('renders interval input', () => {
     renderDialog()
-    expect(screen.getByLabelText('Every')).toBeInTheDocument()
+    expect(screen.getByLabelText(/Every/)).toBeInTheDocument()
+  })
+
+  it('marks the submit-gated fields as required and the rest as optional', () => {
+    renderDialog()
+    const labelText = (name: string) =>
+      screen.getByText(new RegExp(`^${name}`), { selector: 'label' }).textContent ?? ''
+
+    expect(labelText('Account')).toContain('*')
+    expect(labelText('Category')).toContain('*')
+    expect(labelText('Amount')).toContain('*')
+    expect(labelText('Every')).toContain('*')
+    expect(labelText('Type')).not.toContain('*')
+    expect(labelText('Description')).not.toContain('*')
+    expect(screen.getByLabelText(/Amount/)).toHaveAttribute('aria-required', 'true')
   })
 
   it('renders start date input', () => {

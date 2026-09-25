@@ -253,7 +253,7 @@ export default function Budgets() {
             <div className="space-y-1">
               <h2 className="text-lg font-semibold">Total Budget Usage</h2>
               <p className="text-sm text-muted-foreground">
-                {totalBudgetProgress.percentage >= 100
+                {totalBudgetProgress.spent > totalBudgetProgress.total
                   ? `Over budget by ${formatCurrency(totalBudgetProgress.spent - totalBudgetProgress.total, baseCurrency)}`
                   : `${formatCurrency(totalBudgetProgress.total - totalBudgetProgress.spent, baseCurrency)} remaining across all budgets`}
               </p>

@@ -62,7 +62,8 @@ test.describe('Pagination over >1000 transactions', () => {
     expect(await rows.count()).toBe(100)
 
     // Deterministic pagination under tied dates: filter to income, then load
-    // another page — 100 distinct rows, no duplicates.
+    // another page — 100 distinct rows, no duplicates. The count line keeps
+    // showing the unfiltered grand total as its denominator.
     const filterBar = page.locator('.flex.flex-wrap.items-end.gap-3.rounded-xl.border.bg-card')
     await filterBar.locator('[data-slot="select-trigger"]').nth(2).click()
     await expect(page.locator('[data-slot="select-content"][data-open]')).toBeVisible()
@@ -70,10 +71,10 @@ test.describe('Pagination over >1000 transactions', () => {
       .locator('[data-slot="select-content"][data-open] [data-slot="select-item"]')
       .filter({ hasText: 'Income' })
       .click()
-    await expect(page.getByText('Showing 50 of 525 transactions')).toBeVisible()
+    await expect(page.getByText('Showing 50 of 1050 transactions')).toBeVisible()
 
     await page.getByRole('button', { name: 'Load more' }).click()
-    await expect(page.getByText('Showing 100 of 525 transactions')).toBeVisible()
+    await expect(page.getByText('Showing 100 of 1050 transactions')).toBeVisible()
     const descriptions = await page.locator('table tbody tr').allInnerTexts()
     const ids = descriptions.map((d) => d.match(/#(\d{5})/)?.[1])
     expect(new Set(ids).size).toBe(100)

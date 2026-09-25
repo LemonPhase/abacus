@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ICON_MAP } from '@/lib/icons'
+import { RequiredMark } from '@/components/RequiredMark'
 import type { Budget, BudgetPeriod, Category } from '@/types'
 
 export interface BudgetFormData {
@@ -73,9 +74,12 @@ export function BudgetDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="budget-name">Name</Label>
+            <Label htmlFor="budget-name">
+              Name <RequiredMark />
+            </Label>
             <Input
               id="budget-name"
+              aria-required="true"
               value={form.name}
               onChange={(e) => onFormChange({ ...form, name: e.target.value })}
               placeholder="e.g. Monthly Food"
@@ -107,9 +111,12 @@ export function BudgetDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="budget-amount">Amount</Label>
+              <Label htmlFor="budget-amount">
+                Amount <RequiredMark />
+              </Label>
               <Input
                 id="budget-amount"
+                aria-required="true"
                 type="number"
                 step="0.01"
                 min="0"
@@ -129,7 +136,9 @@ export function BudgetDialog({
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Categories</Label>
+            <Label>
+              Categories <RequiredMark />
+            </Label>
             <div className="max-h-48 overflow-y-auto rounded-lg border p-3 space-y-1">
               {expenseCategories.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No expense categories available.</p>

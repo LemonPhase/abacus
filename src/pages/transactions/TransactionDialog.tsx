@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { RequiredMark } from '@/components/RequiredMark'
 import type { Account, Category, TransactionKind } from '@/types'
 
 const TRANSACTION_TYPES: TransactionKind[] = ['income', 'expense', 'transfer']
@@ -89,13 +90,15 @@ export function TransactionDialog({
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label>Account {form.type === 'transfer' ? '(From)' : ''}</Label>
+            <Label>
+              {form.type === 'transfer' ? 'Account (From)' : 'Account'} <RequiredMark />
+            </Label>
             <Select
               value={form.accountId}
               onValueChange={(v) => onFormChange({ ...form, accountId: v ?? '' })}
               items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
             >
-              <SelectTrigger>
+              <SelectTrigger aria-required="true">
                 <SelectValue placeholder="Select account" />
               </SelectTrigger>
               <SelectContent>
@@ -109,13 +112,15 @@ export function TransactionDialog({
           </div>
           {form.type === 'transfer' && (
             <div className="grid gap-2">
-              <Label>Account (To)</Label>
+              <Label>
+                Account (To) <RequiredMark />
+              </Label>
               <Select
                 value={form.toAccountId}
                 onValueChange={(v) => onFormChange({ ...form, toAccountId: v ?? '' })}
                 items={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-required="true">
                   <SelectValue placeholder="Select destination account" />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,7 +149,7 @@ export function TransactionDialog({
             </div>
           )}
           <div className="grid gap-2">
-            <Label>Category{form.type === 'transfer' ? ' (optional)' : ''}</Label>
+            <Label>Category</Label>
             <Select
               value={form.categoryId}
               onValueChange={(v) => onFormChange({ ...form, categoryId: v ?? '' })}
@@ -168,9 +173,12 @@ export function TransactionDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">
-              <Label htmlFor="tx-amount">Amount</Label>
+              <Label htmlFor="tx-amount">
+                Amount <RequiredMark />
+              </Label>
               <Input
                 id="tx-amount"
+                aria-required="true"
                 type="number"
                 step="0.01"
                 min="0"
@@ -209,10 +217,7 @@ export function TransactionDialog({
           <Button
             onClick={onSave}
             disabled={
-              !form.accountId ||
-              (!form.categoryId && form.type !== 'transfer') ||
-              !form.amount ||
-              (form.type === 'transfer' && !form.toAccountId)
+              !form.accountId || !form.amount || (form.type === 'transfer' && !form.toAccountId)
             }
           >
             {editing ? 'Save' : 'Add Transaction'}

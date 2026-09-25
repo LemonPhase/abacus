@@ -11,7 +11,7 @@ import { useCategoriesStore } from '@/stores/categoriesStore'
 import { useTransactionsStore } from '@/stores/transactionsStore'
 import { useRecurringTransactionsStore } from '@/stores/recurringTransactionsStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import type { Account, Category } from '@/types'
+import type { Account, Category, Transaction } from '@/types'
 
 function RoutePath() {
   return <output data-testid="pathname">{useLocation().pathname}</output>
@@ -51,12 +51,40 @@ const categoryFixture: Category = {
   updatedAt: new Date(),
 }
 
+function txFixture(overrides: Partial<Transaction> = {}): Transaction {
+  return {
+    id: 'tx-1',
+    accountId: 'acc-1',
+    categoryId: 'cat-1',
+    type: 'expense',
+    amount: 10,
+    currency: 'USD',
+    baseAmount: 10,
+    baseCurrency: 'USD',
+    fxRate: null,
+    fxDate: null,
+    baseAmountStale: false,
+    date: new Date('2026-05-01'),
+    description: 'Test row',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+}
+
 beforeEach(() => {
   localStorage.clear()
   useSettingsStore.getState().reset()
   useAccountsStore.setState({ accounts: [], loading: false, error: null, _unsub: null })
   useCategoriesStore.setState({ categories: [], loading: false, error: null, _unsub: null })
-  useTransactionsStore.setState({ transactions: [], loading: false, error: null, _unsub: null })
+  useTransactionsStore.setState({
+    transactions: [],
+    loading: false,
+    error: null,
+    total: null,
+    grandTotal: null,
+    _unsub: null,
+  })
   useRecurringTransactionsStore.setState({ items: [], loading: false, error: null, _unsub: null })
 })
 
@@ -67,7 +95,7 @@ describe('Transactions Page', () => {
     await screen.findByText('Transactions')
     await user.click(screen.getByRole('button', { name: 'Add Transaction' }))
 
-    expect(await screen.findByLabelText('Amount')).toBeInTheDocument()
+    expect(await screen.findByLabelText(/Amount/)).toBeInTheDocument()
   })
 
   it('opens the CSV import dialog', async () => {
@@ -99,6 +127,21 @@ describe('Transactions Page', () => {
 
     expect(await screen.findByText('No recurring transactions')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Recurring' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('count line shows displayed rows of the unfiltered grand total', async () => {
+    useTransactionsStore.setState({
+      // Two rows on screen while the table holds three — e.g. one filtered out.
+      transactions: [txFixture({ id: 'tx-1' }), txFixture({ id: 'tx-2', description: 'Other' })],
+      total: 2,
+      grandTotal: 3,
+      load: vi.fn().mockResolvedValue(undefined),
+      loadMore: vi.fn().mockResolvedValue(undefined),
+    })
+
+    renderWithRouter(<Transactions />)
+
+    expect(await screen.findByText('Showing 2 of 3 transactions')).toBeInTheDocument()
   })
 })
 
@@ -147,6 +190,11 @@ describe('TransactionFilters', () => {
 })
 
 describe('TransactionDialog', () => {
+  /** Label text content (including the required marker) for the label matching `name`. */
+  function labelText(name: RegExp) {
+    return screen.getByText(name, { selector: 'label' }).textContent ?? ''
+  }
+
   it('disables save when required fields are missing', () => {
     render(
       <TransactionDialog
@@ -170,6 +218,91 @@ describe('TransactionDialog', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeDisabled()
+  })
+
+  it('enables save without a category (category is optional)', () => {
+    render(
+      <TransactionDialog
+        open
+        editing={false}
+        form={{
+          accountId: 'acc-1',
+          categoryId: '',
+          type: 'expense',
+          amount: '12.34',
+          date: '2026-05-01',
+          description: '',
+          toAccountId: '',
+        }}
+        accounts={[accountFixture]}
+        categories={[categoryFixture]}
+        onOpenChange={vi.fn()}
+        onFormChange={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Add Transaction' })).toBeEnabled()
+  })
+
+  it('marks required fields with * and leaves optional fields unmarked', () => {
+    render(
+      <TransactionDialog
+        open
+        editing={false}
+        form={{
+          accountId: 'acc-1',
+          categoryId: '',
+          type: 'expense',
+          amount: '12.34',
+          date: '2026-05-01',
+          description: '',
+          toAccountId: '',
+        }}
+        accounts={[accountFixture]}
+        categories={[categoryFixture]}
+        onOpenChange={vi.fn()}
+        onFormChange={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+
+    expect(labelText(/^Account/)).toContain('*')
+    expect(labelText(/^Amount/)).toContain('*')
+    expect(labelText(/^Type/)).not.toContain('*')
+    expect(labelText(/^Category/)).not.toContain('*')
+    expect(labelText(/^Date/)).not.toContain('*')
+    expect(labelText(/^Description/)).not.toContain('*')
+    // Decorative markers; requiredness is announced via aria-required.
+    for (const mark of screen.getAllByText('*', { selector: 'span' })) {
+      expect(mark).toHaveAttribute('aria-hidden', 'true')
+    }
+    expect(screen.getByLabelText(/Amount/)).toHaveAttribute('aria-required', 'true')
+  })
+
+  it('marks the transfer destination as required only for transfers', () => {
+    render(
+      <TransactionDialog
+        open
+        editing={false}
+        form={{
+          accountId: 'acc-1',
+          categoryId: '',
+          type: 'transfer',
+          amount: '12.34',
+          date: '2026-05-01',
+          description: '',
+          toAccountId: '',
+        }}
+        accounts={[accountFixture, { ...accountFixture, id: 'acc-2', name: 'Savings' }]}
+        categories={[categoryFixture]}
+        onOpenChange={vi.fn()}
+        onFormChange={vi.fn()}
+        onSave={vi.fn()}
+      />,
+    )
+
+    expect(labelText(/^Account \(To\)/)).toContain('*')
   })
 
   it('disables save for transfers when toAccountId is missing', () => {

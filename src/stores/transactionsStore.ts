@@ -95,6 +95,8 @@ interface TransactionsState {
   loadingMore: boolean
   hasMore: boolean
   total: number | null
+  /** Unfiltered row count — the denominator of the transactions count line. */
+  grandTotal: number | null
   add: (data: NewTransaction) => Promise<Transaction>
   bulkAdd: (data: NewTransaction[]) => Promise<Transaction[]>
   update: (id: string, data: Partial<NewTransaction>) => Promise<void>

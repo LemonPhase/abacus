@@ -45,10 +45,20 @@ export function BudgetList({
                 </p>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon-xs" onClick={() => onEdit(budget)}>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Edit budget"
+                  onClick={() => onEdit(budget)}
+                >
                   <Pencil className="size-3" />
                 </Button>
-                <Button variant="ghost" size="icon-xs" onClick={() => onDelete(budget)}>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Delete budget"
+                  onClick={() => onDelete(budget)}
+                >
                   <Trash2 className="size-3" />
                 </Button>
               </div>
@@ -74,7 +84,7 @@ export function BudgetList({
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{progress.percentage.toFixed(0)}% used</span>
                 <span>
-                  {progress.percentage >= 100
+                  {progress.spent > budget.amount
                     ? 'Over budget!'
                     : `${formatCurrency(budget.amount - progress.spent, baseCurrency)} left`}
                 </span>

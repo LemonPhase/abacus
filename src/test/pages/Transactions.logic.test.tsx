@@ -145,7 +145,7 @@ async function openTransferDialog(user: ReturnType<typeof userEvent.setup>) {
   await user.click(updated[3])
   await user.click(await screen.findByRole('option', { name: 'Transfers' }))
 
-  const amountInput = within(dialog).getByLabelText('Amount')
+  const amountInput = within(dialog).getByLabelText(/Amount/)
   await user.clear(amountInput)
   await user.type(amountInput, '125')
   await user.type(within(dialog).getByLabelText('Description'), 'Move funds')
@@ -221,7 +221,7 @@ describe('Transactions transfer logic', () => {
     await user.click(within(row).getAllByRole('button')[0])
 
     const dialog = await screen.findByRole('dialog')
-    const amountInput = within(dialog).getByLabelText('Amount')
+    const amountInput = within(dialog).getByLabelText(/Amount/)
     await user.clear(amountInput)
     await user.type(amountInput, '200')
 
@@ -254,11 +254,7 @@ describe('Transactions transfer logic', () => {
     await user.click(comboboxes[0])
     await user.click(await screen.findByRole('option', { name: 'Expense' }))
 
-    // Type change resets the category; pick one so validation passes.
-    const updatedComboboxes = within(dialog).getAllByRole('combobox')
-    await user.click(updatedComboboxes[2])
-    await user.click(await screen.findByRole('option', { name: 'Transfers' }))
-
+    // Type change resets the category — it is optional, so save straight away.
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
@@ -270,6 +266,7 @@ describe('Transactions transfer logic', () => {
         newType: 'expense',
         amount: 125,
         accountId: accountFixture.id,
+        categoryId: null,
       }),
     )
   })

@@ -129,6 +129,9 @@ describe('RecurringTransactionsView', () => {
       expect(screen.getByText('Netflix')).toBeInTheDocument()
     })
     expect(screen.getByText(/Monthly/)).toBeInTheDocument()
+    // not due until 2099 — no Apply action, but named row actions exist
+    expect(screen.queryByLabelText(/Apply now/)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Edit Netflix')).toBeInTheDocument()
   })
 
   it('shows paused label for inactive items', async () => {
@@ -157,6 +160,37 @@ describe('RecurringTransactionsView', () => {
     await waitFor(() => {
       expect(screen.getByText('Paused')).toBeInTheDocument()
     })
+  })
+
+  it('exposes accessible names on row action buttons', async () => {
+    seedAccount()
+    getTable('recurring_transactions').push({
+      id: 'rt-1',
+      user_id: 'mock-user-id',
+      account_id: 'acc-1',
+      category_id: null,
+      type: 'expense',
+      amount: 50,
+      currency: 'USD',
+      description: 'Rent',
+      frequency: 'monthly',
+      interval_value: 1,
+      day_of_month: 1,
+      start_date: '2024-01-01',
+      end_date: null,
+      next_date: '2020-01-01',
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByText('Rent')).toBeInTheDocument()
+    })
+    expect(screen.getByLabelText('Apply now Rent')).toBeInTheDocument()
+    expect(screen.getByLabelText('Edit Rent')).toBeInTheDocument()
+    expect(screen.getByLabelText('Delete Rent')).toBeInTheDocument()
   })
 
   it('shows Due now label for past-due items', async () => {
