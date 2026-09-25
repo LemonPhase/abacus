@@ -15,8 +15,9 @@ and multi-currency-aware.
 
 ## How to get to it (user POV)
 
-- Sidebar `Dashboard` → `/app/dashboard` (default landing after sign-in).
-- Sidebar `Reports` → `/app/reports` (lazy-loaded).
+- Nav link `Home` → `/app/dashboard` (default landing after sign-in; the page `h1` is `Home`, not `Dashboard`).
+- Nav link `Reports` → `/app/reports` (lazy-loaded; on mobile it is under `More`).
+- The mobile-only `Full reports` link on the Dashboard → `/app/reports`.
 
 ## Driving it with Playwright
 
@@ -28,13 +29,13 @@ Preconditions:
 - **Income / Expenses cards.** `page.locator('.rounded-xl', { hasText: /^Income/ }).first()` and `/^Expenses/` show seeded sums. Screenshot `dash-<id>-cards.png`.
 - **Charts.** `Income vs Expenses` is visible and `No transaction data yet` is NOT; `page.locator('.recharts-wrapper').first()` is visible. `Spending by Category` shows `Rent` and `Groceries` legend entries. Screenshot `dash-<id>-charts.png`.
 - **Recent transactions.** `Recent Transactions` lists `Monthly salary`.
-- **Reports.** Run `await page.goto('/app/reports')` and wait for the `h1` (lazy chunk). `Income` is visible and the recharts wrappers render. Screenshot `reports-<id>-charts.png`.
+- **Reports.** Run `await page.goto('/app/reports')` and wait for the `h1` (lazy chunk). `Income` is visible (use `.first()` — the Category Breakdown table has a second `Income` header) and the recharts wrappers render (2 on data). Screenshot `reports-<id>-charts.png`.
 - **Side effect.** All figures must match a read-only recount from `userSupabase` (`transactions`, `accounts`) within the shown rounding.
 
 ## Gotchas
 
 - Reports/Settings chunks are lazy — URL change alone does not mean render. Wait for the heading.
 - Card locators match by text prefix (`.rounded-xl` + `hasText`) — always `.first()` to avoid nested cards.
-- Charts mount empty before data arrives (`No transaction data yet` state) — assert the empty-state text is gone before snapshotting.
-- Charts animate on data arrival — capture and assert computed state after they settle (≤500ms).
+- Charts don't mount empty: the whole chart block is gated behind the loading spinner. `No transaction data yet` renders only after loading completes with zero data (Reports' empty state is `No data for this period`).
+- Charts run recharts' default (~1500ms) animation — no chart sets animation props — so wait ≥1600ms after data renders before snapshotting computed state.
 - Base currency (Settings) converts amounts; if the user changed it, computed expectations change with it.

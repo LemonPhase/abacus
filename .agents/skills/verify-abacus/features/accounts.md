@@ -1,9 +1,10 @@
 # Accounts
 
 Accounts lets a user track money by account (checking, savings, credit,
-investment, cash) with a name, type, currency, and opening balance. The
-Investments segment shares the same page host and shows projection tools for
-investment-type accounts.
+investment, cash) with a name, type, currency, and opening balance.
+Investments is a standalone page at `/app/investments` with projection tools
+for investment plans (compound-growth projections — not accounts of type
+`investment`).
 
 ## Sub-features
 
@@ -11,13 +12,14 @@ investment-type accounts.
 - `accounts-edit` renames or changes an account in place.
 - `accounts-delete` removes an account behind a confirm dialog.
 - `accounts-empty` shows the empty state when none exist.
-- `accounts-investments` is the Investments segment at its own entry point.
+- `accounts-investments` opens the standalone Investments page at its own entry point.
 
 ## How to get to it (user POV)
 
-- Sidebar `Accounts` → `/app/accounts`.
-- Sidebar `Investments` → `/app/investments` (same host, selected segment).
-- The `Add Account` button on the page (or the FAB on mobile).
+- Sidebar `Accounts` → `/app/accounts` (desktop sidebar, mobile bar tab).
+- Sidebar `Investments` → `/app/investments` (desktop sidebar; on mobile it is under `More`).
+- The `View investments` link on the Accounts page → `/app/investments`.
+- The `Add Account` button on the page. (The FAB is `Add Transaction` on every page — see [navigation](./navigation.md).)
 
 ## Driving it with Playwright
 
@@ -30,11 +32,11 @@ Preconditions:
 - **Side effect.** Read the row back: `(await userSupabase.from('accounts').select('name, balance').eq('name', 'Main Checking')).data` has exactly one row with `balance: 2500`.
 - **Edit.** In `page.locator('tr', { hasText: 'Main Checking' })` choose the Pencil (`.locator('button').first()`), fill `acct-name` with `Main Checking Updated`, choose `Save`. `Main Checking Updated` is visible. Screenshot `accounts-<id>-edited.png`.
 - **Delete.** In the updated row choose the Trash (`.locator('button').last()`), confirm `Delete` in the dialog titled `Delete Account`. `No accounts yet` returns. Screenshot `accounts-<id>-deleted.png`.
-- **Investments entry.** Run `await page.goto('/app/investments')`. The Investments segment renders on the Accounts host. Screenshot `accounts-<id>-investments.png`.
+- **Investments entry.** Run `await page.goto('/app/investments')`. The standalone Investments page renders with its own `h1` `Investments` (a fresh user also shows `No investment plans yet`). Screenshot `accounts-<id>-investments.png`.
 
 ## Gotchas
 
-- Row buttons have icon-only labels — use position within the row (first/last), but scope to the row matched by text first.
-- Type defaults to Checking and currency to USD in the dialog; don't assume the dropdowns need driving.
+- Row buttons expose accessible names `Edit <name>` / `Delete <name>`; position within the row (first = edit, last = delete) also works — scope to the row matched by text first.
+- Type defaults to Checking; currency defaults to the Settings base currency (USD for a fresh user) — don't assume the dropdowns need driving.
 - The dialog submit button shares its name (`Add Account`) with the page opener — always scope it under `[data-slot="dialog-content"]`.
 - `/app/investments` is a separate entry point in the map: verifying `/app/accounts` does not cover it.
